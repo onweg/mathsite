@@ -14,7 +14,7 @@ export function Weekly() {
       <motion.div
         aria-hidden
         style={{ y: yBig, rotate }}
-        className="pointer-events-none absolute -left-10 top-10 font-display text-[26rem] italic leading-none text-paper-50/[0.03] md:text-[36rem]"
+        className="pointer-events-none absolute -left-10 top-10 select-none font-display text-[26rem] italic leading-none text-paper-50/[0.03] md:text-[36rem]"
       >
         03
       </motion.div>

@@ -1,5 +1,5 @@
-import { motion, useScroll, useTransform } from 'framer-motion'
-import { useRef } from 'react'
+import { motion, useMotionValue, useScroll, useSpring, useTransform } from 'framer-motion'
+import { useRef, useState } from 'react'
 import { Reveal, RevealText } from '../components/RevealText'
 
 const classes = [
@@ -37,7 +37,7 @@ export function Classes() {
         <header className="mb-20 flex flex-col items-start justify-between gap-8 md:flex-row md:items-end">
           <h2 className="max-w-3xl font-display text-[clamp(2.4rem,5.5vw,6rem)] font-light leading-[0.95] tracking-tight">
             <RevealText as="span" className="block">Три</RevealText>
-            <RevealText as="span" className="block italic text-azure-500" delay={0.1}>
+            <RevealText as="span" className="block italic text-sage-500" delay={0.1}>
               потока
             </RevealText>
           </h2>
@@ -60,36 +60,62 @@ export function Classes() {
 
 function ClassRow({ data, index }: { data: typeof classes[number]; index: number }) {
   const ref = useRef<HTMLDivElement>(null)
-  const parallax = useRef<HTMLDivElement>(null)
-  const img = useRef<HTMLDivElement>(null)
+  const [hovered, setHovered] = useState(false)
+
+  // плавное догоняние курсора через spring — число не телепортируется, а едет за курсором
+  const x = useMotionValue(0)
+  const y = useMotionValue(0)
+  const sx = useSpring(x, { stiffness: 90, damping: 20, mass: 0.6 })
+  const sy = useSpring(y, { stiffness: 90, damping: 20, mass: 0.6 })
 
   const handleMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const el = ref.current
-    if (!el || !parallax.current) return
+    if (!el) return
     const r = el.getBoundingClientRect()
-    parallax.current.style.left = `${e.clientX - r.left}px`
-    parallax.current.style.top = `${e.clientY - r.top}px`
+    x.set(e.clientX - r.left)
+    y.set(e.clientY - r.top)
+  }
+
+  const handleEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = ref.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const px = e.clientX - r.left
+    const py = e.clientY - r.top
+    // телепортируем и исходное значение, и spring-выход — иначе цифра поедет
+    // с прошлой позиции через всю строку
+    x.jump(px)
+    y.jump(py)
+    sx.jump(px)
+    sy.jump(py)
+    setHovered(true)
   }
 
   return (
     <motion.div
       ref={ref}
       onMouseMove={handleMove}
+      onMouseEnter={handleEnter}
+      onMouseLeave={() => setHovered(false)}
       data-cursor="lg"
       data-cursor-label={data.name}
       initial={{ opacity: 0, y: 40 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-10% 0px' }}
       transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: index * 0.08 }}
-      className="group relative grid cursor-none grid-cols-12 items-center gap-6 overflow-hidden py-10 md:py-14"
+      className="group relative grid cursor-none select-none grid-cols-12 items-center gap-6 overflow-hidden py-10 md:py-14"
     >
-      <div
-        ref={parallax}
+      <motion.div
         aria-hidden
-        className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 font-display text-[18vw] italic leading-none text-gold-500/0 transition-colors duration-700 group-hover:text-gold-500/90"
+        style={{ x: sx, y: sy, willChange: 'transform' }}
+        animate={{ opacity: hovered ? 1 : 0 }}
+        transition={{ duration: hovered ? 0.5 : 0.25, ease: [0.22, 1, 0.36, 1] }}
+        className="pointer-events-none absolute left-0 top-0"
       >
-        {data.k}
-      </div>
+        <span className="block -translate-x-1/2 -translate-y-1/2 font-display text-[18vw] italic leading-none text-gold-500/90">
+          {data.k}
+        </span>
+      </motion.div>
 
       <span className="col-span-2 font-mono text-[11px] uppercase tracking-[0.3em] text-paper-50/50 md:col-span-1">
         {data.k}

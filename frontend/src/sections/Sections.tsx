@@ -7,7 +7,7 @@ type Item = {
   title: string
   tag: string
   desc: string
-  accent?: 'gold' | 'azure'
+  accent?: 'gold' | 'sage'
 }
 
 const items: Item[] = [
@@ -23,7 +23,7 @@ const items: Item[] = [
     title: 'ИИ-теоретик',
     tag: 'Чат · Голос',
     desc: 'Чат на каждой странице. Скажи «ии, вопрос» — слушаю. «ии, ответь» — отвечаю. Контекст темы не теряется.',
-    accent: 'azure',
+    accent: 'sage',
   },
   {
     num: '03',
@@ -37,7 +37,7 @@ const items: Item[] = [
     title: 'Вклад в оценку',
     tag: 'Тесты · Задачи',
     desc: 'Домашка, которая считается. Задача → решение → проверка. Тест → ответ → мгновенный разбор ошибки.',
-    accent: 'azure',
+    accent: 'sage',
   },
   {
     num: '05',
@@ -51,7 +51,7 @@ const items: Item[] = [
     title: 'Наше творчество',
     tag: 'Галерея',
     desc: 'Работы учеников, фото с олимпиад, кусочки уроков. Доска почёта, которая живёт.',
-    accent: 'azure',
+    accent: 'sage',
   },
 ]
 
@@ -111,8 +111,8 @@ function Card({ item, index }: { item: Item; index: number }) {
     el.style.transform = 'perspective(900px) rotateX(0) rotateY(0)'
   }
 
-  const accentText = item.accent === 'azure' ? 'text-azure-500' : 'text-gold-500'
-  const accentBg = item.accent === 'azure' ? 'bg-azure-500' : 'bg-gold-500'
+  const accentText = item.accent === 'sage' ? 'text-sage-500' : 'text-gold-500'
+  const accentBg = item.accent === 'sage' ? 'bg-sage-500' : 'bg-gold-500'
 
   return (
     <motion.div
@@ -136,7 +136,10 @@ function Card({ item, index }: { item: Item; index: number }) {
             <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/50">
               {item.tag}
             </span>
-            <span className={`font-display text-5xl italic ${accentText}`}>
+            <span
+              className={`inline-block select-none pl-2 pr-1 font-display text-5xl italic leading-[1.1] ${accentText}`}
+              style={{ willChange: 'transform', transform: 'translateZ(0)' }}
+            >
               {item.num}
             </span>
           </div>

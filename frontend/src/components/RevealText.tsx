@@ -33,7 +33,7 @@ export function RevealText({
   return (
     <Comp
       ref={ref}
-      className={`inline-block ${className}`}
+      className={`inline-block select-none ${className}`}
       aria-label={children}
     >
       <span className="sr-only">{children}</span>

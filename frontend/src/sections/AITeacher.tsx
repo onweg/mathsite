@@ -23,7 +23,7 @@ export function AITeacher() {
           </div>
           <h2 className="font-display text-[clamp(2.4rem,5.5vw,6rem)] font-light leading-[0.95] tracking-tight">
             <RevealText as="span" className="block">Голосом,</RevealText>
-            <RevealText as="span" className="block italic text-azure-500" delay={0.1}>
+            <RevealText as="span" className="block italic text-sage-500" delay={0.1}>
               как с учителем
             </RevealText>
             <RevealText as="span" className="block" delay={0.2}>
@@ -79,7 +79,7 @@ export function AITeacher() {
           <motion.div
             aria-hidden
             style={{ y: yFloat }}
-            className="pointer-events-none absolute -right-10 -top-10 font-display text-[9rem] italic leading-none text-azure-500/20"
+            className="pointer-events-none absolute -right-10 -top-10 font-display text-[9rem] italic leading-none text-sage-500/20"
           >
             ∑
           </motion.div>
@@ -205,7 +205,7 @@ function Bubble({ who, text }: { who: 'student' | 'ai'; text: string }) {
             : 'rounded-tr-sm bg-gold-500/90 text-ink-950'
         }`}
       >
-        <div className={`mb-1.5 font-mono text-[9px] uppercase tracking-[0.25em] ${isAI ? 'text-azure-400' : 'text-ink-950/60'}`}>
+        <div className={`mb-1.5 font-mono text-[9px] uppercase tracking-[0.25em] ${isAI ? 'text-sage-400' : 'text-ink-950/60'}`}>
           {isAI ? 'ИИ · YandexGPT' : 'Ты'}
         </div>
         {isAI ? <Markdown text={text} /> : <div className="whitespace-pre-wrap">{text}</div>}
@@ -218,7 +218,7 @@ function Typing() {
   return (
     <div className="flex justify-start">
       <div className="rounded-2xl rounded-tl-sm border border-paper-50/10 bg-ink-800 px-5 py-3.5">
-        <div className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.25em] text-azure-400">
+        <div className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.25em] text-sage-400">
           ИИ · YandexGPT
         </div>
         <div className="flex items-center gap-1.5">

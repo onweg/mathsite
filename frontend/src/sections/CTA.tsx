@@ -16,7 +16,7 @@ export function CTA() {
         style={{ scale, y }}
         className="pointer-events-none absolute inset-0 flex items-center justify-center"
       >
-        <div className="font-display text-[clamp(10rem,30vw,30rem)] italic leading-none text-gold-500/10">
+        <div className="select-none font-display text-[clamp(10rem,30vw,30rem)] italic leading-none text-gold-500/10">
           ∞
         </div>
       </motion.div>

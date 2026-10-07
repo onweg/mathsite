@@ -65,7 +65,7 @@
 
   .grain {
     background-image:
-      radial-gradient(ellipse 60% 50% at 50% 0%, rgba(74, 158, 255, 0.08), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 50% 0%, rgba(106, 139, 120, 0.08), transparent 60%),
       radial-gradient(ellipse 50% 40% at 100% 100%, rgba(212, 165, 116, 0.09), transparent 60%);
   }
 

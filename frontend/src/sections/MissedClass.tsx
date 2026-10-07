@@ -63,7 +63,7 @@ export function MissedClass() {
       {/* фоновый большой глиф */}
       <motion.div
         aria-hidden
-        className="pointer-events-none absolute -right-10 top-20 font-display text-[22rem] italic leading-none text-paper-50/[0.04]"
+        className="pointer-events-none absolute -right-10 top-20 select-none font-display text-[22rem] italic leading-none text-paper-50/[0.04]"
       >
         ∵
       </motion.div>

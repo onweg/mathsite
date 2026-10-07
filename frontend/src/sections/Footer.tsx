@@ -4,7 +4,7 @@ export function Footer() {
       <div className="mx-auto max-w-[1700px] px-6 md:px-10">
         <div className="grid grid-cols-2 gap-10 md:grid-cols-4">
           <div className="col-span-2 md:col-span-2">
-            <div className="font-display text-5xl font-light leading-none tracking-tight md:text-7xl">
+            <div className="select-none font-display text-5xl font-light leading-none tracking-tight md:text-7xl">
               Mathematica<span className="italic text-gold-500">.</span>
             </div>
             <p className="mt-6 max-w-sm text-sm leading-relaxed text-paper-100/70">

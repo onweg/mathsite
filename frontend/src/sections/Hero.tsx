@@ -2,6 +2,7 @@ import { motion, useScroll, useTransform } from 'framer-motion'
 import { useRef } from 'react'
 import { Magnetic } from '../components/Magnetic'
 import { RevealText } from '../components/RevealText'
+import { Scene3D } from '../components/Scene3D'
 
 export function Hero() {
   const ref = useRef<HTMLElement>(null)
@@ -18,29 +19,23 @@ export function Hero() {
       ref={ref}
       className="relative isolate min-h-[115vh] overflow-hidden pt-32"
     >
-      {/* Parallax backdrop glyphs */}
+      {/* 3D-сцена: Платоновы тела + тор-кнот */}
+      <Scene3D />
+
+      {/* Grain-зерно + тёплый градиент — фоновая текстура поверх 3D */}
       <motion.div
         style={{ y: yBg, scale }}
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 select-none"
+        className="pointer-events-none absolute inset-0 -z-[5] select-none"
       >
-        <div className="absolute left-[-6%] top-[18%] font-display text-[22rem] italic leading-none text-paper-50/[0.04]">
-          ∫
-        </div>
-        <div className="absolute right-[-4%] top-[12%] font-serif text-[18rem] italic leading-none text-gold-500/10">
-          π
-        </div>
-        <div className="absolute left-[40%] top-[55%] font-mono text-[9rem] text-azure-500/10">
-          x²+y²
-        </div>
-        <div className="absolute inset-0 grain" />
+        <div className="absolute inset-0 grain opacity-60" />
       </motion.div>
 
       <motion.div
         style={{ y: yTitle, opacity }}
         className="relative mx-auto flex max-w-[1700px] flex-col px-6 md:px-10"
       >
-        <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/60">
+        <div className="flex select-none items-center gap-3 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/60">
           <span className="h-px w-10 bg-paper-50/40" />
           <span>Урок № 2026 — 10 — 07</span>
         </div>
@@ -77,7 +72,7 @@ export function Hero() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, delay: 1.3, ease: [0.22, 1, 0.36, 1] }}
-            className="flex flex-wrap items-center gap-5 md:col-span-5 md:col-start-8"
+            className="flex select-none flex-wrap items-center gap-5 md:col-span-5 md:col-start-8"
           >
             <Magnetic strength={0.5}>
               <a
@@ -117,7 +112,7 @@ export function Hero() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1.2, delay: 1.6 }}
-          className="mt-24 flex items-end justify-between font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/50"
+          className="mt-24 flex select-none items-end justify-between font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/50"
         >
           <div className="flex items-center gap-3">
             <span className="relative flex h-2 w-2">
@@ -142,7 +137,7 @@ function ScrollHint() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ delay: 1.9, duration: 1 }}
-      className="pointer-events-none absolute bottom-10 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/60"
+      className="pointer-events-none absolute bottom-10 left-1/2 flex -translate-x-1/2 select-none flex-col items-center gap-3 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/60"
     >
       <span>scroll</span>
       <span className="relative block h-10 w-px overflow-hidden bg-paper-50/15">

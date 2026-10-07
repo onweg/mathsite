@@ -32,7 +32,7 @@ export function Preloader({ onDone }: { onDone: () => void }) {
         <motion.div
           exit={{ y: '-100%' }}
           transition={{ duration: 1.1, ease: [0.76, 0, 0.24, 1] }}
-          className="fixed inset-0 z-[200] flex items-end justify-between bg-ink-950 px-8 pb-10 md:px-14"
+          className="fixed inset-0 z-[200] flex select-none items-end justify-between bg-ink-950 px-8 pb-10 md:px-14"
         >
           <div className="font-mono text-xs uppercase tracking-[0.3em] text-paper-50/60">
             Загрузка · Mathematica

@@ -18,7 +18,7 @@ export function Nav() {
   return (
     <motion.header
       style={{ background: bg, backdropFilter: blur, borderBottomColor: border }}
-      className="fixed inset-x-0 top-0 z-50 border-b"
+      className="fixed inset-x-0 top-0 z-50 select-none border-b"
     >
       <div className="mx-auto flex max-w-[1700px] items-center justify-between px-6 py-5 md:px-10">
         <a href="#top" data-cursor data-cursor-label="В начало" className="group flex items-center gap-3">

@@ -20,9 +20,10 @@ export default {
           500: '#d4a574',
           600: '#b7864e',
         },
-        azure: {
-          400: '#7fb6ff',
-          500: '#4a9eff',
+        sage: {
+          400: '#9fb9a9',
+          500: '#6a8b78',
+          600: '#4e6a5a',
         },
       },
       fontFamily: {
