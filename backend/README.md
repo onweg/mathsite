@@ -36,10 +36,26 @@ pip install -r requirements.txt
 ```bash
 cd backend
 source .venv/bin/activate
+alembic upgrade head           # накатить схему (идемпотентно)
 uvicorn app.api.app_factory:app --reload --port 8000
 ```
 
 Swagger: http://localhost:8000/docs
+
+## Миграции (Alembic)
+
+Схема БД версионируется в `backend/alembic/versions/`. Autogenerate выключен —
+миграции пишем руками через `op.execute(...)`, т.к. в приложении ORM нет.
+
+```bash
+alembic upgrade head              # применить все
+alembic current                   # текущая ревизия
+alembic history                   # история
+alembic downgrade -1              # откатить последнюю
+alembic revision -m "add users"   # создать новую пустую миграцию
+```
+
+Детали — `backend/alembic/README.md`.
 
 ## Эндпоинты
 
