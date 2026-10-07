@@ -1,0 +1,39 @@
+# secrets
+.env
+.env.local
+.env.*.local
+.envrc
+*.key
+*.pem
+
+# node / vite
+node_modules/
+dist/
+.vite/
+.cache/
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# docker / data
+pgdata/
+uploads/
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# logs
+*.log
+
+# учебники/материалы заказчика — не публикуем, держим локально
+*.pdf
