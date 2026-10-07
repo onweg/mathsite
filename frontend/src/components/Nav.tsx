@@ -4,6 +4,7 @@ import { Magnetic } from './Magnetic'
 const links = [
   { label: 'Разделы', href: '#sections' },
   { label: 'ИИ-теоретик', href: '#ai' },
+  { label: 'Пропустил урок', href: '#missed' },
   { label: 'Задача недели', href: '#weekly' },
   { label: 'Классы', href: '#classes' },
 ]

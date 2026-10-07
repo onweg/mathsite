@@ -35,6 +35,42 @@ export async function chat(
   }
 }
 
+export type RagChunk = {
+  page: number | null
+  source: string
+  similarity: number
+  preview: string
+}
+
+export type RagReply = {
+  text: string
+  blocked: boolean
+  reason: string | null
+  chunks: RagChunk[]
+}
+
+export async function askRag(
+  query: string,
+  opts: { topic?: Topic; limit?: number } = {},
+): Promise<RagReply> {
+  const r = await fetch(`${BASE}/rag/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, topic: opts.topic, limit: opts.limit ?? 5 }),
+  })
+  if (!r.ok) {
+    const text = await r.text().catch(() => '')
+    throw new Error(`rag ${r.status}: ${text || r.statusText}`)
+  }
+  const data = (await r.json()) as RagReply
+  return {
+    text: data.text,
+    blocked: Boolean(data.blocked),
+    reason: data.reason ?? null,
+    chunks: data.chunks ?? [],
+  }
+}
+
 export async function health(): Promise<boolean> {
   try {
     const r = await fetch(`${BASE}/health`)
