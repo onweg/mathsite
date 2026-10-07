@@ -1,6 +1,26 @@
 # Mathematica Backend
 
-Минимальный FastAPI-бэк с YandexGPT. Postgres и RAG — следующий шаг.
+FastAPI + YandexGPT + pgvector. Чистая слоёная архитектура: `api → services → domain`, инфраструктура подключается через Protocol'ы.
+
+## Структура
+
+```
+app/
+  core/            # Settings, DomainError, JSON logger
+  domain/          # Чистые типы и функции (без I/O)
+    chat/         # Message, ChatReply, ModerationResult
+    rag/          # Chunk, SearchHit, build_rag_prompt, system prompts
+    safety/       # pre_filter, post_filter, PII mask
+  services/        # Use cases: ChatService, RagService, IndexingService, ClassifierService
+  infrastructure/  # I/O адаптеры за Protocol'ами
+    llm/          # LLMProvider Protocol + YandexProvider
+    db/           # AsyncConnectionPool + pgvector
+    repositories/ # ChunksRepository
+    pdf/          # pypdf extractor, chunker
+    ratelimit/    # In-memory sliding window
+  api/             # HTTP: роутеры, DI, middleware, lifespan
+  schemas/         # HTTP DTO (pydantic)
+```
 
 ## Первый запуск
 
@@ -11,22 +31,32 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Запуск dev-сервера
+## Dev-сервер
 
 ```bash
 cd backend
 source .venv/bin/activate
-uvicorn app.main:app --reload --port 8000
+uvicorn app.api.app_factory:app --reload --port 8000
 ```
 
-Открой: http://localhost:8000/docs — swagger-интерфейс, можно потыкать `/chat` руками.
+Swagger: http://localhost:8000/docs
 
 ## Эндпоинты
 
-- `GET /health` — проверка
-- `POST /chat` — `{messages: [{role, text}], section?}` → `{text, usage}`
-- `POST /embed` — `{text, kind: "doc"|"query"}` → `{embedding, dim}`
+- `GET /health`
+- `POST /chat` — `{messages, topic?, section?, temperature?}` → `{text, blocked, reason, usage}`
+- `POST /rag/ask` — `{query, topic?, limit?}` → `{text, blocked, reason, chunks}`
+- `POST /embed` — `{text, kind}` → `{embedding, dim}`
 
-## Остановка
+## Индексация учебников
 
-Ctrl+C в терминале где запущен uvicorn.
+```bash
+python -m scripts.index_books          # все PDF
+python -m scripts.index_books algebra  # только Макарычева
+```
+
+## Добавить нового LLM-провайдера
+
+1. Реализовать `LLMProvider` Protocol в `app/infrastructure/llm/<provider>.py` (4 метода: `chat`, `stream_chat`, `embed`, `moderate`).
+2. Подменить `YandexProvider` на новый класс в `app/api/app_factory.py` (lifespan).
+3. Всё, остальной код не трогаем.

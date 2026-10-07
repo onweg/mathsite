@@ -18,9 +18,15 @@ class Settings(BaseSettings):
     postgres_user: str = "mathsite"
     postgres_password: str = "mathsite_dev_pw"
 
+    pg_pool_min: int = 2
+    pg_pool_max: int = 10
+
     app_env: str = "dev"
     app_port: int = 8000
     cors_origins: str = "http://localhost:5173"
+
+    rate_limit_per_minute: int = 20
+    rate_limit_per_hour: int = 200
 
     @property
     def pg_dsn(self) -> str:

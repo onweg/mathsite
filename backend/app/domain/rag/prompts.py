@@ -1,8 +1,6 @@
-"""System prompts для разных сценариев и предметов."""
+"""System prompts для сценариев чата. Чистый домен."""
 
-from typing import Literal
-
-Topic = Literal["algebra", "geometry"]
+from ..chat.types import Topic
 
 BASE_RULES = """ТЫ — ИИ-репетитор на сайте учителя математики для школьников 8 класса.
 
@@ -54,15 +52,6 @@ GEOMETRY_CONTEXT = """
 """
 
 
-def system_prompt(topic: Topic | None = None) -> str:
-    if topic == "algebra":
-        return BASE_RULES + ALGEBRA_CONTEXT
-    if topic == "geometry":
-        return BASE_RULES + GEOMETRY_CONTEXT
-    return BASE_RULES
-
-
-# Отдельный мини-промпт для классификатора темы
 CLASSIFIER_PROMPT = """Определи, является ли вопрос ученика вопросом по школьной математике
 (алгебра или геометрия, уровень 7-9 класса).
 
@@ -73,5 +62,12 @@ CLASSIFIER_PROMPT = """Определи, является ли вопрос уч
 Ответ одним словом, без пояснений."""
 
 
-# Шаблон отказа — используется и в pre-filter, и в post-filter
 REFUSAL = "Я помогаю только с математикой 8 класса. Задай вопрос по учебнику."
+
+
+def system_prompt(topic: Topic | None = None) -> str:
+    if topic == "algebra":
+        return BASE_RULES + ALGEBRA_CONTEXT
+    if topic == "geometry":
+        return BASE_RULES + GEOMETRY_CONTEXT
+    return BASE_RULES
