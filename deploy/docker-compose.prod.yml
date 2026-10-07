@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: mathsite-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: { context: ../backend, dockerfile: Dockerfile }
+    image: mathsite-backend:latest
+    container_name: mathsite-backend
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      YC_FOLDER_ID: ${YC_FOLDER_ID}
+      YC_API_KEY: ${YC_API_KEY}
+      YC_API_KEY_ID: ${YC_API_KEY_ID:-}
+      APP_ENV: prod
+    ports: ["127.0.0.1:8000:8000"]
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args: { VITE_API_URL: /api }
+    image: mathsite-frontend:latest
+    container_name: mathsite-frontend
+    restart: unless-stopped
+    depends_on: [backend]
+    ports: ["127.0.0.1:8080:8080"]
+
+
+volumes:
+  postgres_data:
