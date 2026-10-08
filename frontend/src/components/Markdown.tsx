@@ -9,7 +9,7 @@ import { BlockMath, InlineMath } from 'react-katex'
 export function Markdown({ text }: { text: string }) {
   const tokens = tokenize(text)
   return (
-    <div className="space-y-2 whitespace-pre-wrap text-[15px] leading-relaxed">
+    <div className="math-rich space-y-2 whitespace-pre-wrap text-[15px]">
       {tokens.map((t, i) => {
         if (t.type === 'block') {
           return (
