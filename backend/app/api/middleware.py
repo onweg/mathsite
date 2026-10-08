@@ -52,7 +52,11 @@ def _domain_to_response(exc: DomainError) -> JSONResponse:
             status_code=502,
             content={"detail": "LLM вернул некорректный ответ"},
         )
-    return JSONResponse(status_code=500, content={"detail": "internal error"})
+    # остальные DomainError-ы маршрутизируются по status_code (401/403/404/409/400)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": str(exc) or exc.code, "code": exc.code},
+    )
 
 
 def register_error_handlers(app: FastAPI) -> None:

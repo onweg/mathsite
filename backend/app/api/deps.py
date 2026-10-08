@@ -6,11 +6,15 @@
 
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, Header, Request
 
+from app.core.errors import Forbidden, NotAuthenticated
+from app.domain.auth.types import User
 from app.infrastructure.llm.base import LLMProvider
 from app.infrastructure.ratelimit.base import RateLimiter
 from app.infrastructure.repositories.chunks_repo import ChunksRepository
+from app.infrastructure.repositories.users_repo import UsersRepository
+from app.services.auth_service import AuthService
 from app.services.chat_service import ChatService
 from app.services.classifier_service import ClassifierService
 from app.services.indexing_service import IndexingService
@@ -63,3 +67,26 @@ def get_indexing_service(
 
 def client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
+
+
+def get_users_repo(request: Request) -> UsersRepository:
+    return _state(request).users_repo
+
+
+def get_auth_service(
+    users: Annotated[UsersRepository, Depends(get_users_repo)],
+) -> AuthService:
+    return AuthService(users)
+
+
+async def get_current_admin(
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    authorization: Annotated[str | None, Header()] = None,
+) -> User:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise NotAuthenticated("missing bearer token")
+    token = authorization.split(" ", 1)[1].strip()
+    user = await auth.user_from_token(token)
+    if user.role != "admin":
+        raise Forbidden("admin only")
+    return user

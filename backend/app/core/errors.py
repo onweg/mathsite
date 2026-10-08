@@ -5,6 +5,7 @@ class DomainError(Exception):
     """Корень иерархии ошибок бизнес-уровня."""
 
     code: str = "domain_error"
+    status_code: int = 400
 
 
 class SafetyBlocked(DomainError):
@@ -42,3 +43,23 @@ class LLMBadResponse(DomainError):
 
 class RepositoryError(DomainError):
     code = "repository_error"
+
+
+class NotAuthenticated(DomainError):
+    code = "not_authenticated"
+    status_code = 401
+
+
+class Forbidden(DomainError):
+    code = "forbidden"
+    status_code = 403
+
+
+class NotFound(DomainError):
+    code = "not_found"
+    status_code = 404
+
+
+class Conflict(DomainError):
+    code = "conflict"
+    status_code = 409

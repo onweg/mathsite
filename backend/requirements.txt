@@ -10,3 +10,6 @@ psycopg-pool==3.2.4
 pgvector==0.3.6
 alembic==1.14.0
 sqlalchemy==2.0.36
+bcrypt==4.2.1
+PyJWT==2.10.1
+python-multipart==0.0.19

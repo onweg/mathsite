@@ -73,9 +73,13 @@
 - `[x]` DomainError → HTTP mapping в middleware
 - `[x]` AsyncConnectionPool под Postgres
 - `[x]` Alembic миграции (`alembic upgrade head`)
-- `[ ]` **← СЕЙЧАС** Деплой: VPS (Ubuntu), Docker Compose, Nginx reverse-proxy, Let's Encrypt, домен .ru, FastAPI отвечает по домену
-- `[ ]` SQLAlchemy-модели / голые таблицы: `users`, `students`, `tasks`, `tests`, `chat_messages` + Alembic миграция 0002
-- `[ ]` Авторизация учителя (JWT) + bcrypt
+- `[x]` Деплой: VPS (FirstVDS Ubuntu), Docker Compose, Nginx reverse-proxy, Let's Encrypt, домен `www.matematika-urok.ru` через Cloudflare, HTTPS работает
+- `[x]` CI/CD: GitHub Actions SSH-деплой на push в main, secrets в репе
+- `[ ]` **← СЕЙЧАС** Миграция 0002: `users` (учитель, bcrypt), `materials` (загружаемые PDF), `weekly_tasks`, `quizzes` + `quiz_items`, `quiz_attempts`
+- `[ ]` **← СЕЙЧАС** Авторизация учителя (JWT) + bcrypt + guard
+- `[ ]` **← СЕЙЧАС** Админка UI: вход, загрузка материалов (PDF → BackgroundTasks индексация), CRUD задачи недели
+- `[ ]` **← СЕЙЧАС** Расширить «Пропустил урок»: топики подтягиваются из `materials` + базовые алгебра/геометрия
+- `[ ]` **← СЕЙЧАС (приоритет заказчика)** Нейроквизы: учитель генерирует квиз по теме через LLM → редактирует → публикует; ученики проходят, автопроверка
 - `[ ]` Модель Student, импорт списка класса (CSV или форма), генерация персональных QR-токенов
 - `[ ]` Персистентность истории чата (сейчас только в React state)
 - `[ ]` pg_dump бэкап в cron
@@ -107,21 +111,30 @@
 
 ---
 
-## ТЕКУЩИЙ ЭТАП: деплой на VPS
+## ТЕКУЩИЙ ЭТАП: админка учителя + нейроквизы
 
-Цель — сайт в интернете по своему домену за HTTPS, прод-доступен из класса.
+Цель — учитель сам управляет контентом: загружает учебные PDF, пишет задачу недели, генерирует квизы через ИИ.
 
-Задачи:
-1. Выбрать и купить VPS (Timeweb или Hetzner), Ubuntu 22.04/24.04
-2. Купить домен `.ru`, настроить A-запись
-3. Dockerfile для backend (uvicorn + alembic upgrade в entrypoint)
-4. Dockerfile для frontend (vite build → nginx:alpine с готовой статикой)
-5. `docker-compose.prod.yml`: postgres (pgvector), backend, nginx
-6. Nginx reverse-proxy: `/` → frontend статика, `/api/*` → backend
-7. Let's Encrypt (certbot) с автообновлением
-8. `.env.prod` на сервере, секреты не в git
-9. Скрипт деплоя (git pull → docker compose build → up -d → migrate)
-10. pg_dump в cron, бэкапы на объектное хранилище или вторую машину
+Backend:
+1. Миграция 0002 (users, materials, weekly_tasks, quizzes, quiz_items, quiz_attempts)
+2. `AuthService` + JWT + bcrypt, guard admin
+3. `MaterialsService`: upload PDF → сохранить файл → `BackgroundTasks` индексация (extract → chunk → embed → repo)
+4. `WeeklyTaskService`: CRUD
+5. `QuizService`: `generate(topic, source, difficulty)` через LLM → валидация Pydantic → draft; publish/edit; `attempt` для ученика с автопроверкой
+6. API: `/api/auth/login`, `/api/admin/materials`, `/api/admin/weekly`, `/api/admin/quizzes` (+ `/generate`), публичные `/api/materials`, `/api/weekly`, `/api/quizzes/{id}`
+
+Frontend:
+7. `/admin/login` + `/admin` (табы: материалы / неделя / квизы)
+8. `useAuth`, JWT в localStorage
+9. Расширить `MissedClass`: список топиков из API
+10. Публичная страница квизов для учеников: прохождение + результат
+
+Деплой:
+- Нужен volume для `/opt/mathsite/uploads/` в docker-compose (учитель загружает → файл на диск)
+
+**Готово из прошлого этапа:**
+- `[x]` VPS, домен, HTTPS, nginx, CI/CD через GitHub Actions
+- `[x]` Postgres с проиндексированным учебником (818 чанков)
 
 ---
 

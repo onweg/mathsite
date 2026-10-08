@@ -14,8 +14,10 @@ from app.infrastructure.llm.yandex import YandexProvider
 from app.infrastructure.ratelimit.base import Limit
 from app.infrastructure.ratelimit.memory import InMemoryRateLimiter
 from app.infrastructure.repositories.chunks_repo import PgChunksRepository
+from app.infrastructure.repositories.users_repo import PgUsersRepository
 
 from .middleware import RequestIdMiddleware, register_error_handlers
+from .routers import auth as auth_router
 from .routers import chat as chat_router
 from .routers import embed as embed_router
 from .routers import health as health_router
@@ -47,6 +49,7 @@ async def _lifespan(app: FastAPI):
         client=http_client,
     )
     app.state.chunks_repo = PgChunksRepository(pool)
+    app.state.users_repo = PgUsersRepository(pool)
     app.state.rate_limiter = InMemoryRateLimiter((
         Limit(max_requests=settings.rate_limit_per_minute, window_seconds=60),
         Limit(max_requests=settings.rate_limit_per_hour, window_seconds=3600),
@@ -77,6 +80,7 @@ def create_app() -> FastAPI:
     app.include_router(chat_router.router)
     app.include_router(rag_router.router)
     app.include_router(embed_router.router)
+    app.include_router(auth_router.router)
     return app
 
 

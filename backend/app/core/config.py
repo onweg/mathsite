@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 20
     rate_limit_per_hour: int = 200
 
+    jwt_secret: str = "dev-secret-change-me"
+    jwt_ttl_hours: int = 24 * 7
+    jwt_algorithm: str = "HS256"
+
+    upload_dir: str = "./uploads"
+
     @property
     def pg_dsn(self) -> str:
         return (
