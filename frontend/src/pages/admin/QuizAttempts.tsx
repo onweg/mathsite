@@ -57,7 +57,24 @@ export function QuizAttempts({ token, quizId }: { token: string; quizId: string 
             {attempts.map((a) => (
               <li key={a.id} className="py-2.5 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-paper-50 truncate">{a.student_name}</div>
+                  <div className="text-paper-50 truncate flex items-center gap-2">
+                    {a.student_name}
+                    {a.student_id ? (
+                      <span
+                        title="вошёл по персональной QR-ссылке"
+                        className="text-[9px] font-mono uppercase tracking-widest text-emerald-300/80 border border-emerald-500/30 rounded px-1.5 py-0.5"
+                      >
+                        QR
+                      </span>
+                    ) : (
+                      <span
+                        title="прошёл анонимно, имя указал сам"
+                        className="text-[9px] font-mono uppercase tracking-widest text-paper-50/40 border border-paper-50/10 rounded px-1.5 py-0.5"
+                      >
+                        anon
+                      </span>
+                    )}
+                  </div>
                   <div className="text-[11px] text-paper-50/40 mt-0.5">
                     {formatDate(a.created_at)}
                   </div>

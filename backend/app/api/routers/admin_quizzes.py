@@ -190,6 +190,7 @@ async def list_attempts(
         AttemptSummaryDTO(
             id=str(a.id),
             student_name=a.student_name,
+            student_id=str(a.student_id) if a.student_id else None,
             score=a.score,
             total=a.total,
             created_at=a.created_at.isoformat(),

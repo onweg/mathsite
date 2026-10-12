@@ -19,9 +19,14 @@ from app.domain.quiz.types import (
     QuizStatus,
 )
 from app.domain.rag.chunk import Source
+from app.domain.student.types import Student
 from app.infrastructure.llm.base import LLMProvider
 from app.infrastructure.repositories.chunks_repo import ChunksRepository
-from app.infrastructure.repositories.quizzes_repo import AttemptSummary, QuizzesRepository
+from app.infrastructure.repositories.quizzes_repo import (
+    AttemptSummary,
+    QuizzesRepository,
+    StudentAttempt,
+)
 
 log = logging.getLogger("mathsite.quiz")
 
@@ -175,9 +180,10 @@ class QuizService:
         quiz_id: UUID,
         *,
         student_name: str,
+        student: Student | None,
         answers: dict[str, str],
     ) -> tuple[AttemptResult, UUID]:
-        """answers: {item_id (str): выбранный id варианта}. Проверяем, пишем, возвращаем результат."""
+        """Если `student` передан (есть cookie) — попытка привязывается к нему, иначе анон."""
         quiz = await self.get(quiz_id)
         if quiz.status != "published":
             raise Conflict("квиз не опубликован")
@@ -195,9 +201,13 @@ class QuizService:
                 {"item_id": iid, "correct": ok, "expected": item.correct_answer, "got": answers.get(iid, "")}
             )
 
+        # авторизованный ученик — всегда под своим именем
+        effective_name = student.name if student else (student_name.strip() or "аноним")
+
         attempt_id = await self._quizzes.save_attempt(
             quiz_id,
-            student_name.strip() or "аноним",
+            effective_name,
+            student.id if student else None,
             answers,
             score,
             len(quiz.items),
@@ -206,6 +216,9 @@ class QuizService:
 
     async def list_attempts(self, quiz_id: UUID) -> list[AttemptSummary]:
         return await self._quizzes.list_attempts(quiz_id)
+
+    async def list_attempts_by_student(self, student_id: UUID) -> list[StudentAttempt]:
+        return await self._quizzes.list_by_student(student_id)
 
 
 def _normalize(s: str) -> str:

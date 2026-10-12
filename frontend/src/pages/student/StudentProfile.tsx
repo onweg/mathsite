@@ -1,12 +1,18 @@
+import { useEffect, useState } from 'react'
+import { StudentAttemptDTO, studentAuth } from '../../lib/api'
 import { useStudent } from '../../lib/student'
 
-/**
- * Профиль ученика. Пока минимум — имя, класс, кнопка выхода.
- * История попыток — следующий этап (А6): когда attempt будет писать student_id,
- * здесь появится список.
- */
 export function StudentProfile() {
   const auth = useStudent()
+  const [attempts, setAttempts] = useState<StudentAttemptDTO[] | null>(null)
+
+  useEffect(() => {
+    if (auth.status !== 'authed') return
+    studentAuth
+      .myAttempts()
+      .then(setAttempts)
+      .catch(() => setAttempts([]))
+  }, [auth.status])
 
   if (auth.status === 'loading') {
     return (
@@ -39,6 +45,11 @@ export function StudentProfile() {
   }
 
   const { student } = auth
+  const total = attempts?.length ?? 0
+  const avg =
+    attempts && attempts.length
+      ? attempts.reduce((s, a) => s + a.score / Math.max(1, a.total), 0) / attempts.length
+      : 0
 
   return (
     <div className="min-h-screen bg-ink-950 text-paper-50">
@@ -63,13 +74,70 @@ export function StudentProfile() {
           <div className="text-paper-50/60">{student.class_label || 'без класса'}</div>
         </div>
 
-        <section className="rounded-2xl border border-paper-50/10 bg-ink-900/40 p-6 space-y-3">
-          <div className="text-sm uppercase tracking-widest text-paper-50/60">Мои квизы</div>
-          <p className="text-paper-50/60 text-sm">
-            Пока попыток нет. Пройди квиз на главной — результат появится здесь.
-          </p>
+        <section className="rounded-2xl border border-paper-50/10 bg-ink-900/40 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm uppercase tracking-widest text-paper-50/60">Мои квизы</h2>
+            {attempts && attempts.length > 0 && (
+              <div className="font-mono text-xs text-paper-50/60">
+                {total} попыток · средний {Math.round(avg * 100)}%
+              </div>
+            )}
+          </div>
+
+          {attempts === null ? (
+            <div className="text-paper-50/50 text-sm">загрузка…</div>
+          ) : attempts.length === 0 ? (
+            <p className="text-paper-50/60 text-sm">
+              Пока попыток нет. Пройди квиз на главной — результат появится здесь.
+            </p>
+          ) : (
+            <ul className="divide-y divide-paper-50/5">
+              {attempts.map((a) => (
+                <li key={a.id} className="py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-paper-50 truncate">{a.quiz_title}</div>
+                    <div className="text-[11px] text-paper-50/40 mt-0.5">
+                      {formatDate(a.created_at)}
+                    </div>
+                  </div>
+                  <ScoreBadge score={a.score} total={a.total} />
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
+
+        <div className="text-center text-xs text-paper-50/40">
+          <a href="/#quizzes" className="hover:text-paper-50/70">
+            Пройти ещё квиз
+          </a>
+        </div>
       </main>
     </div>
   )
+}
+
+function ScoreBadge({ score, total }: { score: number; total: number }) {
+  const pct = total ? score / total : 0
+  const color =
+    pct >= 0.8 ? 'text-emerald-300' : pct >= 0.5 ? 'text-amber-300' : 'text-red-300'
+  return (
+    <span className={`font-mono text-sm shrink-0 ${color}`}>
+      {score} / {total}
+    </span>
+  )
+}
+
+function formatDate(iso: string): string {
+  try {
+    const d = new Date(iso)
+    return d.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return iso
+  }
 }

@@ -55,3 +55,12 @@ class ImportResultDTO(BaseModel):
 
 class ActivateRequest(BaseModel):
     token: str = Field(min_length=10, max_length=200)
+
+
+class StudentAttemptDTO(BaseModel):
+    id: str
+    quiz_id: str
+    quiz_title: str
+    score: int
+    total: int
+    created_at: str

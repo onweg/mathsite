@@ -7,8 +7,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import get_quiz_service
+from app.api.deps import get_optional_student, get_quiz_service
 from app.domain.quiz.types import Quiz
+from app.domain.student.types import Student
 from app.schemas.quiz import (
     AttemptRequest,
     AttemptResultDTO,
@@ -72,9 +73,13 @@ async def attempt(
     quiz_id: UUID,
     body: AttemptRequest,
     svc: Annotated[QuizService, Depends(get_quiz_service)],
+    student: Annotated[Student | None, Depends(get_optional_student)] = None,
 ) -> AttemptResultDTO:
     result, attempt_id = await svc.attempt(
-        quiz_id, student_name=body.student_name, answers=body.answers
+        quiz_id,
+        student_name=body.student_name,
+        student=student,
+        answers=body.answers,
     )
     return AttemptResultDTO(
         attempt_id=str(attempt_id),

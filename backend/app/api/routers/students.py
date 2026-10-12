@@ -11,6 +11,7 @@ from app.api.deps import (
     STUDENT_COOKIE_MAX_AGE,
     client_ip,
     get_current_student,
+    get_quiz_service,
     get_rate_limiter,
     get_students_service,
     is_prod,
@@ -18,7 +19,8 @@ from app.api.deps import (
 from app.core.errors import NotAuthenticated, RateLimited
 from app.domain.student.types import Student
 from app.infrastructure.ratelimit.base import RateLimiter
-from app.schemas.student import ActivateRequest, StudentPublicDTO
+from app.schemas.student import ActivateRequest, StudentAttemptDTO, StudentPublicDTO
+from app.services.quiz_service import QuizService
 from app.services.students_service import StudentsService
 
 router = APIRouter(prefix="/students", tags=["students"])
@@ -67,3 +69,22 @@ async def me(
 @router.post("/logout", status_code=204)
 async def logout(response: Response) -> None:
     response.delete_cookie(STUDENT_COOKIE_NAME, path="/")
+
+
+@router.get("/me/attempts", response_model=list[StudentAttemptDTO])
+async def my_attempts(
+    student: Annotated[Student, Depends(get_current_student)],
+    quizzes: Annotated[QuizService, Depends(get_quiz_service)],
+) -> list[StudentAttemptDTO]:
+    attempts = await quizzes.list_attempts_by_student(student.id)
+    return [
+        StudentAttemptDTO(
+            id=str(a.id),
+            quiz_id=str(a.quiz_id),
+            quiz_title=a.quiz_title,
+            score=a.score,
+            total=a.total,
+            created_at=a.created_at.isoformat(),
+        )
+        for a in attempts
+    ]

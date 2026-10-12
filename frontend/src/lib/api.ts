@@ -190,6 +190,7 @@ export type AttemptResultDTO = {
 export type AttemptSummaryDTO = {
   id: string
   student_name: string
+  student_id: string | null
   score: number
   total: number
   created_at: string
@@ -385,6 +386,15 @@ export type StudentPublicDTO = {
   class_label: string
 }
 
+export type StudentAttemptDTO = {
+  id: string
+  quiz_id: string
+  quiz_title: string
+  score: number
+  total: number
+  created_at: string
+}
+
 export const studentAuth = {
   activate: (token: string) =>
     apiJson<StudentPublicDTO>('/students/activate', {
@@ -396,6 +406,8 @@ export const studentAuth = {
       () => null,
     ),
   logout: () => apiJson<void>('/students/logout', { method: 'POST' }),
+  myAttempts: () =>
+    apiJson<StudentAttemptDTO[]>('/students/me/attempts', { method: 'GET' }),
 }
 
 export const adminStudents = {

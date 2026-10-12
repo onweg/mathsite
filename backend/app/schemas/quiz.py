@@ -103,6 +103,7 @@ class AttemptResultDTO(BaseModel):
 class AttemptSummaryDTO(BaseModel):
     id: str
     student_name: str
+    student_id: str | None = None
     score: int
     total: int
     created_at: str

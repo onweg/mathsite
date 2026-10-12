@@ -7,6 +7,7 @@ import {
   QuizSummaryDTO,
   publicQuizzes,
 } from '../lib/api'
+import { useStudent } from '../lib/student'
 
 const NAME_KEY = 'mathsite.student.name'
 
@@ -20,6 +21,9 @@ export function Quizzes() {
   const [quizzes, setQuizzes] = useState<QuizSummaryDTO[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [screen, setScreen] = useState<Screen>({ kind: 'list' })
+  const auth = useStudent()
+  const authedName =
+    auth.status === 'authed' ? auth.student.name : null
 
   useEffect(() => {
     publicQuizzes
@@ -61,7 +65,22 @@ export function Quizzes() {
         )}
 
         {screen.kind === 'list' && (
-          <QuizList quizzes={quizzes} onOpen={(q) => setScreen({ kind: 'intro', quiz: q })} />
+          <QuizList
+            quizzes={quizzes}
+            onOpen={async (q) => {
+              // Авторизованный ученик — сразу в прохождение, intro не нужен.
+              if (authedName) {
+                try {
+                  const full = await publicQuizzes.get(q.id)
+                  setScreen({ kind: 'run', quiz: full })
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : 'не удалось загрузить квиз')
+                }
+              } else {
+                setScreen({ kind: 'intro', quiz: q })
+              }
+            }}
+          />
         )}
 
         {screen.kind === 'intro' && (

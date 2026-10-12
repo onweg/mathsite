@@ -19,6 +19,19 @@ from app.domain.quiz.types import Choice, Quiz, QuizItem, QuizStatus
 class AttemptSummary:
     id: UUID
     student_name: str
+    student_id: UUID | None
+    score: int
+    total: int
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class StudentAttempt:
+    """Для профиля ученика: привязана к конкретному студенту, с названием квиза."""
+
+    id: UUID
+    quiz_id: UUID
+    quiz_title: str
     score: int
     total: int
     created_at: datetime
@@ -58,12 +71,15 @@ class QuizzesRepository(Protocol):
         self,
         quiz_id: UUID,
         student_name: str,
+        student_id: UUID | None,
         answers: dict[str, str],
         score: int,
         total: int,
     ) -> UUID: ...
 
     async def list_attempts(self, quiz_id: UUID) -> list[AttemptSummary]: ...
+
+    async def list_by_student(self, student_id: UUID) -> list[StudentAttempt]: ...
 
 
 def _choices_to_json(choices: list[Choice]) -> list[dict]:
@@ -311,6 +327,7 @@ class PgQuizzesRepository:
         self,
         quiz_id: UUID,
         student_name: str,
+        student_id: UUID | None,
         answers: dict[str, str],
         score: int,
         total: int,
@@ -318,11 +335,12 @@ class PgQuizzesRepository:
         async with self._pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
-                INSERT INTO quiz_attempts (quiz_id, student_name, answers, score, total)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO quiz_attempts
+                    (quiz_id, student_name, student_id, answers, score, total)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
-                (quiz_id, student_name, Jsonb(answers), score, total),
+                (quiz_id, student_name, student_id, Jsonb(answers), score, total),
             )
             (attempt_id,) = await cur.fetchone()
             await conn.commit()
@@ -332,7 +350,7 @@ class PgQuizzesRepository:
         async with self._pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
-                SELECT id, student_name, score, total, created_at
+                SELECT id, student_name, student_id, score, total, created_at
                 FROM quiz_attempts
                 WHERE quiz_id = %s
                 ORDER BY created_at DESC
@@ -343,7 +361,38 @@ class PgQuizzesRepository:
             rows = await cur.fetchall()
         return [
             AttemptSummary(
-                id=r[0], student_name=r[1], score=r[2], total=r[3], created_at=r[4]
+                id=r[0],
+                student_name=r[1],
+                student_id=r[2],
+                score=r[3],
+                total=r[4],
+                created_at=r[5],
+            )
+            for r in rows
+        ]
+
+    async def list_by_student(self, student_id: UUID) -> list[StudentAttempt]:
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                SELECT a.id, a.quiz_id, q.title, a.score, a.total, a.created_at
+                FROM quiz_attempts a
+                JOIN quizzes q ON q.id = a.quiz_id
+                WHERE a.student_id = %s
+                ORDER BY a.created_at DESC
+                LIMIT 200
+                """,
+                (student_id,),
+            )
+            rows = await cur.fetchall()
+        return [
+            StudentAttempt(
+                id=r[0],
+                quiz_id=r[1],
+                quiz_title=r[2],
+                score=r[3],
+                total=r[4],
+                created_at=r[5],
             )
             for r in rows
         ]
