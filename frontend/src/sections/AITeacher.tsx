@@ -1,7 +1,9 @@
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { Markdown } from '../components/Markdown'
+import { MicButton } from '../components/MicButton'
 import { RevealText } from '../components/RevealText'
+import { useSpeech } from '../hooks/useSpeech'
 import { chat, health, type ChatMessage, type Topic } from '../lib/api'
 
 const initial: ChatMessage[] = [
@@ -170,10 +172,11 @@ function ChatPanel() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKey}
-          placeholder="Спроси по математике · Enter — отправить"
+          placeholder="Спроси по математике · Enter — отправить · микрофон — голосом"
           rows={1}
           className="min-h-[36px] flex-1 resize-none bg-transparent px-2 py-2 text-[15px] text-paper-50 placeholder:text-paper-50/40 focus:outline-none"
         />
+        <ChatMic value={input} onChange={setInput} />
         <button
           onClick={send}
           disabled={loading || !input.trim()}
@@ -186,6 +189,22 @@ function ChatPanel() {
         </button>
       </div>
     </>
+  )
+}
+
+function ChatMic({ value, onChange }: { value: string; onChange: (s: string) => void }) {
+  const speech = useSpeech({
+    lang: 'ru-RU',
+    continuous: false,
+    onFinal: (text) => onChange(((value || '') + ' ' + text).trim()),
+  })
+  return (
+    <MicButton
+      supported={speech.supported}
+      listening={speech.listening}
+      interim={speech.interim}
+      onToggle={() => (speech.listening ? speech.stop() : speech.start())}
+    />
   )
 }
 

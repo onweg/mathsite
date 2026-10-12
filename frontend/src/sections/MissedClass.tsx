@@ -2,7 +2,9 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { Magnetic } from '../components/Magnetic'
 import { Markdown } from '../components/Markdown'
+import { MicButton } from '../components/MicButton'
 import { Reveal, RevealText } from '../components/RevealText'
+import { useSpeech } from '../hooks/useSpeech'
 import {
   askRag,
   publicMaterials,
@@ -246,6 +248,15 @@ function AskForm({
     }
   }
 
+  const speech = useSpeech({
+    lang: 'ru-RU',
+    continuous: false,
+    onFinal: (text) => {
+      // дописываем к текущему вводу, не затираем
+      onChange(((value || '') + ' ' + text).trim())
+    },
+  })
+
   return (
     <div className="flex flex-col gap-4 rounded-3xl border border-paper-50/10 bg-ink-900/60 p-5 md:p-6">
       <div className="flex flex-wrap items-center gap-2">
@@ -282,6 +293,13 @@ function AskForm({
           onKeyDown={onKey}
           placeholder="О чём рассказать? Например: как раскладывать на множители"
           className="flex-1 bg-transparent px-2 py-2 text-base text-paper-50 placeholder:text-paper-50/35 focus:outline-none"
+        />
+
+        <MicButton
+          supported={speech.supported}
+          listening={speech.listening}
+          interim={speech.interim}
+          onToggle={() => (speech.listening ? speech.stop() : speech.start())}
         />
 
         <Magnetic strength={0.4}>
