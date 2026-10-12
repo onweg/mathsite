@@ -9,6 +9,7 @@ import { Footer } from './sections/Footer'
 import { Hero } from './sections/Hero'
 import { Marquee } from './sections/Marquee'
 import { MissedClass } from './sections/MissedClass'
+import { Quizzes } from './sections/Quizzes'
 import { Sections } from './sections/Sections'
 import { Weekly } from './sections/Weekly'
 import { useLenis } from './hooks/useLenis'
@@ -37,6 +38,7 @@ function PublicSite() {
         <AITeacher />
         <MissedClass />
         <Weekly />
+        <Quizzes />
         <Classes />
         <CTA />
         <Footer />
