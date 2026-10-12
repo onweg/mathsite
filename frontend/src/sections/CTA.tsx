@@ -65,12 +65,12 @@ export function CTA() {
           </Magnetic>
           <Magnetic strength={0.3}>
             <a
-              href="#"
+              href="/admin"
               data-cursor
               data-cursor-label="Админ"
               className="font-mono text-[11px] uppercase tracking-[0.22em] text-paper-50/80 transition-colors hover:text-paper-50"
             >
-              Я учитель — войти в админку →
+              Я учитель — войти в админку
             </a>
           </Magnetic>
         </div>

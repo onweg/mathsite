@@ -71,7 +71,7 @@ export function QuizEditor({
     return (
       <div className="space-y-4">
         <button onClick={onBack} className={backBtn}>
-          ← к списку
+          Назад к списку
         </button>
         {error ? (
           <div className="text-red-400/90 text-sm">{error}</div>
@@ -87,7 +87,7 @@ export function QuizEditor({
   return (
     <div className="space-y-6">
       <button onClick={onBack} className={backBtn}>
-        ← к списку
+        Назад к списку
       </button>
 
       <header className="space-y-2">

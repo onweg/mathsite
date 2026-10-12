@@ -207,7 +207,7 @@ function WeeklyEditor({
   return (
     <div className="space-y-5">
       <button onClick={onCancel} className={backBtn}>
-        ← к списку
+        Назад к списку
       </button>
 
       <div className="flex items-center justify-between">

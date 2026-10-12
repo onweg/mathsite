@@ -76,7 +76,7 @@ export function AdminLogin({
         </button>
 
         <a href="/" className="block text-center text-xs text-paper-50/40 hover:text-paper-50/70">
-          ← на сайт
+          Назад на сайт
         </a>
       </form>
     </div>
