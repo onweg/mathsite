@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { QuizDTO, adminQuizzes } from '../../lib/api'
+import { QuizAttempts } from './QuizAttempts'
 import { QuizItemCard } from './QuizItemCard'
 
 export function QuizEditor({
@@ -146,6 +147,8 @@ export function QuizEditor({
           />
         ))}
       </div>
+
+      {isPublished && <QuizAttempts token={token} quizId={quiz.id} />}
     </div>
   )
 }

@@ -9,7 +9,19 @@ from uuid import UUID
 from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
+from dataclasses import dataclass
+from datetime import datetime
+
 from app.domain.quiz.types import Choice, Quiz, QuizItem, QuizStatus
+
+
+@dataclass(frozen=True)
+class AttemptSummary:
+    id: UUID
+    student_name: str
+    score: int
+    total: int
+    created_at: datetime
 
 
 class QuizzesRepository(Protocol):
@@ -50,6 +62,8 @@ class QuizzesRepository(Protocol):
         score: int,
         total: int,
     ) -> UUID: ...
+
+    async def list_attempts(self, quiz_id: UUID) -> list[AttemptSummary]: ...
 
 
 def _choices_to_json(choices: list[Choice]) -> list[dict]:
@@ -313,3 +327,23 @@ class PgQuizzesRepository:
             (attempt_id,) = await cur.fetchone()
             await conn.commit()
         return attempt_id
+
+    async def list_attempts(self, quiz_id: UUID) -> list[AttemptSummary]:
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                SELECT id, student_name, score, total, created_at
+                FROM quiz_attempts
+                WHERE quiz_id = %s
+                ORDER BY created_at DESC
+                LIMIT 500
+                """,
+                (quiz_id,),
+            )
+            rows = await cur.fetchall()
+        return [
+            AttemptSummary(
+                id=r[0], student_name=r[1], score=r[2], total=r[3], created_at=r[4]
+            )
+            for r in rows
+        ]

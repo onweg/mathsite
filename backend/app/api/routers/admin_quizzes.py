@@ -11,6 +11,7 @@ from app.api.deps import get_current_admin, get_quiz_service
 from app.domain.auth.types import User
 from app.domain.quiz.types import Choice, Quiz, QuizItem
 from app.schemas.quiz import (
+    AttemptSummaryDTO,
     GenerateRequest,
     QuizDTO,
     QuizItemDTO,
@@ -176,3 +177,22 @@ async def delete(
     svc: Annotated[QuizService, Depends(get_quiz_service)],
 ) -> None:
     await svc.delete(quiz_id)
+
+
+@router.get("/{quiz_id}/attempts", response_model=list[AttemptSummaryDTO])
+async def list_attempts(
+    quiz_id: UUID,
+    _: Annotated[User, Depends(get_current_admin)],
+    svc: Annotated[QuizService, Depends(get_quiz_service)],
+) -> list[AttemptSummaryDTO]:
+    attempts = await svc.list_attempts(quiz_id)
+    return [
+        AttemptSummaryDTO(
+            id=str(a.id),
+            student_name=a.student_name,
+            score=a.score,
+            total=a.total,
+            created_at=a.created_at.isoformat(),
+        )
+        for a in attempts
+    ]

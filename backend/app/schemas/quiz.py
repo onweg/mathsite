@@ -98,3 +98,11 @@ class AttemptResultDTO(BaseModel):
     score: int
     total: int
     per_item: list[dict]
+
+
+class AttemptSummaryDTO(BaseModel):
+    id: str
+    student_name: str
+    score: int
+    total: int
+    created_at: str

@@ -21,7 +21,7 @@ from app.domain.quiz.types import (
 from app.domain.rag.chunk import Source
 from app.infrastructure.llm.base import LLMProvider
 from app.infrastructure.repositories.chunks_repo import ChunksRepository
-from app.infrastructure.repositories.quizzes_repo import QuizzesRepository
+from app.infrastructure.repositories.quizzes_repo import AttemptSummary, QuizzesRepository
 
 log = logging.getLogger("mathsite.quiz")
 
@@ -203,6 +203,9 @@ class QuizService:
             len(quiz.items),
         )
         return AttemptResult(score=score, total=len(quiz.items), per_item=per_item), attempt_id
+
+    async def list_attempts(self, quiz_id: UUID) -> list[AttemptSummary]:
+        return await self._quizzes.list_attempts(quiz_id)
 
 
 def _normalize(s: str) -> str:
