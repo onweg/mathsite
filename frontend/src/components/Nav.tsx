@@ -1,5 +1,6 @@
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { Magnetic } from './Magnetic'
+import { useStudent } from '../lib/student'
 
 const links = [
   { label: 'Разделы', href: '#sections' },
@@ -14,6 +15,8 @@ export function Nav() {
   const bg = useTransform(scrollY, [0, 120], ['rgba(7,7,12,0)', 'rgba(7,7,12,0.72)'])
   const blur = useTransform(scrollY, [0, 120], ['blur(0px)', 'blur(14px)'])
   const border = useTransform(scrollY, [0, 120], ['rgba(246,242,234,0)', 'rgba(246,242,234,0.08)'])
+
+  const student = useStudent()
 
   return (
     <motion.header
@@ -44,18 +47,32 @@ export function Nav() {
           ))}
         </nav>
 
-        <Magnetic strength={0.4}>
-          <a
-            href="#enter"
-            data-cursor="lg"
-            data-cursor-label="Войти"
-            className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full border border-paper-50/20 bg-paper-50/5 px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.22em] text-paper-50 backdrop-blur transition-colors hover:border-gold-500/60"
-          >
-            <span className="relative z-10">Войти по QR</span>
-            <span className="relative z-10 h-1.5 w-1.5 rounded-full bg-gold-500 transition-transform duration-500 group-hover:scale-150" />
-            <span className="absolute inset-0 -translate-x-full bg-gold-500/10 transition-transform duration-700 ease-out-expo group-hover:translate-x-0" />
-          </a>
-        </Magnetic>
+        {student.status === 'authed' ? (
+          <Magnetic strength={0.4}>
+            <a
+              href="/me"
+              data-cursor="lg"
+              data-cursor-label="Профиль"
+              className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full border border-gold-500/50 bg-gold-500/10 px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.22em] text-paper-50 backdrop-blur transition-colors hover:border-gold-500"
+            >
+              <span className="relative z-10 truncate max-w-[160px]">{student.student.name}</span>
+              <span className="relative z-10 h-1.5 w-1.5 rounded-full bg-gold-500" />
+            </a>
+          </Magnetic>
+        ) : (
+          <Magnetic strength={0.4}>
+            <a
+              href="/me"
+              data-cursor="lg"
+              data-cursor-label="Войти"
+              className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full border border-paper-50/20 bg-paper-50/5 px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.22em] text-paper-50 backdrop-blur transition-colors hover:border-gold-500/60"
+            >
+              <span className="relative z-10">Войти по QR</span>
+              <span className="relative z-10 h-1.5 w-1.5 rounded-full bg-gold-500 transition-transform duration-500 group-hover:scale-150" />
+              <span className="absolute inset-0 -translate-x-full bg-gold-500/10 transition-transform duration-700 ease-out-expo group-hover:translate-x-0" />
+            </a>
+          </Magnetic>
+        )}
       </div>
     </motion.header>
   )

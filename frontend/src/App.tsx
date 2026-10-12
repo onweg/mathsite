@@ -14,10 +14,14 @@ import { Sections } from './sections/Sections'
 import { Weekly } from './sections/Weekly'
 import { useLenis } from './hooks/useLenis'
 import { AdminRouter } from './pages/AdminRouter'
+import { StudentActivate } from './pages/student/StudentActivate'
+import { StudentProfile } from './pages/student/StudentProfile'
 
 export default function App() {
-  const isAdmin = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')
-  if (isAdmin) return <AdminRouter />
+  const path = typeof window !== 'undefined' ? window.location.pathname : ''
+  if (path.startsWith('/admin')) return <AdminRouter />
+  if (path.startsWith('/s/')) return <StudentActivate />
+  if (path === '/me' || path.startsWith('/me/')) return <StudentProfile />
   return <PublicSite />
 }
 
