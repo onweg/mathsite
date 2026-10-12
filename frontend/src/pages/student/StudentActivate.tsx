@@ -1,12 +1,23 @@
 import { useEffect, useState } from 'react'
 import { studentAuth } from '../../lib/api'
 
+function useSystemCursor() {
+  useEffect(() => {
+    const prev = document.body.style.cursor
+    document.body.style.cursor = 'auto'
+    return () => {
+      document.body.style.cursor = prev
+    }
+  }, [])
+}
+
 /**
  * Magic-link `/s/<token>` — тонкая страница.
  * Отправляет токен на /students/activate; backend ставит HTTP-only cookie.
  * Успех → редирект на /me. Ошибка — приветливое сообщение + кнопка «на сайт».
  */
 export function StudentActivate() {
+  useSystemCursor()
   const [state, setState] = useState<'loading' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState<string>('')
 

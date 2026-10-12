@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useAdminAuth } from '../lib/auth'
 import { AdminDashboard } from './AdminDashboard'
 import { AdminLogin } from './AdminLogin'
@@ -6,6 +7,16 @@ import { PrintClassPage } from './admin/PrintClassPage'
 export function AdminRouter() {
   const auth = useAdminAuth()
   const path = typeof window !== 'undefined' ? window.location.pathname : ''
+
+  // На главной есть custom cursor (body { cursor: none }).
+  // В админке он мешает — работаем системным курсором.
+  useEffect(() => {
+    const prev = document.body.style.cursor
+    document.body.style.cursor = 'auto'
+    return () => {
+      document.body.style.cursor = prev
+    }
+  }, [])
 
   if (auth.status === 'loading') {
     return (

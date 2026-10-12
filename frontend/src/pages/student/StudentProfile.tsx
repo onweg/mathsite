@@ -3,6 +3,15 @@ import { StudentAttemptDTO, studentAuth } from '../../lib/api'
 import { useStudent } from '../../lib/student'
 
 export function StudentProfile() {
+  // На главной body { cursor: none } — на профиле ученика пусть системный.
+  useEffect(() => {
+    const prev = document.body.style.cursor
+    document.body.style.cursor = 'auto'
+    return () => {
+      document.body.style.cursor = prev
+    }
+  }, [])
+
   const auth = useStudent()
   const [attempts, setAttempts] = useState<StudentAttemptDTO[] | null>(null)
 
