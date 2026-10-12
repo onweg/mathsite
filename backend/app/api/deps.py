@@ -13,11 +13,13 @@ from app.domain.auth.types import User
 from app.infrastructure.llm.base import LLMProvider
 from app.infrastructure.ratelimit.base import RateLimiter
 from app.infrastructure.repositories.chunks_repo import ChunksRepository
+from app.infrastructure.repositories.quizzes_repo import QuizzesRepository
 from app.infrastructure.repositories.users_repo import UsersRepository
 from app.services.auth_service import AuthService
 from app.services.chat_service import ChatService
 from app.services.classifier_service import ClassifierService
 from app.services.indexing_service import IndexingService
+from app.services.quiz_service import QuizService
 from app.services.rag_service import RagService
 
 
@@ -90,3 +92,15 @@ async def get_current_admin(
     if user.role != "admin":
         raise Forbidden("admin only")
     return user
+
+
+def get_quizzes_repo(request: Request) -> QuizzesRepository:
+    return _state(request).quizzes_repo
+
+
+def get_quiz_service(
+    llm: Annotated[LLMProvider, Depends(get_llm)],
+    quizzes: Annotated[QuizzesRepository, Depends(get_quizzes_repo)],
+    chunks: Annotated[ChunksRepository, Depends(get_chunks_repo)],
+) -> QuizService:
+    return QuizService(llm, quizzes, chunks)

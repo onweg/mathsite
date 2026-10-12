@@ -17,5 +17,5 @@ export function AdminRouter() {
     return <AdminLogin onSuccess={auth.signIn} />
   }
 
-  return <AdminDashboard user={auth.user} onSignOut={auth.signOut} />
+  return <AdminDashboard user={auth.user} token={auth.token} onSignOut={auth.signOut} />
 }

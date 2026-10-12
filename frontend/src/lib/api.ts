@@ -115,3 +115,140 @@ export async function me(token: string): Promise<AdminUser> {
   if (!r.ok) throw new Error(`me ${r.status}`)
   return (await r.json()) as AdminUser
 }
+
+// ====== Квизы ======
+
+export type Difficulty = 'easy' | 'medium' | 'hard'
+export type QuizStatus = 'draft' | 'published'
+export type ItemKind = 'mcq' | 'short'
+export type Source = 'textbook_8_algebra' | 'textbook_8_geometry' | 'olympiad'
+
+export type QuizChoice = { id: string; text: string }
+
+export type QuizItemDTO = {
+  id: string | null
+  position: number
+  kind: ItemKind
+  question_md: string
+  choices: QuizChoice[]
+  correct_answer: string
+  explanation: string | null
+}
+
+export type QuizDTO = {
+  id: string
+  title: string
+  topic: string
+  difficulty: Difficulty
+  status: QuizStatus
+  source_key: Source | null
+  items: QuizItemDTO[]
+}
+
+export type QuizSummaryDTO = {
+  id: string
+  title: string
+  topic: string
+  difficulty: Difficulty
+  status: QuizStatus
+  source_key: Source | null
+  items_count: number
+}
+
+export type QuizItemPublicDTO = {
+  id: string
+  position: number
+  kind: ItemKind
+  question_md: string
+  choices: QuizChoice[]
+}
+
+export type QuizPublicDTO = {
+  id: string
+  title: string
+  topic: string
+  difficulty: Difficulty
+  items: QuizItemPublicDTO[]
+}
+
+export type AttemptResultDTO = {
+  attempt_id: string
+  score: number
+  total: number
+  per_item: { item_id: string; correct: boolean; expected: string; got: string }[]
+}
+
+async function apiJson<T>(
+  path: string,
+  { method, token, body }: { method: string; token?: string | null; body?: unknown } = {
+    method: 'GET',
+  },
+): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  if (token) headers.Authorization = `Bearer ${token}`
+  const r = await fetch(`${BASE}${path}`, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  })
+  if (r.status === 204) return undefined as T
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    const detail = (data as { detail?: string }).detail || `${method} ${path} ${r.status}`
+    throw new Error(detail)
+  }
+  return (await r.json()) as T
+}
+
+// ---- Admin ----
+export const adminQuizzes = {
+  list: (token: string) => apiJson<QuizSummaryDTO[]>('/admin/quizzes', { method: 'GET', token }),
+  get: (token: string, id: string) =>
+    apiJson<QuizDTO>(`/admin/quizzes/${id}`, { method: 'GET', token }),
+  generate: (
+    token: string,
+    body: {
+      title: string
+      topic: string
+      source_key: Source | null
+      difficulty: Difficulty
+      items_count: number
+    },
+  ) => apiJson<QuizDTO>('/admin/quizzes/generate', { method: 'POST', token, body }),
+  updateMeta: (
+    token: string,
+    id: string,
+    body: { title?: string; topic?: string },
+  ) => apiJson<QuizDTO>(`/admin/quizzes/${id}`, { method: 'PATCH', token, body }),
+  updateItem: (
+    token: string,
+    quizId: string,
+    itemId: string,
+    body: {
+      question_md?: string
+      choices?: QuizChoice[]
+      correct_answer?: string
+      explanation?: string | null
+    },
+  ) =>
+    apiJson<QuizDTO>(`/admin/quizzes/${quizId}/items/${itemId}`, {
+      method: 'PATCH',
+      token,
+      body,
+    }),
+  publish: (token: string, id: string) =>
+    apiJson<QuizDTO>(`/admin/quizzes/${id}/publish`, { method: 'POST', token }),
+  unpublish: (token: string, id: string) =>
+    apiJson<QuizDTO>(`/admin/quizzes/${id}/unpublish`, { method: 'POST', token }),
+  delete: (token: string, id: string) =>
+    apiJson<void>(`/admin/quizzes/${id}`, { method: 'DELETE', token }),
+}
+
+// ---- Public ----
+export const publicQuizzes = {
+  list: () => apiJson<QuizSummaryDTO[]>('/quizzes', { method: 'GET' }),
+  get: (id: string) => apiJson<QuizPublicDTO>(`/quizzes/${id}`, { method: 'GET' }),
+  attempt: (id: string, body: { student_name: string; answers: Record<string, string> }) =>
+    apiJson<AttemptResultDTO>(`/quizzes/${id}/attempt`, { method: 'POST', body }),
+}
