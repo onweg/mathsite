@@ -14,7 +14,10 @@ from app.infrastructure.llm.base import LLMProvider
 from app.infrastructure.ratelimit.base import RateLimiter
 from pathlib import Path
 
+from fastapi import Cookie
+
 from app.core.config import settings
+from app.domain.student.types import Student
 from app.infrastructure.repositories.chunks_repo import ChunksRepository
 from app.infrastructure.repositories.materials_repo import MaterialsRepository
 from app.infrastructure.repositories.quizzes_repo import QuizzesRepository
@@ -31,6 +34,13 @@ from app.services.rag_service import RagService
 from app.services.students_import_service import StudentsImportService
 from app.services.students_service import StudentsService
 from app.services.weekly_service import WeeklyTaskService
+
+STUDENT_COOKIE_NAME = "mathsite_student"
+STUDENT_COOKIE_MAX_AGE = 365 * 24 * 3600  # 1 год
+
+
+def is_prod() -> bool:
+    return settings.app_env.lower() == "prod"
 
 
 def _state(request: Request):
@@ -155,3 +165,28 @@ def get_students_import_service(
     students: Annotated[StudentsService, Depends(get_students_service)],
 ) -> StudentsImportService:
     return StudentsImportService(students)
+
+
+async def get_optional_student(
+    svc: Annotated[StudentsService, Depends(get_students_service)],
+    cookie_value: Annotated[str | None, Cookie(alias=STUDENT_COOKIE_NAME)] = None,
+) -> Student | None:
+    """Мягкий guard: вернёт Student если cookie валиден, иначе None.
+
+    Используется в публичных эндпоинтах, где анонимный доступ допустим
+    (например, прохождение квиза).
+    """
+    if not cookie_value:
+        return None
+    return await svc.by_token(cookie_value)
+
+
+async def get_current_student(
+    student: Annotated[Student | None, Depends(get_optional_student)],
+) -> Student:
+    """Строгий guard: 401 если cookie отсутствует/невалиден."""
+    if not student:
+        from app.core.errors import NotAuthenticated
+
+        raise NotAuthenticated("ученик не авторизован")
+    return student

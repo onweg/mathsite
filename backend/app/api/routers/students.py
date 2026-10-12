@@ -1,0 +1,69 @@
+"""Публичный API для учеников: активация через QR-токен, профиль, выход."""
+
+from __future__ import annotations
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Response
+
+from app.api.deps import (
+    STUDENT_COOKIE_NAME,
+    STUDENT_COOKIE_MAX_AGE,
+    client_ip,
+    get_current_student,
+    get_rate_limiter,
+    get_students_service,
+    is_prod,
+)
+from app.core.errors import NotAuthenticated, RateLimited
+from app.domain.student.types import Student
+from app.infrastructure.ratelimit.base import RateLimiter
+from app.schemas.student import ActivateRequest, StudentPublicDTO
+from app.services.students_service import StudentsService
+
+router = APIRouter(prefix="/students", tags=["students"])
+
+
+def _public_dto(s: Student) -> StudentPublicDTO:
+    return StudentPublicDTO(id=str(s.id), name=s.name, class_label=s.class_label)
+
+
+@router.post("/activate", response_model=StudentPublicDTO)
+async def activate(
+    body: ActivateRequest,
+    response: Response,
+    svc: Annotated[StudentsService, Depends(get_students_service)],
+    rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
+    ip: Annotated[str, Depends(client_ip)],
+) -> StudentPublicDTO:
+    """Проверяем токен → ставим HTTP-only cookie → возвращаем профиль."""
+    ok, reason = rate_limiter.check(f"activate:{ip}")
+    if not ok:
+        raise RateLimited(reason)
+
+    student = await svc.by_token(body.token)
+    if not student:
+        raise NotAuthenticated("токен не распознан")
+
+    response.set_cookie(
+        key=STUDENT_COOKIE_NAME,
+        value=student.qr_token,
+        max_age=STUDENT_COOKIE_MAX_AGE,
+        httponly=True,
+        secure=is_prod(),
+        samesite="lax",
+        path="/",
+    )
+    return _public_dto(student)
+
+
+@router.get("/me", response_model=StudentPublicDTO)
+async def me(
+    student: Annotated[Student, Depends(get_current_student)],
+) -> StudentPublicDTO:
+    return _public_dto(student)
+
+
+@router.post("/logout", status_code=204)
+async def logout(response: Response) -> None:
+    response.delete_cookie(STUDENT_COOKIE_NAME, path="/")

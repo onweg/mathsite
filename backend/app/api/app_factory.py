@@ -32,6 +32,7 @@ from .routers import health as health_router
 from .routers import materials as materials_router
 from .routers import quizzes as quizzes_router
 from .routers import rag as rag_router
+from .routers import students as students_router
 from .routers import weekly as weekly_router
 
 
@@ -84,7 +85,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origin_regex=r"^http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):\d+$",
-        allow_credentials=False,
+        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -103,6 +104,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_materials_router.router)
     app.include_router(materials_router.router)
     app.include_router(admin_students_router.router)
+    app.include_router(students_router.router)
     return app
 
 

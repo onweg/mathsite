@@ -17,6 +17,7 @@ export async function chat(
   const r = await fetch(`${BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ messages, topic: opts.topic, section: opts.section }),
   })
   if (!r.ok) {
@@ -56,6 +57,7 @@ export async function askRag(
   const r = await fetch(`${BASE}/rag/ask`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({
       query,
       topic: opts.topic,
@@ -104,6 +106,7 @@ export async function login(email: string, password: string): Promise<LoginRespo
   const r = await fetch(`${BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ email, password }),
   })
   if (!r.ok) {
@@ -116,6 +119,7 @@ export async function login(email: string, password: string): Promise<LoginRespo
 export async function me(token: string): Promise<AdminUser> {
   const r = await fetch(`${BASE}/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
+    credentials: 'include',
   })
   if (!r.ok) throw new Error(`me ${r.status}`)
   return (await r.json()) as AdminUser
@@ -203,6 +207,7 @@ async function apiJson<T>(
   const r = await fetch(`${BASE}${path}`, {
     method,
     headers,
+    credentials: 'include',
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
   if (r.status === 204) return undefined as T
@@ -333,6 +338,7 @@ export const adminMaterials = {
     const r = await fetch(`${BASE}/admin/materials`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
       body: fd,
     })
     if (!r.ok) {
@@ -373,6 +379,25 @@ export type ImportResultDTO = {
   errors: { line: number; source: string; reason: string }[]
 }
 
+export type StudentPublicDTO = {
+  id: string
+  name: string
+  class_label: string
+}
+
+export const studentAuth = {
+  activate: (token: string) =>
+    apiJson<StudentPublicDTO>('/students/activate', {
+      method: 'POST',
+      body: { token },
+    }),
+  me: () =>
+    apiJson<StudentPublicDTO | null>('/students/me', { method: 'GET' }).catch(
+      () => null,
+    ),
+  logout: () => apiJson<void>('/students/logout', { method: 'POST' }),
+}
+
 export const adminStudents = {
   list: (token: string, classLabel?: string) => {
     const qs = classLabel ? `?class_label=${encodeURIComponent(classLabel)}` : ''
@@ -398,6 +423,7 @@ export const adminStudents = {
     const r = await fetch(`${BASE}/admin/students/bulk/${kind}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
       body: fd,
     })
     if (!r.ok) {
