@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.infrastructure.repositories.chunks_repo import ChunksRepository
 from app.infrastructure.repositories.materials_repo import MaterialsRepository
 from app.infrastructure.repositories.quizzes_repo import QuizzesRepository
+from app.infrastructure.repositories.students_repo import StudentsRepository
 from app.infrastructure.repositories.users_repo import UsersRepository
 from app.infrastructure.repositories.weekly_repo import WeeklyTasksRepository
 from app.services.auth_service import AuthService
@@ -27,6 +28,8 @@ from app.services.indexing_service import IndexingService
 from app.services.materials_service import MaterialsService
 from app.services.quiz_service import QuizService
 from app.services.rag_service import RagService
+from app.services.students_import_service import StudentsImportService
+from app.services.students_service import StudentsService
 from app.services.weekly_service import WeeklyTaskService
 
 
@@ -136,3 +139,19 @@ def get_materials_service(
     return MaterialsService(
         repo, chunks, indexer, upload_dir=Path(settings.upload_dir)
     )
+
+
+def get_students_repo(request: Request) -> StudentsRepository:
+    return _state(request).students_repo
+
+
+def get_students_service(
+    repo: Annotated[StudentsRepository, Depends(get_students_repo)],
+) -> StudentsService:
+    return StudentsService(repo)
+
+
+def get_students_import_service(
+    students: Annotated[StudentsService, Depends(get_students_service)],
+) -> StudentsImportService:
+    return StudentsImportService(students)
