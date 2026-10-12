@@ -2,14 +2,16 @@ import { useState } from 'react'
 import { AdminUser } from '../lib/api'
 import { MaterialsPage } from './admin/MaterialsPage'
 import { QuizzesPage } from './admin/QuizzesPage'
+import { StudentsPage } from './admin/StudentsPage'
 import { WeeklyPage } from './admin/WeeklyPage'
 
-type Tab = 'quizzes' | 'weekly' | 'materials'
+type Tab = 'quizzes' | 'weekly' | 'materials' | 'students'
 
 const TABS: { id: Tab; label: string; ready: boolean }[] = [
   { id: 'quizzes', label: 'Квизы', ready: true },
   { id: 'weekly', label: 'Задача недели', ready: true },
   { id: 'materials', label: 'Материалы', ready: true },
+  { id: 'students', label: 'Класс', ready: true },
 ]
 
 export function AdminDashboard({
@@ -71,6 +73,7 @@ export function AdminDashboard({
         {tab === 'quizzes' && <QuizzesPage token={token} />}
         {tab === 'weekly' && <WeeklyPage token={token} />}
         {tab === 'materials' && <MaterialsPage token={token} />}
+        {tab === 'students' && <StudentsPage token={token} />}
       </main>
     </div>
   )

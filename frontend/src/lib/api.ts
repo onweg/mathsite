@@ -352,6 +352,71 @@ export const publicMaterials = {
   list: () => apiJson<MaterialPublicDTO[]>('/materials', { method: 'GET' }),
 }
 
+// ====== Ученики ======
+
+export type StudentDTO = {
+  id: string
+  name: string
+  class_label: string
+  qr_token: string
+  note: string | null
+}
+
+export type ClassSummaryDTO = {
+  class_label: string
+  count: number
+}
+
+export type ImportResultDTO = {
+  created: number
+  skipped_duplicates: number
+  errors: { line: number; source: string; reason: string }[]
+}
+
+export const adminStudents = {
+  list: (token: string, classLabel?: string) => {
+    const qs = classLabel ? `?class_label=${encodeURIComponent(classLabel)}` : ''
+    return apiJson<StudentDTO[]>(`/admin/students${qs}`, { method: 'GET', token })
+  },
+  classes: (token: string) =>
+    apiJson<ClassSummaryDTO[]>('/admin/students/classes', { method: 'GET', token }),
+  create: (
+    token: string,
+    body: { name: string; class_label: string; note?: string | null },
+  ) => apiJson<StudentDTO>('/admin/students', { method: 'POST', token, body }),
+  bulkText: (token: string, body: { text: string; default_class_label: string }) =>
+    apiJson<ImportResultDTO>('/admin/students/bulk/text', { method: 'POST', token, body }),
+  async bulkFile(
+    token: string,
+    kind: 'csv' | 'xlsx',
+    file: File,
+    defaultClassLabel: string,
+  ): Promise<ImportResultDTO> {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('default_class_label', defaultClassLabel)
+    const r = await fetch(`${BASE}/admin/students/bulk/${kind}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: fd,
+    })
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}))
+      throw new Error((data as { detail?: string }).detail || `import ${r.status}`)
+    }
+    return (await r.json()) as ImportResultDTO
+  },
+  update: (
+    token: string,
+    id: string,
+    body: { name?: string; class_label?: string; note?: string | null },
+  ) => apiJson<StudentDTO>(`/admin/students/${id}`, { method: 'PATCH', token, body }),
+  regenerate: (token: string, id: string) =>
+    apiJson<StudentDTO>(`/admin/students/${id}/regenerate`, { method: 'POST', token }),
+  delete: (token: string, id: string) =>
+    apiJson<void>(`/admin/students/${id}`, { method: 'DELETE', token }),
+}
+
 // ---- Public ----
 export const publicQuizzes = {
   list: () => apiJson<QuizSummaryDTO[]>('/quizzes', { method: 'GET' }),
