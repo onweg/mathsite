@@ -12,8 +12,15 @@ import { MissedClass } from './sections/MissedClass'
 import { Sections } from './sections/Sections'
 import { Weekly } from './sections/Weekly'
 import { useLenis } from './hooks/useLenis'
+import { AdminRouter } from './pages/AdminRouter'
 
 export default function App() {
+  const isAdmin = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')
+  if (isAdmin) return <AdminRouter />
+  return <PublicSite />
+}
+
+function PublicSite() {
   const [ready, setReady] = useState(false)
   useLenis()
 

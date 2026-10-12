@@ -79,3 +79,39 @@ export async function health(): Promise<boolean> {
     return false
   }
 }
+
+// ====== Auth (учитель-администратор) ======
+
+export type AdminUser = {
+  id: string
+  email: string
+  name: string
+  role: string
+}
+
+export type LoginResponse = {
+  user: AdminUser
+  access_token: string
+  token_type: string
+}
+
+export async function login(email: string, password: string): Promise<LoginResponse> {
+  const r = await fetch(`${BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    throw new Error((data as { detail?: string }).detail || `login ${r.status}`)
+  }
+  return (await r.json()) as LoginResponse
+}
+
+export async function me(token: string): Promise<AdminUser> {
+  const r = await fetch(`${BASE}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) throw new Error(`me ${r.status}`)
+  return (await r.json()) as AdminUser
+}
