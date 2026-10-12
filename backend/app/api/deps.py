@@ -15,12 +15,14 @@ from app.infrastructure.ratelimit.base import RateLimiter
 from app.infrastructure.repositories.chunks_repo import ChunksRepository
 from app.infrastructure.repositories.quizzes_repo import QuizzesRepository
 from app.infrastructure.repositories.users_repo import UsersRepository
+from app.infrastructure.repositories.weekly_repo import WeeklyTasksRepository
 from app.services.auth_service import AuthService
 from app.services.chat_service import ChatService
 from app.services.classifier_service import ClassifierService
 from app.services.indexing_service import IndexingService
 from app.services.quiz_service import QuizService
 from app.services.rag_service import RagService
+from app.services.weekly_service import WeeklyTaskService
 
 
 def _state(request: Request):
@@ -104,3 +106,13 @@ def get_quiz_service(
     chunks: Annotated[ChunksRepository, Depends(get_chunks_repo)],
 ) -> QuizService:
     return QuizService(llm, quizzes, chunks)
+
+
+def get_weekly_repo(request: Request) -> WeeklyTasksRepository:
+    return _state(request).weekly_repo
+
+
+def get_weekly_service(
+    repo: Annotated[WeeklyTasksRepository, Depends(get_weekly_repo)],
+) -> WeeklyTaskService:
+    return WeeklyTaskService(repo)

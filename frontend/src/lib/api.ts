@@ -245,6 +245,47 @@ export const adminQuizzes = {
     apiJson<void>(`/admin/quizzes/${id}`, { method: 'DELETE', token }),
 }
 
+// ====== Задача недели ======
+
+export type WeeklyTaskDTO = {
+  id: string
+  title: string
+  body_md: string
+  answer_md: string
+  is_published: boolean
+}
+
+export type WeeklyTaskPublicDTO = {
+  id: string
+  title: string
+  body_md: string
+}
+
+export const adminWeekly = {
+  list: (token: string) => apiJson<WeeklyTaskDTO[]>('/admin/weekly', { method: 'GET', token }),
+  get: (token: string, id: string) =>
+    apiJson<WeeklyTaskDTO>(`/admin/weekly/${id}`, { method: 'GET', token }),
+  create: (
+    token: string,
+    body: { title: string; body_md: string; answer_md: string },
+  ) => apiJson<WeeklyTaskDTO>('/admin/weekly', { method: 'POST', token, body }),
+  update: (
+    token: string,
+    id: string,
+    body: { title?: string; body_md?: string; answer_md?: string },
+  ) => apiJson<WeeklyTaskDTO>(`/admin/weekly/${id}`, { method: 'PATCH', token, body }),
+  publish: (token: string, id: string) =>
+    apiJson<WeeklyTaskDTO>(`/admin/weekly/${id}/publish`, { method: 'POST', token }),
+  unpublish: (token: string, id: string) =>
+    apiJson<WeeklyTaskDTO>(`/admin/weekly/${id}/unpublish`, { method: 'POST', token }),
+  delete: (token: string, id: string) =>
+    apiJson<void>(`/admin/weekly/${id}`, { method: 'DELETE', token }),
+}
+
+export const publicWeekly = {
+  current: () => apiJson<WeeklyTaskPublicDTO | null>('/weekly', { method: 'GET' }),
+}
+
 // ---- Public ----
 export const publicQuizzes = {
   list: () => apiJson<QuizSummaryDTO[]>('/quizzes', { method: 'GET' }),

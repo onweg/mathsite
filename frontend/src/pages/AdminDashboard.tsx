@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { AdminUser } from '../lib/api'
 import { QuizzesPage } from './admin/QuizzesPage'
+import { WeeklyPage } from './admin/WeeklyPage'
 
-type Tab = 'quizzes' | 'materials' | 'weekly'
+type Tab = 'quizzes' | 'weekly' | 'materials'
 
 const TABS: { id: Tab; label: string; ready: boolean }[] = [
   { id: 'quizzes', label: 'Квизы', ready: true },
+  { id: 'weekly', label: 'Задача недели', ready: true },
   { id: 'materials', label: 'Материалы', ready: false },
-  { id: 'weekly', label: 'Задача недели', ready: false },
 ]
 
 export function AdminDashboard({
@@ -67,7 +68,8 @@ export function AdminDashboard({
 
       <main className="max-w-4xl mx-auto px-6 py-10">
         {tab === 'quizzes' && <QuizzesPage token={token} />}
-        {tab !== 'quizzes' && (
+        {tab === 'weekly' && <WeeklyPage token={token} />}
+        {tab === 'materials' && (
           <div className="rounded-xl border border-dashed border-paper-50/15 p-10 text-center text-paper-50/50">
             этот раздел ещё в разработке
           </div>

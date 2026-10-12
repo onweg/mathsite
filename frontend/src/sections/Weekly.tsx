@@ -1,13 +1,24 @@
 import { motion, useScroll, useTransform } from 'framer-motion'
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Markdown } from '../components/Markdown'
 import { Magnetic } from '../components/Magnetic'
 import { RevealText, Reveal } from '../components/RevealText'
+import { WeeklyTaskPublicDTO, publicWeekly } from '../lib/api'
 
 export function Weekly() {
   const ref = useRef<HTMLElement>(null)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] })
   const yBig = useTransform(scrollYProgress, [0, 1], ['25%', '-25%'])
   const rotate = useTransform(scrollYProgress, [0, 1], [-6, 6])
+
+  const [task, setTask] = useState<WeeklyTaskPublicDTO | null | undefined>(undefined)
+
+  useEffect(() => {
+    publicWeekly
+      .current()
+      .then(setTask)
+      .catch(() => setTask(null))
+  }, [])
 
   return (
     <section id="weekly" ref={ref} className="relative overflow-hidden border-y border-paper-50/5 bg-ink-900 py-32 md:py-44">
@@ -23,7 +34,7 @@ export function Weekly() {
         <div className="md:col-span-5">
           <div className="mb-6 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/60">
             <span className="h-px w-10 bg-paper-50/40" />
-            <span>Задача недели · 07 — 13 октября</span>
+            <span>Задача недели</span>
           </div>
           <h2 className="font-display text-[clamp(2.4rem,5.5vw,6rem)] font-light leading-[0.95] tracking-tight">
             <RevealText as="span" className="block">Одна задача,</RevealText>
@@ -49,43 +60,45 @@ export function Weekly() {
                 <span className="h-1.5 w-1.5 rounded-full bg-gold-500" />
               </a>
             </Magnetic>
-            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-paper-50/50">
-              До разбора · 4 д 12 ч
-            </div>
           </div>
         </div>
 
         <div className="md:col-span-7">
           <Reveal>
             <article className="relative rounded-3xl border border-paper-50/10 bg-ink-950/60 p-8 md:p-12">
-              <div className="mb-8 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.25em] text-paper-50/50">
-                <span>Задача № 142</span>
-                <span className="text-gold-500">★ ★ ★ ☆ ☆</span>
-              </div>
-              <p className="text-balance font-serif text-2xl leading-relaxed text-paper-50 md:text-[1.9rem]">
-                В выпуклом четырёхугольнике{' '}
-                <span className="italic text-gold-500">ABCD</span> диагонали
-                пересекаются в точке{' '}
-                <span className="italic text-gold-500">O</span>. Известно, что
-                площади треугольников{' '}
-                <span className="italic">AOB</span> и{' '}
-                <span className="italic">COD</span> равны 9 и 16. Найдите площадь
-                четырёхугольника, если{' '}
-                <span className="italic">AO · OC = BO · OD</span>.
-              </p>
-
-              <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3 font-mono text-[10px] uppercase tracking-[0.25em] text-paper-50/55">
-                <span>Темы:</span>
-                <span className="text-paper-50">Планиметрия</span>
-                <span className="h-1 w-1 rounded-full bg-paper-50/40" />
-                <span className="text-paper-50">Подобие</span>
-                <span className="h-1 w-1 rounded-full bg-paper-50/40" />
-                <span className="text-paper-50">Отношения площадей</span>
-              </div>
+              {task === undefined ? (
+                <div className="font-mono text-xs uppercase tracking-[0.25em] text-paper-50/40">
+                  загружаем…
+                </div>
+              ) : task === null ? (
+                <EmptyState />
+              ) : (
+                <>
+                  <div className="mb-8 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.25em] text-paper-50/50">
+                    <span>{task.title}</span>
+                  </div>
+                  <div className="text-balance font-serif text-xl leading-relaxed text-paper-50 md:text-[1.6rem]">
+                    <Markdown text={task.body_md} />
+                  </div>
+                </>
+              )}
             </article>
           </Reveal>
         </div>
       </div>
     </section>
+  )
+}
+
+function EmptyState() {
+  return (
+    <div className="py-6 space-y-3 text-paper-50/60">
+      <div className="font-mono text-[10px] uppercase tracking-[0.25em]">
+        задача недели ещё не опубликована
+      </div>
+      <p className="text-sm">
+        Как только учитель опубликует новую задачу — она появится здесь.
+      </p>
+    </div>
   )
 }
