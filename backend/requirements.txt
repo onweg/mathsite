@@ -13,3 +13,4 @@ sqlalchemy==2.0.36
 bcrypt==4.2.1
 PyJWT==2.10.1
 python-multipart==0.0.19
+openpyxl==3.1.5
