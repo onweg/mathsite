@@ -3,7 +3,18 @@ import { useEffect, useRef, useState } from 'react'
 import { Magnetic } from '../components/Magnetic'
 import { Markdown } from '../components/Markdown'
 import { Reveal, RevealText } from '../components/RevealText'
-import { askRag, type RagChunk, type RagReply, type Topic } from '../lib/api'
+import {
+  askRag,
+  publicMaterials,
+  type MaterialPublicDTO,
+  type RagChunk,
+  type RagReply,
+  type Topic,
+} from '../lib/api'
+
+type Selection =
+  | { kind: 'topic'; value: Topic }
+  | { kind: 'material'; source_key: string; title: string }
 
 type State =
   | { kind: 'empty' }
@@ -29,16 +40,29 @@ const CHIPS: Record<Topic, { label: string; q: string }[]> = {
 }
 
 export function MissedClass() {
-  const [topic, setTopic] = useState<Topic>('algebra')
+  const [selection, setSelection] = useState<Selection>({ kind: 'topic', value: 'algebra' })
+  const [materials, setMaterials] = useState<MaterialPublicDTO[]>([])
   const [input, setInput] = useState('')
   const [state, setState] = useState<State>({ kind: 'empty' })
   const resultRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    publicMaterials
+      .list()
+      .then(setMaterials)
+      .catch(() => setMaterials([]))
+  }, [])
+
+  const topic: Topic = selection.kind === 'topic' ? selection.value : 'algebra'
 
   const run = async (q: string) => {
     if (!q.trim()) return
     setState({ kind: 'loading' })
     try {
-      const reply = await askRag(q, { topic })
+      const reply = await askRag(q, {
+        topic: selection.kind === 'topic' ? selection.value : undefined,
+        source_key: selection.kind === 'material' ? selection.source_key : undefined,
+      })
       setState({ kind: 'answered', query: q, reply })
       // плавно уводим фокус к ответу
       requestAnimationFrame(() => {
@@ -98,8 +122,9 @@ export function MissedClass() {
 
         {/* Форма — всегда видна */}
         <AskForm
-          topic={topic}
-          onTopicChange={setTopic}
+          selection={selection}
+          onSelectionChange={setSelection}
+          materials={materials}
           value={input}
           onChange={setInput}
           onSubmit={() => run(input)}
@@ -108,7 +133,7 @@ export function MissedClass() {
 
         {/* Чипы — только в пустом состоянии */}
         <AnimatePresence>
-          {state.kind === 'empty' && (
+          {state.kind === 'empty' && selection.kind === 'topic' && (
             <motion.div
               key="chips"
               initial={{ opacity: 0, y: 10 }}
@@ -172,7 +197,7 @@ export function MissedClass() {
               <AnswerBlock
                 query={state.query}
                 reply={state.reply}
-                topic={topic}
+                sourceLabel={selectionLabel(selection)}
                 onReset={reset}
               />
             </motion.div>
@@ -198,15 +223,17 @@ export function MissedClass() {
 /* -------------------------------------------------------------------------- */
 
 function AskForm({
-  topic,
-  onTopicChange,
+  selection,
+  onSelectionChange,
+  materials,
   value,
   onChange,
   onSubmit,
   disabled,
 }: {
-  topic: Topic
-  onTopicChange: (t: Topic) => void
+  selection: Selection
+  onSelectionChange: (s: Selection) => void
+  materials: MaterialPublicDTO[]
   value: string
   onChange: (s: string) => void
   onSubmit: () => void
@@ -220,74 +247,86 @@ function AskForm({
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-3xl border border-paper-50/10 bg-ink-900/60 p-5 md:flex-row md:items-center md:gap-6 md:p-6">
-      <TopicToggle value={topic} onChange={onTopicChange} />
-
-      <div className="h-px w-full bg-paper-50/10 md:h-10 md:w-px" />
-
-      <input
-        data-cursor
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={onKey}
-        placeholder="О чём рассказать? Например: как раскладывать на множители"
-        className="flex-1 bg-transparent px-2 py-2 text-base text-paper-50 placeholder:text-paper-50/35 focus:outline-none"
-      />
-
-      <Magnetic strength={0.4}>
-        <button
-          data-cursor="lg"
-          data-cursor-label="Разобрать"
-          disabled={disabled || !value.trim()}
-          onClick={onSubmit}
-          className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full bg-gold-500 px-6 py-3 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-950 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+    <div className="flex flex-col gap-4 rounded-3xl border border-paper-50/10 bg-ink-900/60 p-5 md:p-6">
+      <div className="flex flex-wrap items-center gap-2">
+        <TopicChip
+          active={selection.kind === 'topic' && selection.value === 'algebra'}
+          onClick={() => onSelectionChange({ kind: 'topic', value: 'algebra' })}
         >
-          <span className="relative z-10">Разобрать</span>
-          <svg
-            className="relative z-10 transition-transform duration-500 group-hover:translate-x-1"
-            width="14" height="10" viewBox="0 0 14 10" fill="none">
-            <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span className="absolute inset-0 translate-y-full bg-paper-50 transition-transform duration-700 ease-out-expo group-hover:translate-y-0" />
-        </button>
-      </Magnetic>
+          Алгебра
+        </TopicChip>
+        <TopicChip
+          active={selection.kind === 'topic' && selection.value === 'geometry'}
+          onClick={() => onSelectionChange({ kind: 'topic', value: 'geometry' })}
+        >
+          Геометрия
+        </TopicChip>
+        {materials.map((m) => (
+          <TopicChip
+            key={m.source_key}
+            active={selection.kind === 'material' && selection.source_key === m.source_key}
+            onClick={() =>
+              onSelectionChange({ kind: 'material', source_key: m.source_key, title: m.title })
+            }
+          >
+            {m.title}
+          </TopicChip>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
+        <input
+          data-cursor
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={onKey}
+          placeholder="О чём рассказать? Например: как раскладывать на множители"
+          className="flex-1 bg-transparent px-2 py-2 text-base text-paper-50 placeholder:text-paper-50/35 focus:outline-none"
+        />
+
+        <Magnetic strength={0.4}>
+          <button
+            data-cursor="lg"
+            data-cursor-label="Разобрать"
+            disabled={disabled || !value.trim()}
+            onClick={onSubmit}
+            className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full bg-gold-500 px-6 py-3 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-950 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <span className="relative z-10">Разобрать</span>
+            <svg
+              className="relative z-10 transition-transform duration-500 group-hover:translate-x-1"
+              width="14" height="10" viewBox="0 0 14 10" fill="none">
+              <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="absolute inset-0 translate-y-full bg-paper-50 transition-transform duration-700 ease-out-expo group-hover:translate-y-0" />
+          </button>
+        </Magnetic>
+      </div>
     </div>
   )
 }
 
-function TopicToggle({
-  value,
-  onChange,
+function TopicChip({
+  active,
+  onClick,
+  children,
 }: {
-  value: Topic
-  onChange: (t: Topic) => void
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
 }) {
-  const items: { k: Topic; label: string }[] = [
-    { k: 'algebra', label: 'Алгебра' },
-    { k: 'geometry', label: 'Геометрия' },
-  ]
   return (
-    <div className="relative flex shrink-0 items-center rounded-full border border-paper-50/10 bg-ink-800/60 p-0.5">
-      {items.map((it) => (
-        <button
-          key={it.k}
-          onClick={() => onChange(it.k)}
-          data-cursor
-          className={`relative rounded-full px-4 py-1.5 font-mono text-[10px] uppercase tracking-[0.22em] transition-colors ${
-            value === it.k ? 'text-ink-950' : 'text-paper-50/70 hover:text-paper-50'
-          }`}
-        >
-          {value === it.k && (
-            <motion.span
-              layoutId="missed-topic-pill"
-              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-              className="absolute inset-0 rounded-full bg-gold-500"
-            />
-          )}
-          <span className="relative">{it.label}</span>
-        </button>
-      ))}
-    </div>
+    <button
+      onClick={onClick}
+      data-cursor
+      className={`relative overflow-hidden rounded-full border px-4 py-1.5 font-mono text-[10px] uppercase tracking-[0.22em] transition-colors ${
+        active
+          ? 'border-gold-500 bg-gold-500 text-ink-950'
+          : 'border-paper-50/10 bg-ink-800/60 text-paper-50/70 hover:text-paper-50'
+      }`}
+    >
+      <span className="relative">{children}</span>
+    </button>
   )
 }
 
@@ -337,6 +376,15 @@ function LoadingLog() {
   )
 }
 
+function selectionLabel(s: Selection): string {
+  if (s.kind === 'topic') {
+    return s.value === 'algebra'
+      ? 'учебник алгебры 8 класса, Макарычев'
+      : 'учебник геометрии 7–9, Атанасян'
+  }
+  return s.title
+}
+
 function PulseDot() {
   return (
     <motion.span
@@ -352,16 +400,15 @@ function PulseDot() {
 function AnswerBlock({
   query,
   reply,
-  topic,
+  sourceLabel,
   onReset,
 }: {
   query: string
   reply: RagReply
-  topic: Topic
+  sourceLabel: string
   onReset: () => void
 }) {
   const notFound = reply.chunks.length === 0 || reply.blocked
-  const sourceLabel = topic === 'algebra' ? 'учебник алгебры 8 класса, Макарычев' : 'учебник геометрии 7–9, Атанасян'
 
   return (
     <article>

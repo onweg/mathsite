@@ -6,6 +6,8 @@ from .chat import Topic
 class RagRequest(BaseModel):
     query: str = Field(min_length=3, max_length=500)
     topic: Topic | None = None
+    # произвольный source_key материала учителя (material_xxx)
+    source_key: str | None = Field(default=None, max_length=100)
     limit: int = Field(default=5, ge=1, le=10)
 
 

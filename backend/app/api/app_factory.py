@@ -14,17 +14,20 @@ from app.infrastructure.llm.yandex import YandexProvider
 from app.infrastructure.ratelimit.base import Limit
 from app.infrastructure.ratelimit.memory import InMemoryRateLimiter
 from app.infrastructure.repositories.chunks_repo import PgChunksRepository
+from app.infrastructure.repositories.materials_repo import PgMaterialsRepository
 from app.infrastructure.repositories.quizzes_repo import PgQuizzesRepository
 from app.infrastructure.repositories.users_repo import PgUsersRepository
 from app.infrastructure.repositories.weekly_repo import PgWeeklyTasksRepository
 
 from .middleware import RequestIdMiddleware, register_error_handlers
+from .routers import admin_materials as admin_materials_router
 from .routers import admin_quizzes as admin_quizzes_router
 from .routers import admin_weekly as admin_weekly_router
 from .routers import auth as auth_router
 from .routers import chat as chat_router
 from .routers import embed as embed_router
 from .routers import health as health_router
+from .routers import materials as materials_router
 from .routers import quizzes as quizzes_router
 from .routers import rag as rag_router
 from .routers import weekly as weekly_router
@@ -58,6 +61,7 @@ async def _lifespan(app: FastAPI):
     app.state.users_repo = PgUsersRepository(pool)
     app.state.quizzes_repo = PgQuizzesRepository(pool)
     app.state.weekly_repo = PgWeeklyTasksRepository(pool)
+    app.state.materials_repo = PgMaterialsRepository(pool)
     app.state.rate_limiter = InMemoryRateLimiter((
         Limit(max_requests=settings.rate_limit_per_minute, window_seconds=60),
         Limit(max_requests=settings.rate_limit_per_hour, window_seconds=3600),
@@ -93,6 +97,8 @@ def create_app() -> FastAPI:
     app.include_router(quizzes_router.router)
     app.include_router(admin_weekly_router.router)
     app.include_router(weekly_router.router)
+    app.include_router(admin_materials_router.router)
+    app.include_router(materials_router.router)
     return app
 
 

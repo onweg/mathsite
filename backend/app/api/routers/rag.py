@@ -27,7 +27,9 @@ async def rag_ask(
     if not ok:
         raise RateLimited(reason)
 
-    ans = await rag_service.ask(req.query, topic=req.topic, limit=req.limit)
+    ans = await rag_service.ask(
+        req.query, topic=req.topic, limit=req.limit, source_key=req.source_key
+    )
     return RagResponse(
         text=ans.reply.text,
         reason="no_relevant_chunks" if ans.not_found else None,

@@ -51,12 +51,17 @@ export type RagReply = {
 
 export async function askRag(
   query: string,
-  opts: { topic?: Topic; limit?: number } = {},
+  opts: { topic?: Topic; source_key?: string; limit?: number } = {},
 ): Promise<RagReply> {
   const r = await fetch(`${BASE}/rag/ask`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, topic: opts.topic, limit: opts.limit ?? 5 }),
+    body: JSON.stringify({
+      query,
+      topic: opts.topic,
+      source_key: opts.source_key,
+      limit: opts.limit ?? 5,
+    }),
   })
   if (!r.ok) {
     const text = await r.text().catch(() => '')
@@ -294,6 +299,57 @@ export const adminWeekly = {
 
 export const publicWeekly = {
   current: () => apiJson<WeeklyTaskPublicDTO | null>('/weekly', { method: 'GET' }),
+}
+
+// ====== Материалы ======
+
+export type MaterialStatus = 'pending' | 'indexing' | 'ready' | 'failed'
+
+export type MaterialDTO = {
+  id: string
+  slug: string
+  title: string
+  source_key: string
+  status: MaterialStatus
+  chunks_count: number
+  error_message: string | null
+}
+
+export type MaterialPublicDTO = {
+  id: string
+  title: string
+  source_key: string
+  chunks_count: number
+}
+
+export const adminMaterials = {
+  list: (token: string) => apiJson<MaterialDTO[]>('/admin/materials', { method: 'GET', token }),
+  get: (token: string, id: string) =>
+    apiJson<MaterialDTO>(`/admin/materials/${id}`, { method: 'GET', token }),
+  async upload(token: string, file: File, title: string): Promise<MaterialDTO> {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('title', title)
+    const r = await fetch(`${BASE}/admin/materials`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: fd,
+    })
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}))
+      throw new Error((data as { detail?: string }).detail || `upload ${r.status}`)
+    }
+    const data = (await r.json()) as { material: MaterialDTO }
+    return data.material
+  },
+  reindex: (token: string, id: string) =>
+    apiJson<MaterialDTO>(`/admin/materials/${id}/reindex`, { method: 'POST', token }),
+  delete: (token: string, id: string) =>
+    apiJson<void>(`/admin/materials/${id}`, { method: 'DELETE', token }),
+}
+
+export const publicMaterials = {
+  list: () => apiJson<MaterialPublicDTO[]>('/materials', { method: 'GET' }),
 }
 
 // ---- Public ----

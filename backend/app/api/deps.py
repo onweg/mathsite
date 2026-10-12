@@ -12,7 +12,11 @@ from app.core.errors import Forbidden, NotAuthenticated
 from app.domain.auth.types import User
 from app.infrastructure.llm.base import LLMProvider
 from app.infrastructure.ratelimit.base import RateLimiter
+from pathlib import Path
+
+from app.core.config import settings
 from app.infrastructure.repositories.chunks_repo import ChunksRepository
+from app.infrastructure.repositories.materials_repo import MaterialsRepository
 from app.infrastructure.repositories.quizzes_repo import QuizzesRepository
 from app.infrastructure.repositories.users_repo import UsersRepository
 from app.infrastructure.repositories.weekly_repo import WeeklyTasksRepository
@@ -20,6 +24,7 @@ from app.services.auth_service import AuthService
 from app.services.chat_service import ChatService
 from app.services.classifier_service import ClassifierService
 from app.services.indexing_service import IndexingService
+from app.services.materials_service import MaterialsService
 from app.services.quiz_service import QuizService
 from app.services.rag_service import RagService
 from app.services.weekly_service import WeeklyTaskService
@@ -116,3 +121,18 @@ def get_weekly_service(
     repo: Annotated[WeeklyTasksRepository, Depends(get_weekly_repo)],
 ) -> WeeklyTaskService:
     return WeeklyTaskService(repo)
+
+
+def get_materials_repo(request: Request) -> MaterialsRepository:
+    return _state(request).materials_repo
+
+
+def get_materials_service(
+    repo: Annotated[MaterialsRepository, Depends(get_materials_repo)],
+    chunks: Annotated[ChunksRepository, Depends(get_chunks_repo)],
+    llm: Annotated[LLMProvider, Depends(get_llm)],
+) -> MaterialsService:
+    indexer = IndexingService(llm, chunks)
+    return MaterialsService(
+        repo, chunks, indexer, upload_dir=Path(settings.upload_dir)
+    )

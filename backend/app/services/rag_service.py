@@ -43,6 +43,7 @@ class RagService:
         *,
         topic: Topic | None,
         limit: int,
+        source_key: str | None = None,
     ) -> RagAnswer:
         pre = safety.pre_filter(query)
         if not pre.allowed:
@@ -52,11 +53,13 @@ class RagService:
         if not await self._classifier.is_math_question(query):
             raise SafetyBlocked("classifier:not_math")
 
-        source: Source | None = None
-        if topic == "algebra":
-            source = "textbook_8_algebra"
-        elif topic == "geometry":
-            source = "textbook_8_geometry"
+        # явный source_key материала перекрывает topic
+        source: Source | None = source_key
+        if not source:
+            if topic == "algebra":
+                source = "textbook_8_algebra"
+            elif topic == "geometry":
+                source = "textbook_8_geometry"
 
         q_vec = await self._llm.embed(query, kind="query")
         hits = await self._repo.semantic_search(
