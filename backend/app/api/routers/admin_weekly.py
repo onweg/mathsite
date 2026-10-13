@@ -93,7 +93,7 @@ async def unpublish(
     return _dto(await svc.unpublish(task_id))
 
 
-@router.delete("/{task_id}", status_code=204)
+@router.delete("/{task_id}", status_code=204, response_model=None)
 async def delete(
     task_id: UUID,
     _: Annotated[User, Depends(get_current_admin)],

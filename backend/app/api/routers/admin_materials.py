@@ -82,7 +82,7 @@ async def reindex(
     return _dto(material)
 
 
-@router.delete("/{material_id}", status_code=204)
+@router.delete("/{material_id}", status_code=204, response_model=None)
 async def delete(
     material_id: UUID,
     _: Annotated[User, Depends(get_current_admin)],

@@ -170,7 +170,7 @@ async def unpublish(
     return _quiz_to_dto(await svc.unpublish(quiz_id))
 
 
-@router.delete("/{quiz_id}", status_code=204)
+@router.delete("/{quiz_id}", status_code=204, response_model=None)
 async def delete(
     quiz_id: UUID,
     _: Annotated[User, Depends(get_current_admin)],

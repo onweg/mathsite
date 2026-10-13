@@ -213,7 +213,7 @@ export function MissedClass() {
               exit={{ opacity: 0 }}
               className="mt-10 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-6 py-5 text-sm text-rose-100"
             >
-              {state.message}. Запущен ли backend?
+              {state.message}
             </motion.div>
           )}
         </AnimatePresence>

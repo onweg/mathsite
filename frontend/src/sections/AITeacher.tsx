@@ -161,7 +161,7 @@ function ChatPanel() {
         {loading && <Typing />}
         {error && (
           <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-            {error}. Запущен ли backend? ({'python -m uvicorn app.main:app --reload --port 8000'})
+            {error}
           </div>
         )}
       </div>

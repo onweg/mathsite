@@ -106,7 +106,7 @@ async def bulk_csv(
     user: Annotated[User, Depends(get_current_admin)],
     svc: Annotated[StudentsImportService, Depends(get_students_import_service)],
     file: Annotated[UploadFile, File(...)],
-    default_class_label: Annotated[str, Form("")] = "",
+    default_class_label: Annotated[str, Form()] = "",
 ) -> ImportResultDTO:
     data = await file.read()
     if len(data) > _MAX_UPLOAD_BYTES:
@@ -120,7 +120,7 @@ async def bulk_xlsx(
     user: Annotated[User, Depends(get_current_admin)],
     svc: Annotated[StudentsImportService, Depends(get_students_import_service)],
     file: Annotated[UploadFile, File(...)],
-    default_class_label: Annotated[str, Form("")] = "",
+    default_class_label: Annotated[str, Form()] = "",
 ) -> ImportResultDTO:
     data = await file.read()
     if len(data) > _MAX_UPLOAD_BYTES:
@@ -154,7 +154,7 @@ async def regenerate(
     return _dto(await svc.regenerate_token(student_id))
 
 
-@router.delete("/{student_id}", status_code=204)
+@router.delete("/{student_id}", status_code=204, response_model=None)
 async def delete(
     student_id: UUID,
     _: Annotated[User, Depends(get_current_admin)],

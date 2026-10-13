@@ -66,7 +66,7 @@ async def me(
     return _public_dto(student)
 
 
-@router.post("/logout", status_code=204)
+@router.post("/logout", status_code=204, response_model=None)
 async def logout(response: Response) -> None:
     response.delete_cookie(STUDENT_COOKIE_NAME, path="/")
 
