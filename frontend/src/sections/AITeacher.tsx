@@ -4,6 +4,7 @@ import { Markdown } from '../components/Markdown'
 import { MicButton } from '../components/MicButton'
 import { RevealText } from '../components/RevealText'
 import { chat, health, type ChatMessage, type Topic } from '../lib/api'
+import { scrollToId } from '../hooks/useLenis'
 import { useVoice } from '../lib/voice'
 
 const initial: ChatMessage[] = [
@@ -150,7 +151,7 @@ function ChatPanel() {
         append: (t) => writeInput((inputRef.current + ' ' + t).trim()),
         submit: () => void sendRef.current(),
         focus: () => {
-          document.getElementById('ai')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          scrollToId('ai')
           boxRef.current?.focus({ preventScroll: true })
         },
       }),

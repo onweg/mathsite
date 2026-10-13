@@ -7,6 +7,7 @@ import {
   QuizSummaryDTO,
   publicQuizzes,
 } from '../lib/api'
+import { scrollToElement } from '../hooks/useLenis'
 import { useStudent } from '../lib/student'
 
 const NAME_KEY = 'mathsite.student.name'
@@ -43,7 +44,7 @@ export function Quizzes() {
       firstScreen.current = false
       return
     }
-    sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    scrollToElement(sectionRef.current)
   }, [screen.kind])
 
   if (!quizzes) {

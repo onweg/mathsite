@@ -56,7 +56,7 @@ const STORAGE_KEY = 'mathsite.voice.enabled'
 /** Сколько молчим в режиме диктовки, прежде чем вернуться к ожиданию якоря. */
 const IDLE_MS = 20_000
 /** Chrome сам обрывает распознавание — поднимаем обратно с небольшой паузой. */
-const RESTART_MS = 400
+const RESTART_MS = 150
 
 /* ---------- Разбор якорей ---------- */
 
@@ -70,7 +70,8 @@ function norm(s: string): string {
  * Поэтому держим несколько написаний, но обязательно вместе со словом-командой —
  * иначе на уроке якорь будет срабатывать от любого «и».
  */
-const WAKE_RE = /(?:^|\s)(?:и\s?и|аи|ai|эй\s*и\s?и)\s*[,.!?…–—-]*\s*(?:вопрос\w*|спроси\w*)/
+const WAKE_RE =
+  /(?:^|\s)(?:и\s?и|и{2,}|аи|ai|ия|эй|ей|ай)\s*[,.!?…–—-]*\s*(?:вопрос[а-я]*|спроси[а-я]*)/
 const SEND_RE =
   /(?:^|\s)(?:и\s?и\s*[,.!?…–—-]*\s*)?(?:ответь|отвечай|отправь|отправить|готово)\s*[.!?…]*\s*$/
 const CANCEL_RE =
@@ -79,7 +80,8 @@ const CANCEL_RE =
 export function findWakePhrase(text: string): { tail: string } | null {
   const m = WAKE_RE.exec(norm(text))
   if (!m) return null
-  return { tail: text.slice(m.index + m[0].length).trim() }
+  const tail = text.slice(m.index + m[0].length).replace(/^[\s,.!?…:;–—-]+/, '').trim()
+  return { tail }
 }
 
 export function findSendPhrase(text: string): { body: string } | null {
@@ -111,6 +113,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
 
   const recRef = useRef<any>(null)
+  /** Якорь поймали на interim — значит в финальном куске его надо срезать. */
+  const pendingWakeRef = useRef(false)
   const enabledRef = useRef(false)
   const modeRef = useRef<Mode>('off')
   const pausedRef = useRef(false)
@@ -130,6 +134,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const endDictation = useCallback(() => {
+    pendingWakeRef.current = false
     clearIdle()
     setInterim('')
     setModeBoth(enabledRef.current ? 'wake' : 'off')
@@ -172,7 +177,14 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       if (!text) return
 
       if (modeRef.current === 'dictating') {
-        consume(text)
+        let chunk = text
+        if (pendingWakeRef.current) {
+          pendingWakeRef.current = false
+          // Тот же кусок речи, по которому мы уже проснулись: сам якорь в вопрос не пишем.
+          const w = findWakePhrase(chunk)
+          if (w) chunk = w.tail
+        }
+        if (chunk) consume(chunk)
         return
       }
       const wake = findWakePhrase(text)
@@ -202,6 +214,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           else int += txt
         }
         setInterim(int)
+        // Реакция на якорь — сразу, не дожидаясь финализации фразы.
+        if (int && modeRef.current === 'wake' && findWakePhrase(int)) {
+          pendingWakeRef.current = true
+          beginDictation()
+        }
         if (fin) handleFinal(fin)
       }
       rec.onerror = (e: any) => {
@@ -233,7 +250,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     } catch {
       // start() бросает, если распознавание уже идёт — это нормально
     }
-  }, [Ctor, handleFinal, setModeBoth])
+  }, [Ctor, beginDictation, handleFinal, setModeBoth])
 
   const enable = useCallback(() => {
     if (!supported) return
