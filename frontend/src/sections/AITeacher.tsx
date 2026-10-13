@@ -204,7 +204,7 @@ function ChatPanel() {
           value={input}
           onChange={(e) => writeInput(e.target.value)}
           onKeyDown={onKey}
-          placeholder="Спроси по математике · Enter — отправить · или скажи «ИИ, вопрос»"
+          placeholder="Спроси по математике · или скажи «ИИ, вопрос»"
           rows={1}
           className="min-h-[36px] flex-1 resize-none bg-transparent px-2 py-2 text-[15px] text-paper-50 placeholder:text-paper-50/40 focus:outline-none"
         />
