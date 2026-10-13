@@ -84,6 +84,23 @@ export function findWakePhrase(text: string): { tail: string } | null {
   return { tail }
 }
 
+/**
+ * Срезает якорь в начале реплики.
+ *
+ * Отдельно от WAKE_RE: когда мы проснулись на промежуточном результате,
+ * финальный кусок от Chrome может прийти уже без «ИИ» впереди — например
+ * просто «Вопрос рациональные выражения». Без этой чистки слово «вопрос»
+ * уезжало в текст вопроса.
+ */
+const LEADING_WAKE_RE =
+  /^[\s,.!?…:;–—-]*(?:(?:и\s?и|и{2,}|аи|ai|ия|эй|ей|ай)[\s,.!?…:;–—-]*)?(?:вопрос[а-я]*|спроси[а-я]*)[\s,.!?…:;–—-]*/
+
+export function stripWakePrefix(text: string): string {
+  const m = LEADING_WAKE_RE.exec(norm(text))
+  if (!m || m[0].length === 0) return text.trim()
+  return text.slice(m[0].length).trim()
+}
+
 export function findSendPhrase(text: string): { body: string } | null {
   const m = SEND_RE.exec(norm(text))
   if (!m) return null
@@ -182,7 +199,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           pendingWakeRef.current = false
           // Тот же кусок речи, по которому мы уже проснулись: сам якорь в вопрос не пишем.
           const w = findWakePhrase(chunk)
-          if (w) chunk = w.tail
+          chunk = w ? w.tail : stripWakePrefix(chunk)
         }
         if (chunk) consume(chunk)
         return

@@ -4,7 +4,7 @@ import { Markdown } from '../components/Markdown'
 import { MicButton } from '../components/MicButton'
 import { RevealText } from '../components/RevealText'
 import { chat, health, type ChatMessage, type Topic } from '../lib/api'
-import { scrollToId } from '../hooks/useLenis'
+import { scrollToElement } from '../hooks/useLenis'
 import { useVoice } from '../lib/voice'
 
 const initial: ChatMessage[] = [
@@ -151,7 +151,9 @@ function ChatPanel() {
         append: (t) => writeInput((inputRef.current + ' ' + t).trim()),
         submit: () => void sendRef.current(),
         focus: () => {
-          scrollToId('ai')
+          // Ведём не к началу секции, а к самому полю ввода: ученик должен
+          // видеть, что его слова печатаются.
+          scrollToElement(boxRef.current, { align: 'bottom', margin: 140 })
           boxRef.current?.focus({ preventScroll: true })
         },
       }),

@@ -12,13 +12,29 @@ let instance: Lenis | null = null
 /** Высота фиксированной шапки — на столько не доезжаем до верха секции. */
 const NAV_OFFSET = -96
 
-export function scrollToElement(el: Element | null): void {
+type Align = 'top' | 'bottom'
+
+/**
+ * `align: 'bottom'` подводит элемент к нижней части экрана, а не к верхней.
+ * Нужно для поля ввода в чате: секция высокая, и выравнивание по её верху
+ * оставляет само поле далеко внизу за краем экрана.
+ */
+export function scrollToElement(
+  el: Element | null,
+  opts: { align?: Align; margin?: number } = {},
+): void {
   if (!el) return
+  const { align = 'top', margin = 120 } = opts
+
   if (instance) {
-    instance.scrollTo(el as HTMLElement, { offset: NAV_OFFSET, duration: 1.1 })
+    const offset =
+      align === 'bottom'
+        ? -(window.innerHeight - el.getBoundingClientRect().height - margin)
+        : NAV_OFFSET
+    instance.scrollTo(el as HTMLElement, { offset, duration: 1.1 })
     return
   }
-  el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  el.scrollIntoView({ behavior: 'smooth', block: align === 'bottom' ? 'end' : 'start' })
 }
 
 export function scrollToId(id: string): void {
