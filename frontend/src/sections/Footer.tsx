@@ -28,16 +28,6 @@ export function Footer() {
             </ul>
           </div>
 
-          <div>
-            <div className="mb-5 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/50">
-              Контакты
-            </div>
-            <ul className="space-y-2 font-serif text-base italic text-paper-100/90">
-              <li>abdulewix@mail.com</li>
-              <li>школа · 8 класс</li>
-              <li>показ коллегам · ноябрь</li>
-            </ul>
-          </div>
         </div>
 
         <div className="mt-20 flex flex-col items-start justify-between gap-6 border-t border-paper-50/8 pt-8 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/50 md:flex-row md:items-center">

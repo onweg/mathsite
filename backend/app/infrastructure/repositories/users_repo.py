@@ -15,6 +15,8 @@ class UsersRepository(Protocol):
 
     async def create(self, email: str, name: str, password_hash: str) -> User: ...
 
+    async def set_password(self, user_id: UUID, password_hash: str) -> None: ...
+
 
 class PgUsersRepository:
     def __init__(self, pool: AsyncConnectionPool):
@@ -56,3 +58,11 @@ class PgUsersRepository:
             row = await cur.fetchone()
             await conn.commit()
         return User(id=row[0], email=row[1], name=row[2], role=row[3], created_at=row[4])
+
+    async def set_password(self, user_id: UUID, password_hash: str) -> None:
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                "UPDATE users SET password_hash = %s WHERE id = %s",
+                (password_hash, user_id),
+            )
+            await conn.commit()
