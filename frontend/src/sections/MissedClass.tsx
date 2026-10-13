@@ -85,7 +85,7 @@ export function MissedClass() {
   }
 
   return (
-    <section id="missed" className="relative overflow-hidden py-32 md:py-44">
+    <section id="missed" className="relative scroll-mt-24 overflow-hidden py-32 md:py-44">
       {/* фоновый большой глиф */}
       <motion.div
         aria-hidden

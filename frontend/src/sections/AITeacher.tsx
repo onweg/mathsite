@@ -16,7 +16,7 @@ export function AITeacher() {
   const yFloat = useTransform(scrollYProgress, [0, 1], ['12%', '-12%'])
 
   return (
-    <section id="ai" ref={ref} className="relative overflow-hidden py-32 md:py-44">
+    <section id="ai" ref={ref} className="relative scroll-mt-24 overflow-hidden py-32 md:py-44">
       <div className="mx-auto grid max-w-[1700px] grid-cols-1 gap-14 px-6 md:grid-cols-12 md:px-10">
         <div className="md:col-span-5">
           <div className="mb-6 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/60">

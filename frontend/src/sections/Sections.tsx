@@ -1,6 +1,7 @@
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { useRef } from 'react'
 import { Reveal, RevealText } from '../components/RevealText'
+import { useHasQuizzes } from '../lib/useHasQuizzes'
 
 type Item = {
   num: string
@@ -8,12 +9,15 @@ type Item = {
   tag: string
   desc: string
   accent?: 'gold' | 'sage'
+  /** Якорь раздела на этой же странице. Нет href — раздела ещё нет, карточка не кликабельна. */
+  href?: string
 }
 
 const items: Item[] = [
   {
     num: '01',
     title: 'Пропустил урок?',
+    href: '#missed',
     tag: 'RAG · Учебник',
     desc: 'Выбирай тему — нейросеть пересказывает параграф учебника Макарычева простым языком, с примерами и ссылкой на страницу.',
     accent: 'gold',
@@ -21,6 +25,7 @@ const items: Item[] = [
   {
     num: '02',
     title: 'ИИ-теоретик',
+    href: '#ai',
     tag: 'Чат · Голос',
     desc: 'Чат на каждой странице. Скажи «ии, вопрос» — слушаю. «ии, ответь» — отвечаю. Контекст темы не теряется.',
     accent: 'sage',
@@ -28,6 +33,7 @@ const items: Item[] = [
   {
     num: '03',
     title: 'Задача недели',
+    href: '#weekly',
     tag: 'Олимпиада',
     desc: 'Одна задача, одна неделя, одно красивое решение. Разбор публикуется в пятницу.',
     accent: 'gold',
@@ -35,6 +41,7 @@ const items: Item[] = [
   {
     num: '04',
     title: 'Вклад в оценку',
+    href: '#quizzes',
     tag: 'Тесты · Задачи',
     desc: 'Домашка, которая считается. Условие, решение, проверка. Тест, ответ, мгновенный разбор ошибки.',
     accent: 'sage',
@@ -56,8 +63,14 @@ const items: Item[] = [
 ]
 
 export function Sections() {
+  const hasQuizzes = useHasQuizzes()
+  // Квизы живут в секции, которой нет, пока учитель ничего не опубликовал.
+  const cards = items.map((it) =>
+    it.href === '#quizzes' && !hasQuizzes ? { ...it, href: undefined } : it,
+  )
+
   return (
-    <section id="sections" className="relative py-32 md:py-44">
+    <section id="sections" className="relative scroll-mt-24 py-32 md:py-44">
       <div className="mx-auto max-w-[1700px] px-6 md:px-10">
         <header className="mb-20 flex flex-col items-start justify-between gap-8 md:flex-row md:items-end">
           <div>
@@ -80,7 +93,7 @@ export function Sections() {
         </header>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {items.map((item, i) => (
+          {cards.map((item, i) => (
             <Card key={item.num} item={item} index={i} />
           ))}
         </div>
@@ -114,20 +127,14 @@ function Card({ item, index }: { item: Item; index: number }) {
   const accentText = item.accent === 'sage' ? 'text-sage-500' : 'text-gold-500'
   const accentBg = item.accent === 'sage' ? 'bg-sage-500' : 'bg-gold-500'
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 60 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-10% 0px' }}
-      transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: index * 0.07 }}
-      className="group"
-    >
+  const inner = (
+    <div className="group h-full">
       <div
         ref={ref}
         onMouseMove={handleMove}
         onMouseLeave={handleLeave}
         data-cursor="lg"
-        data-cursor-label="Открыть"
+        data-cursor-label={item.href ? 'Открыть' : 'Скоро'}
         className="glow-cursor relative aspect-[0.9] overflow-hidden rounded-2xl border border-paper-50/8 bg-ink-900/70 p-7 transition-[transform,border-color] duration-500 ease-out-expo will-change-transform group-hover:border-paper-50/20 md:p-9"
         style={{ transformStyle: 'preserve-3d' }}
       >
@@ -153,15 +160,21 @@ function Card({ item, index }: { item: Item; index: number }) {
             </p>
 
             <div className="mt-7 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.22em] text-paper-50">
-              <span className="relative overflow-hidden">
-                <span className="block transition-transform duration-500 ease-out-expo group-hover:-translate-y-full">
-                  Войти в раздел
+              {item.href ? (
+                <span className="relative overflow-hidden">
+                  <span className="block transition-transform duration-500 ease-out-expo group-hover:-translate-y-full">
+                    Войти в раздел
+                  </span>
+                  <span className={`absolute inset-0 block translate-y-full transition-transform duration-500 ease-out-expo group-hover:translate-y-0 ${accentText}`}>
+                    Открыть
+                  </span>
                 </span>
-                <span className={`absolute inset-0 block translate-y-full transition-transform duration-500 ease-out-expo group-hover:translate-y-0 ${accentText}`}>
-                  Открыть
-                </span>
-              </span>
-              <span className={`h-1.5 w-1.5 rounded-full ${accentBg}`} />
+              ) : (
+                <span className="text-paper-50/40">Скоро</span>
+              )}
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${item.href ? accentBg : 'bg-paper-50/20'}`}
+              />
             </div>
           </div>
         </div>
@@ -177,6 +190,23 @@ function Card({ item, index }: { item: Item; index: number }) {
           }}
         />
       </div>
+    </div>
+  )
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 60 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-10% 0px' }}
+      transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: index * 0.07 }}
+    >
+      {item.href ? (
+        <a href={item.href} className="block">
+          {inner}
+        </a>
+      ) : (
+        inner
+      )}
     </motion.div>
   )
 }

@@ -21,7 +21,7 @@ export function Weekly() {
   }, [])
 
   return (
-    <section id="weekly" ref={ref} className="relative overflow-hidden border-y border-paper-50/5 bg-ink-900 py-32 md:py-44">
+    <section id="weekly" ref={ref} className="relative scroll-mt-24 overflow-hidden border-y border-paper-50/5 bg-ink-900 py-32 md:py-44">
       <motion.div
         aria-hidden
         style={{ y: yBig, rotate }}

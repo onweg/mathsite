@@ -9,6 +9,8 @@ const classes = [
     sub: 'Основная работа',
     topics: ['Квадратные уравнения', 'Теорема Виета', 'Степени', 'Площади'],
     status: 'ONLINE',
+    // Единственный поток, который реально работает — ведём в разбор по учебнику.
+    href: '#missed',
   },
   {
     k: '09',
@@ -32,7 +34,7 @@ export function Classes() {
   const y = useTransform(scrollYProgress, [0, 1], ['10%', '-10%'])
 
   return (
-    <section id="classes" ref={ref} className="relative py-32 md:py-44">
+    <section id="classes" ref={ref} className="relative scroll-mt-24 py-32 md:py-44">
       <div className="mx-auto max-w-[1700px] px-6 md:px-10">
         <header className="mb-20 flex flex-col items-start justify-between gap-8 md:flex-row md:items-end">
           <h2 className="max-w-3xl font-display text-[clamp(2.4rem,5.5vw,6rem)] font-light leading-[0.95] tracking-tight">
@@ -58,7 +60,9 @@ export function Classes() {
   )
 }
 
-function ClassRow({ data, index }: { data: typeof classes[number]; index: number }) {
+type ClassItem = (typeof classes)[number] & { href?: string }
+
+function ClassRow({ data, index }: { data: ClassItem; index: number }) {
   const ref = useRef<HTMLDivElement>(null)
   const [hovered, setHovered] = useState(false)
 
@@ -91,14 +95,14 @@ function ClassRow({ data, index }: { data: typeof classes[number]; index: number
     setHovered(true)
   }
 
-  return (
+  const row = (
     <motion.div
       ref={ref}
       onMouseMove={handleMove}
       onMouseEnter={handleEnter}
       onMouseLeave={() => setHovered(false)}
       data-cursor="lg"
-      data-cursor-label={data.name}
+      data-cursor-label={data.href ? data.name : data.status}
       initial={{ opacity: 0, y: 40 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-10% 0px' }}
@@ -149,12 +153,22 @@ function ClassRow({ data, index }: { data: typeof classes[number]; index: number
         }`}>
           {data.status}
         </span>
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-paper-50/15 transition-all duration-500 group-hover:border-gold-500 group-hover:bg-gold-500 group-hover:text-ink-950">
-          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-            <path d="M1 7h12M9 3l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
+        {data.href && (
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-paper-50/15 transition-all duration-500 group-hover:border-gold-500 group-hover:bg-gold-500 group-hover:text-ink-950">
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+              <path d="M1 7h12M9 3l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+        )}
       </div>
     </motion.div>
+  )
+
+  return data.href ? (
+    <a href={data.href} className="block">
+      {row}
+    </a>
+  ) : (
+    row
   )
 }
