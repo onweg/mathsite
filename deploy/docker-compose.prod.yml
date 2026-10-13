@@ -34,9 +34,9 @@ services:
       APP_ENV: prod
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET не задан в deploy/.env.prod}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
-      UPLOAD_DIR: /data/uploads
+      UPLOAD_DIR: /app/uploads
     volumes:
-      - uploads_data:/data/uploads
+      - mathsite_uploads:/app/uploads
     ports: ["127.0.0.1:8000:8000"]
 
   frontend:
@@ -53,4 +53,4 @@ services:
 
 volumes:
   postgres_data:
-  uploads_data:
+  mathsite_uploads:
