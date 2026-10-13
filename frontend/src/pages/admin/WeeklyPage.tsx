@@ -391,7 +391,7 @@ function WeeklyGenerateForm({
   onGenerated: (task: WeeklyTaskDTO) => void
 }) {
   const [topic, setTopic] = useState('')
-  const [sourceKey, setSourceKey] = useState<string>('olympiad')
+  const [sourceKey, setSourceKey] = useState<string>('textbook_8_algebra')
   const [level, setLevel] = useState<WeeklyLevel>('olympiad')
   const [materials, setMaterials] = useState<MaterialDTO[]>([])
   const [busy, setBusy] = useState(false)
@@ -449,9 +449,9 @@ function WeeklyGenerateForm({
           onChange={(e) => setSourceKey(e.target.value)}
           className={input}
         >
-          <option value="olympiad">сборник олимпиадных задач</option>
           <option value="textbook_8_algebra">учебник: алгебра 8 класс</option>
           <option value="textbook_8_geometry">учебник: геометрия 7–9</option>
+          <option value="olympiad">олимпиадный вариант (одна работа)</option>
           {materials.map((m) => (
             <option key={m.source_key} value={m.source_key}>
               материал: {m.title}

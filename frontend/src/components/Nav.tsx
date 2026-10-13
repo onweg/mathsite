@@ -1,6 +1,7 @@
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { Magnetic } from './Magnetic'
 import { useHasQuizzes } from '../lib/useHasQuizzes'
+import { useVoice } from '../lib/voice'
 import { useStudent } from '../lib/student'
 
 const baseLinks = [
@@ -53,8 +54,10 @@ export function Nav() {
           ))}
         </nav>
 
-        {student.status === 'authed' ? (
-          <Magnetic strength={0.4}>
+        <div className="flex items-center gap-3">
+          <VoiceToggle />
+          {student.status === 'authed' ? (
+            <Magnetic strength={0.4}>
             <a
               href="/me"
               data-cursor="lg"
@@ -64,9 +67,9 @@ export function Nav() {
               <span className="relative z-10 truncate max-w-[160px]">{student.student.name}</span>
               <span className="relative z-10 h-1.5 w-1.5 rounded-full bg-gold-500" />
             </a>
-          </Magnetic>
-        ) : (
-          <Magnetic strength={0.4}>
+            </Magnetic>
+          ) : (
+            <Magnetic strength={0.4}>
             <a
               href="/me"
               data-cursor="lg"
@@ -77,9 +80,46 @@ export function Nav() {
               <span className="relative z-10 h-1.5 w-1.5 rounded-full bg-gold-500 transition-transform duration-500 group-hover:scale-150" />
               <span className="absolute inset-0 -translate-x-full bg-gold-500/10 transition-transform duration-700 ease-out-expo group-hover:translate-x-0" />
             </a>
-          </Magnetic>
-        )}
+            </Magnetic>
+          )}
+        </div>
       </div>
     </motion.header>
+  )
+}
+
+/**
+ * Включение сквозного голосового режима.
+ * Запрос доступа к микрофону Chrome показывает по клику — поэтому это кнопка,
+ * а не автостарт при загрузке страницы.
+ */
+function VoiceToggle() {
+  const voice = useVoice()
+  if (!voice.supported) return null
+
+  return (
+    <button
+      type="button"
+      onClick={() => (voice.enabled ? voice.disable() : voice.enable())}
+      data-cursor
+      data-cursor-label={voice.enabled ? 'Выключить голос' : 'Включить голос'}
+      title={
+        voice.enabled
+          ? 'Голос включён: скажи «ИИ, вопрос»'
+          : 'Включить голос: потом можно спрашивать, не нажимая кнопок'
+      }
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.2em] transition-colors ${
+        voice.enabled
+          ? 'border-gold-500/60 bg-gold-500/10 text-gold-500'
+          : 'border-paper-50/15 text-paper-50/60 hover:border-paper-50/40 hover:text-paper-50'
+      }`}
+    >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${
+          voice.enabled ? 'bg-gold-500' : 'bg-paper-50/30'
+        }`}
+      />
+      <span className="hidden sm:inline">голос</span>
+    </button>
   )
 }

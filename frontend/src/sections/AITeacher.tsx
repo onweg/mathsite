@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Markdown } from '../components/Markdown'
 import { MicButton } from '../components/MicButton'
 import { RevealText } from '../components/RevealText'
-import { useSpeech } from '../hooks/useSpeech'
 import { chat, health, type ChatMessage, type Topic } from '../lib/api'
+import { useVoice } from '../lib/voice'
 
 const initial: ChatMessage[] = [
   { role: 'assistant', text: 'Привет! Я ИИ-теоретик. Спроси что угодно по математике 8 класса — объясню просто.' },
@@ -99,6 +99,16 @@ function ChatPanel() {
   const [online, setOnline] = useState<boolean | null>(null)
   const [topic, setTopic] = useState<Topic>('algebra')
   const listRef = useRef<HTMLDivElement>(null)
+  const boxRef = useRef<HTMLTextAreaElement>(null)
+  const voice = useVoice()
+
+  // Голос дописывает текст и тут же отправляет. setState асинхронный,
+  // поэтому единственный источник правды для отправки — ref.
+  const inputRef = useRef('')
+  const writeInput = (v: string) => {
+    inputRef.current = v
+    setInput(v)
+  }
 
   useEffect(() => {
     health().then(setOnline)
@@ -110,11 +120,11 @@ function ChatPanel() {
   }, [messages, loading])
 
   const send = async () => {
-    const text = input.trim()
+    const text = inputRef.current.trim()
     if (!text || loading) return
     const next: ChatMessage[] = [...messages, { role: 'user', text }]
     setMessages(next)
-    setInput('')
+    writeInput('')
     setLoading(true)
     setError(null)
     try {
@@ -130,6 +140,24 @@ function ChatPanel() {
       setLoading(false)
     }
   }
+
+  const sendRef = useRef(send)
+  sendRef.current = send
+
+  useEffect(
+    () =>
+      voice.registerTarget({
+        append: (t) => writeInput((inputRef.current + ' ' + t).trim()),
+        submit: () => void sendRef.current(),
+        focus: () => {
+          document.getElementById('ai')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          boxRef.current?.focus({ preventScroll: true })
+        },
+      }),
+    // registerTarget стабилен; объект voice меняется на каждом кадре interim,
+    // подписываться на него целиком — значит пере-регистрироваться без нужды.
+    [voice.registerTarget],
+  )
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -168,15 +196,16 @@ function ChatPanel() {
 
       <div className="mt-6 flex items-end gap-3 rounded-2xl border border-paper-50/10 bg-ink-800/80 p-3">
         <textarea
+          ref={boxRef}
           data-cursor
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => writeInput(e.target.value)}
           onKeyDown={onKey}
-          placeholder="Спроси по математике · Enter — отправить · микрофон — голосом"
+          placeholder="Спроси по математике · Enter — отправить · или скажи «ИИ, вопрос»"
           rows={1}
           className="min-h-[36px] flex-1 resize-none bg-transparent px-2 py-2 text-[15px] text-paper-50 placeholder:text-paper-50/40 focus:outline-none"
         />
-        <ChatMic value={input} onChange={setInput} />
+        <ChatMic />
         <button
           onClick={send}
           disabled={loading || !input.trim()}
@@ -192,18 +221,16 @@ function ChatPanel() {
   )
 }
 
-function ChatMic({ value, onChange }: { value: string; onChange: (s: string) => void }) {
-  const speech = useSpeech({
-    lang: 'ru-RU',
-    continuous: false,
-    onFinal: (text) => onChange(((value || '') + ' ' + text).trim()),
-  })
+function ChatMic() {
+  // Кнопка — ручной вход в ту же диктовку, что и голосовой якорь «ИИ, вопрос».
+  const voice = useVoice()
   return (
     <MicButton
-      supported={speech.supported}
-      listening={speech.listening}
-      interim={speech.interim}
-      onToggle={() => (speech.listening ? speech.stop() : speech.start())}
+      supported={voice.supported}
+      listening={voice.mode === 'dictating'}
+      interim={voice.interim}
+      label="сказать вопрос голосом"
+      onToggle={() => (voice.mode === 'dictating' ? voice.cancelDictation() : voice.startDictation())}
     />
   )
 }

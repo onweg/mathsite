@@ -13,6 +13,7 @@ import { Quizzes } from './sections/Quizzes'
 import { Sections } from './sections/Sections'
 import { Weekly } from './sections/Weekly'
 import { useLenis } from './hooks/useLenis'
+import { VoiceProvider } from './lib/voice'
 import { AdminRouter } from './pages/AdminRouter'
 import { StudentActivate } from './pages/student/StudentActivate'
 import { StudentProfile } from './pages/student/StudentProfile'
@@ -30,23 +31,27 @@ function PublicSite() {
   useLenis()
 
   return (
-    <div className="noise vignette relative min-h-screen">
-      <Preloader onDone={() => setReady(true)} />
-      <Cursor />
-      <Nav />
+    <VoiceProvider>
+      <div className="noise vignette relative min-h-screen">
+        <Preloader onDone={() => setReady(true)} />
+        <Cursor />
+        <Nav />
 
-      <main className={`transition-opacity duration-1000 ${ready ? 'opacity-100' : 'opacity-0'}`}>
-        <Hero />
-        <Marquee />
-        <Sections />
-        <AITeacher />
-        <MissedClass />
-        <Weekly />
-        <Quizzes />
-        <Classes />
-        <CTA />
-        <Footer />
-      </main>
-    </div>
+        <main
+          className={`transition-opacity duration-1000 ${ready ? 'opacity-100' : 'opacity-0'}`}
+        >
+          <Hero />
+          <Marquee />
+          <Sections />
+          <AITeacher />
+          <MissedClass />
+          <Weekly />
+          <Quizzes />
+          <Classes />
+          <CTA />
+          <Footer />
+        </main>
+      </div>
+    </VoiceProvider>
   )
 }

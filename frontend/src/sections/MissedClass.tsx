@@ -5,6 +5,7 @@ import { Markdown } from '../components/Markdown'
 import { MicButton } from '../components/MicButton'
 import { Reveal, RevealText } from '../components/RevealText'
 import { useSpeech } from '../hooks/useSpeech'
+import { useVoice } from '../lib/voice'
 import {
   askRag,
   publicMaterials,
@@ -248,6 +249,9 @@ function AskForm({
     }
   }
 
+  // Chrome держит одно распознавание на вкладку, поэтому на время работы
+  // этого микрофона глобальный голосовой режим уходит в паузу.
+  const voice = useVoice()
   const speech = useSpeech({
     lang: 'ru-RU',
     continuous: false,
@@ -256,6 +260,20 @@ function AskForm({
       onChange(((value || '') + ' ' + text).trim())
     },
   })
+
+  useEffect(() => {
+    if (!speech.listening) voice.resume()
+  }, [speech.listening, voice.resume])
+
+  const toggleMic = () => {
+    if (speech.listening) {
+      speech.stop()
+      voice.resume()
+    } else {
+      voice.pause()
+      speech.start()
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4 rounded-3xl border border-paper-50/10 bg-ink-900/60 p-5 md:p-6">
@@ -299,7 +317,7 @@ function AskForm({
           supported={speech.supported}
           listening={speech.listening}
           interim={speech.interim}
-          onToggle={() => (speech.listening ? speech.stop() : speech.start())}
+          onToggle={toggleMic}
         />
 
         <Magnetic strength={0.4}>
