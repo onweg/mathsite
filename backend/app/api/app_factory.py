@@ -82,13 +82,25 @@ def create_app() -> FastAPI:
     setup_logging()
     app = FastAPI(title="Mathematica API", version="0.3.0", lifespan=_lifespan)
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origin_regex=r"^http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):\d+$",
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # В dev фронт живёт на другом порту — пускаем любой localhost/LAN-origin.
+    # В prod фронт и API за одним nginx (same-origin), поэтому список задаём явно
+    # через CORS_ORIGINS и localhost не пускаем.
+    if settings.app_env == "prod":
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.cors_list,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    else:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origin_regex=r"^http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):\d+$",
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
     app.add_middleware(RequestIdMiddleware)
     register_error_handlers(app)
 

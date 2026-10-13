@@ -29,7 +29,9 @@ class IndexingService:
         replace: bool = True,
     ) -> int:
         log.info("extract %s", pdf_path.name)
-        pages = extract_pages(pdf_path)
+        # pypdf — синхронный CPU-bound разбор: на учебнике это десятки секунд.
+        # В event loop его звать нельзя, иначе весь uvicorn замирает на время индексации.
+        pages = await asyncio.to_thread(extract_pages, pdf_path)
         log.info("  %d страниц с текстом", len(pages))
 
         if replace:

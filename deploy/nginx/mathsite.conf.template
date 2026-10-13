@@ -20,24 +20,40 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
 
+    # Общий потолок на тело запроса. Поднимаем только там, где реально грузят файлы,
+    # чтобы в публичные ручки (/chat, /rag/ask) нельзя было прислать многомегабайтное тело.
     client_max_body_size 1m;
+
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Загрузка учебника учителем: backend режет на 60 МБ, здесь чуть больше на overhead multipart.
+    location = /api/admin/materials {
+        client_max_body_size 64m;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        rewrite ^/api/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8000;
+    }
+
+    # Импорт списка класса (csv/xlsx): backend режет на 2 МБ.
+    location ~ ^/api/admin/students/bulk/ {
+        client_max_body_size 4m;
+        proxy_read_timeout 90s;
+        rewrite ^/api/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8000;
+    }
 
     location /api/ {
         rewrite ^/api/(.*)$ /$1 break;
         proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 90s;
     }
 
     location / {
         proxy_pass http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }

@@ -18,6 +18,9 @@ COPY alembic.ini ./alembic.ini
 COPY scripts ./scripts
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh && chown -R app:app /app
+# /data/uploads — точка монтирования named volume с PDF учителя.
+# Создаём её заранее от app:app: пустой volume наследует владельца каталога из образа.
+RUN mkdir -p /data/uploads && chown -R app:app /data
 USER app
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=5 \

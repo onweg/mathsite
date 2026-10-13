@@ -32,6 +32,11 @@ services:
       YC_API_KEY: ${YC_API_KEY}
       YC_API_KEY_ID: ${YC_API_KEY_ID:-}
       APP_ENV: prod
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET не задан в deploy/.env.prod}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - uploads_data:/data/uploads
     ports: ["127.0.0.1:8000:8000"]
 
   frontend:
@@ -48,3 +53,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:
