@@ -48,9 +48,11 @@ def _domain_to_response(exc: DomainError) -> JSONResponse:
             content={"detail": f"LLM недоступен: {exc.detail or exc.provider}"},
         )
     if isinstance(exc, LLMBadResponse):
+        # Текст составляем мы (парсер/валидатор), системного промпта в нём нет,
+        # а без деталей учитель не поймёт, что делать дальше.
         return JSONResponse(
             status_code=502,
-            content={"detail": "LLM вернул некорректный ответ"},
+            content={"detail": f"LLM вернул некорректный ответ: {exc}"},
         )
     # остальные DomainError-ы маршрутизируются по status_code (401/403/404/409/400)
     return JSONResponse(

@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from app.core.errors import LLMBadResponse, NotFound
+from app.core.errors import Conflict, LLMBadResponse, NotFound
 from app.domain.chat.types import Message
 from app.domain.rag.chunk import Source
 from app.domain.weekly.generation import (
@@ -78,27 +78,44 @@ class WeeklyTaskService:
             min_similarity=_RAG_MIN_SIM,
         )
         if not hits:
-            raise LLMBadResponse(
-                f"по теме «{topic}» не нашлось материала. "
-                f"Загрузите подходящий PDF в «Материалы» или смените тему."
+            raise Conflict(
+                f"По теме «{topic}» не нашлось материала в выбранном источнике. "
+                f"Выберите другой источник, смените формулировку темы "
+                f"или загрузите нужный PDF в разделе «Материалы»."
             )
 
-        reply = await self._llm.chat(
-            messages=[
-                Message(role="system", text=SYSTEM_PROMPT),
-                Message(role="user", text=build_weekly_prompt(
-                    topic=topic,
-                    level=level,
-                    source_fragments=[h.text for h in hits],
-                )),
-            ],
-            temperature=0.5,
-            max_tokens=2500,
+        prompt = build_weekly_prompt(
+            topic=topic,
+            level=level,
+            source_fragments=[h.text for h in hits],
         )
 
-        g = parse_weekly_generation(reply.text)
-        log.info("weekly generated · topic=%s · level=%s · chunks=%d", topic, level, len(hits))
-        return await self._repo.create(g.title, g.body_md, g.answer_md, created_by)
+        # Одна задача — один шанс на кривой JSON. Вторая попытка холоднее:
+        # дешевле, чем заставлять учителя жать кнопку заново.
+        last_error: LLMBadResponse | None = None
+        for attempt, temperature in enumerate((0.5, 0.15), start=1):
+            reply = await self._llm.chat(
+                messages=[
+                    Message(role="system", text=SYSTEM_PROMPT),
+                    Message(role="user", text=prompt),
+                ],
+                temperature=temperature,
+                max_tokens=2500,
+            )
+            try:
+                g = parse_weekly_generation(reply.text)
+            except LLMBadResponse as e:
+                last_error = e
+                log.warning("weekly generation attempt %d failed: %s", attempt, e)
+                continue
+
+            log.info(
+                "weekly generated · topic=%s · level=%s · chunks=%d · attempt=%d",
+                topic, level, len(hits), attempt,
+            )
+            return await self._repo.create(g.title, g.body_md, g.answer_md, created_by)
+
+        raise last_error or LLMBadResponse("модель не вернула задачу")
 
     async def update(
         self,

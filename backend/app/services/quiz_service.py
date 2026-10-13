@@ -70,8 +70,9 @@ class QuizService:
             min_similarity=_RAG_MIN_SIM,
         )
         if not hits:
-            raise LLMBadResponse(
-                f"по теме «{topic}» не найдено подходящего материала в учебнике"
+            raise Conflict(
+                f"По теме «{topic}» не нашлось материала в выбранном источнике. "
+                f"Выберите другой источник или смените формулировку темы."
             )
 
         fragments = [h.text for h in hits]
