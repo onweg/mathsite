@@ -7,12 +7,12 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
 from app.core.errors import LLMBadResponse
+from app.domain.llm_json import extract_json
 from app.domain.quiz.types import Choice, Difficulty, ItemKind, QuizItem
 
 
@@ -90,26 +90,10 @@ def build_generation_prompt(
     )
 
 
-_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
-
-
-def _extract_json(text: str) -> str:
-    """LLM иногда оборачивает JSON в ```json ... ```. Снимаем обёртку, если есть."""
-    m = _JSON_FENCE_RE.search(text)
-    if m:
-        return m.group(1)
-    # иначе ищем первую {...} до последней }
-    start = text.find("{")
-    end = text.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        raise LLMBadResponse("модель не вернула JSON")
-    return text[start : end + 1]
-
-
 def parse_generation(raw: str) -> list[QuizItem]:
     """Распарсить ответ LLM и смапить в доменные QuizItem (id=None, position задаст сервис)."""
     try:
-        payload = json.loads(_extract_json(raw))
+        payload = json.loads(extract_json(raw))
     except json.JSONDecodeError as e:
         raise LLMBadResponse(f"невалидный JSON: {e}") from e
 

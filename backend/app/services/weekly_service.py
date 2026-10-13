@@ -7,16 +7,39 @@
 
 from __future__ import annotations
 
+import logging
 from uuid import UUID
 
-from app.core.errors import NotFound
+from app.core.errors import LLMBadResponse, NotFound
+from app.domain.chat.types import Message
+from app.domain.rag.chunk import Source
+from app.domain.weekly.generation import (
+    SYSTEM_PROMPT,
+    Level,
+    build_weekly_prompt,
+    parse_weekly_generation,
+)
 from app.domain.weekly.types import WeeklyTask
+from app.infrastructure.llm.base import LLMProvider
+from app.infrastructure.repositories.chunks_repo import ChunksRepository
 from app.infrastructure.repositories.weekly_repo import WeeklyTasksRepository
+
+log = logging.getLogger("mathsite.weekly")
+
+_RAG_LIMIT = 8
+_RAG_MIN_SIM = 0.4
 
 
 class WeeklyTaskService:
-    def __init__(self, repo: WeeklyTasksRepository):
+    def __init__(
+        self,
+        repo: WeeklyTasksRepository,
+        llm: LLMProvider,
+        chunks: ChunksRepository,
+    ):
         self._repo = repo
+        self._llm = llm
+        self._chunks = chunks
 
     async def list(self) -> list[WeeklyTask]:
         return await self._repo.list()
@@ -34,6 +57,48 @@ class WeeklyTaskService:
         self, *, title: str, body_md: str, answer_md: str, created_by: UUID
     ) -> WeeklyTask:
         return await self._repo.create(title.strip(), body_md.strip(), answer_md.strip(), created_by)
+
+    async def generate(
+        self,
+        *,
+        topic: str,
+        source_key: Source | None,
+        level: Level,
+        created_by: UUID,
+    ) -> WeeklyTask:
+        """Черновик задачи недели: RAG по теме → LLM → валидация → запись неопубликованной.
+
+        Публикует учитель вручную, уже посмотрев и поправив текст.
+        """
+        q_vec = await self._llm.embed(topic, kind="query")
+        hits = await self._chunks.semantic_search(
+            q_vec,
+            source=source_key,
+            limit=_RAG_LIMIT,
+            min_similarity=_RAG_MIN_SIM,
+        )
+        if not hits:
+            raise LLMBadResponse(
+                f"по теме «{topic}» не нашлось материала. "
+                f"Загрузите подходящий PDF в «Материалы» или смените тему."
+            )
+
+        reply = await self._llm.chat(
+            messages=[
+                Message(role="system", text=SYSTEM_PROMPT),
+                Message(role="user", text=build_weekly_prompt(
+                    topic=topic,
+                    level=level,
+                    source_fragments=[h.text for h in hits],
+                )),
+            ],
+            temperature=0.5,
+            max_tokens=2500,
+        )
+
+        g = parse_weekly_generation(reply.text)
+        log.info("weekly generated · topic=%s · level=%s · chunks=%d", topic, level, len(hits))
+        return await self._repo.create(g.title, g.body_md, g.answer_md, created_by)
 
     async def update(
         self,

@@ -308,6 +308,8 @@ export type WeeklyTaskPublicDTO = {
   body_md: string
 }
 
+export type WeeklyLevel = 'school' | 'olympiad' | 'hard'
+
 export const adminWeekly = {
   list: (token: string) => apiJson<WeeklyTaskDTO[]>('/admin/weekly', { method: 'GET', token }),
   get: (token: string, id: string) =>
@@ -316,6 +318,10 @@ export const adminWeekly = {
     token: string,
     body: { title: string; body_md: string; answer_md: string },
   ) => apiJson<WeeklyTaskDTO>('/admin/weekly', { method: 'POST', token, body }),
+  generate: (
+    token: string,
+    body: { topic: string; source_key?: string | null; level?: WeeklyLevel },
+  ) => apiJson<WeeklyTaskDTO>('/admin/weekly/generate', { method: 'POST', token, body }),
   update: (
     token: string,
     id: string,

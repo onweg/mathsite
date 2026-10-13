@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Markdown } from '../../components/Markdown'
-import { WeeklyTaskDTO, adminWeekly } from '../../lib/api'
+import {
+  MaterialDTO,
+  WeeklyLevel,
+  WeeklyTaskDTO,
+  adminMaterials,
+  adminWeekly,
+} from '../../lib/api'
 
 type View =
   | { mode: 'list' }
   | { mode: 'create' }
+  | { mode: 'generate' }
   | { mode: 'edit'; task: WeeklyTaskDTO }
 
 export function WeeklyPage({ token }: { token: string }) {
@@ -37,6 +44,20 @@ export function WeeklyPage({ token }: { token: string }) {
     )
   }
 
+  if (view.mode === 'generate') {
+    return (
+      <WeeklyGenerateForm
+        token={token}
+        onCancel={() => setView({ mode: 'list' })}
+        onGenerated={(task) => {
+          reload()
+          // Сразу в редактор: черновик нейронки всегда нужно вычитать.
+          setView({ mode: 'edit', task })
+        }}
+      />
+    )
+  }
+
   if (view.mode === 'edit') {
     return (
       <WeeklyEditor
@@ -55,12 +76,20 @@ export function WeeklyPage({ token }: { token: string }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="text-lg text-paper-50 font-serif">Задача недели</h2>
-        <button
-          onClick={() => setView({ mode: 'create' })}
-          className="bg-paper-50 text-ink-950 rounded-lg px-4 py-2 text-sm font-medium"
-        >
-          + новая задача
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setView({ mode: 'generate' })}
+            className="rounded-lg border border-gold-500/50 bg-gold-500/10 px-4 py-2 text-sm text-paper-50 hover:border-gold-500"
+          >
+            сгенерировать
+          </button>
+          <button
+            onClick={() => setView({ mode: 'create' })}
+            className="bg-paper-50 text-ink-950 rounded-lg px-4 py-2 text-sm font-medium"
+          >
+            + новая задача
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -234,16 +263,22 @@ function WeeklyEditor({
             />
           </Field>
 
-          <Field label="условие (markdown + $LaTeX$)">
+          <Field label="условие — его видят ученики">
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={8}
               className={textarea}
             />
+            <p className="text-[11px] text-paper-50/40 pt-1">
+              Формулы — между знаками доллара: <code className="text-paper-50/60">$x^2+1$</code> в
+              строке, <code className="text-paper-50/60">$$...$$</code> отдельным блоком. Жирный —{' '}
+              <code className="text-paper-50/60">**текст**</code>. Нажми «предпросмотр», чтобы
+              увидеть, как это выглядит у ученика.
+            </p>
           </Field>
 
-          <Field label="решение / ответ (markdown + $LaTeX$)">
+          <Field label="решение и ответ — только для тебя">
             <textarea
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
@@ -251,7 +286,7 @@ function WeeklyEditor({
               className={textarea}
             />
             <p className="text-[11px] text-paper-50/40 pt-1">
-              Этот текст НЕ показывается ученикам. Виден только тебе в админке.
+              Решение не уходит на сайт — публичный ответ отдаёт только условие.
             </p>
           </Field>
         </>
@@ -334,6 +369,129 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="space-y-1">
       <div className="text-xs uppercase tracking-wider text-paper-50/60">{label}</div>
       {children}
+    </div>
+  )
+}
+
+/* ----- Генерация нейронкой ----- */
+
+const LEVELS: { value: WeeklyLevel; label: string }[] = [
+  { value: 'school', label: 'школьная' },
+  { value: 'olympiad', label: 'олимпиадная' },
+  { value: 'hard', label: 'сложная' },
+]
+
+function WeeklyGenerateForm({
+  token,
+  onCancel,
+  onGenerated,
+}: {
+  token: string
+  onCancel: () => void
+  onGenerated: (task: WeeklyTaskDTO) => void
+}) {
+  const [topic, setTopic] = useState('')
+  const [sourceKey, setSourceKey] = useState<string>('olympiad')
+  const [level, setLevel] = useState<WeeklyLevel>('olympiad')
+  const [materials, setMaterials] = useState<MaterialDTO[]>([])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    adminMaterials
+      .list(token)
+      .then((m) => setMaterials(m.filter((x) => x.status === 'ready')))
+      .catch(() => setMaterials([]))
+  }, [token])
+
+  async function run() {
+    setBusy(true)
+    setError(null)
+    try {
+      const task = await adminWeekly.generate(token, {
+        topic: topic.trim(),
+        source_key: sourceKey || null,
+        level,
+      })
+      onGenerated(task)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'не удалось сгенерировать')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <button onClick={onCancel} className={backBtn}>
+        Назад к списку
+      </button>
+
+      <h2 className="text-lg text-paper-50 font-serif">задача недели от нейросети</h2>
+      <p className="text-sm text-paper-50/50 max-w-2xl">
+        Нейросеть берёт подходящие куски из выбранного источника и составляет по ним одну задачу
+        с решением. Получится черновик — он сразу откроется в редакторе. На сайт попадёт только
+        после твоей кнопки «опубликовать».
+      </p>
+
+      <Field label="тема">
+        <input
+          type="text"
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+          placeholder="Например: квадратные уравнения, теорема Пифагора, делимость"
+          className={input}
+        />
+      </Field>
+
+      <Field label="источник">
+        <select
+          value={sourceKey}
+          onChange={(e) => setSourceKey(e.target.value)}
+          className={input}
+        >
+          <option value="olympiad">сборник олимпиадных задач</option>
+          <option value="textbook_8_algebra">учебник: алгебра 8 класс</option>
+          <option value="textbook_8_geometry">учебник: геометрия 7–9</option>
+          {materials.map((m) => (
+            <option key={m.source_key} value={m.source_key}>
+              материал: {m.title}
+            </option>
+          ))}
+          <option value="">искать по всем материалам</option>
+        </select>
+      </Field>
+
+      <Field label="уровень">
+        <div className="flex flex-wrap gap-2">
+          {LEVELS.map((l) => (
+            <button
+              key={l.value}
+              onClick={() => setLevel(l.value)}
+              className={`rounded-lg border px-4 py-2 text-sm transition ${
+                level === l.value
+                  ? 'border-gold-500/70 bg-gold-500/10 text-paper-50'
+                  : 'border-paper-50/10 text-paper-50/60 hover:border-paper-50/30'
+              }`}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      {error && (
+        <div className="text-sm text-red-400/90 border border-red-500/30 bg-red-500/10 rounded-lg px-3 py-2">
+          {error}
+        </div>
+      )}
+
+      <button
+        onClick={run}
+        disabled={busy || topic.trim().length < 2}
+        className="bg-paper-50 text-ink-950 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
+      >
+        {busy ? 'нейросеть думает, это до минуты…' : 'сгенерировать черновик'}
+      </button>
     </div>
   )
 }

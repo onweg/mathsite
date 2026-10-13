@@ -10,7 +10,12 @@ from fastapi import APIRouter, Depends
 from app.api.deps import get_current_admin, get_weekly_service
 from app.domain.auth.types import User
 from app.domain.weekly.types import WeeklyTask
-from app.schemas.weekly import CreateWeeklyRequest, UpdateWeeklyRequest, WeeklyTaskDTO
+from app.schemas.weekly import (
+    CreateWeeklyRequest,
+    GenerateWeeklyRequest,
+    UpdateWeeklyRequest,
+    WeeklyTaskDTO,
+)
 from app.services.weekly_service import WeeklyTaskService
 
 router = APIRouter(prefix="/admin/weekly", tags=["admin:weekly"])
@@ -45,6 +50,22 @@ async def create(
         title=body.title,
         body_md=body.body_md,
         answer_md=body.answer_md,
+        created_by=user.id,
+    )
+    return _dto(task)
+
+
+@router.post("/generate", response_model=WeeklyTaskDTO)
+async def generate(
+    body: GenerateWeeklyRequest,
+    user: Annotated[User, Depends(get_current_admin)],
+    svc: Annotated[WeeklyTaskService, Depends(get_weekly_service)],
+) -> WeeklyTaskDTO:
+    """Черновик задачи недели от нейросети. Публикует учитель отдельной кнопкой."""
+    task = await svc.generate(
+        topic=body.topic,
+        source_key=body.source_key,
+        level=body.level,
         created_by=user.id,
     )
     return _dto(task)

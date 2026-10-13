@@ -132,8 +132,10 @@ def get_weekly_repo(request: Request) -> WeeklyTasksRepository:
 
 def get_weekly_service(
     repo: Annotated[WeeklyTasksRepository, Depends(get_weekly_repo)],
+    llm: Annotated[LLMProvider, Depends(get_llm)],
+    chunks: Annotated[ChunksRepository, Depends(get_chunks_repo)],
 ) -> WeeklyTaskService:
-    return WeeklyTaskService(repo)
+    return WeeklyTaskService(repo, llm, chunks)
 
 
 def get_materials_repo(request: Request) -> MaterialsRepository:
