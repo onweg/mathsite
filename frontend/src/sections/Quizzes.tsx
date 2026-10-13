@@ -25,12 +25,26 @@ export function Quizzes() {
   const authedName =
     auth.status === 'authed' ? auth.student.name : null
 
+  const sectionRef = useRef<HTMLElement>(null)
+  const firstScreen = useRef(true)
+
   useEffect(() => {
     publicQuizzes
       .list()
       .then(setQuizzes)
       .catch((e) => setError(e instanceof Error ? e.message : 'не удалось загрузить квизы'))
   }, [])
+
+  // Экраны квиза сильно разной высоты: список → прохождение → результат.
+  // Без этого страница после смены экрана становится короче, скролл остаётся
+  // на прежней позиции и пользователя «выбрасывает» в футер.
+  useEffect(() => {
+    if (firstScreen.current) {
+      firstScreen.current = false
+      return
+    }
+    sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [screen.kind])
 
   if (!quizzes) {
     return null // пока грузится — ничего не показываем
@@ -42,7 +56,8 @@ export function Quizzes() {
   return (
     <section
       id="quizzes"
-      className="relative border-y border-paper-50/5 bg-ink-950 py-32 md:py-44"
+      ref={sectionRef}
+      className="relative scroll-mt-24 border-y border-paper-50/5 bg-ink-950 py-32 md:py-44"
     >
       <div className="mx-auto max-w-[1700px] px-6 md:px-10">
         <header className="mb-14 md:mb-20">
@@ -247,12 +262,6 @@ function QuizRunner({
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const topRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [])
-
   const total = quiz.items.length
   const answered = Object.keys(answers).length
 
@@ -278,7 +287,7 @@ function QuizRunner({
   }
 
   return (
-    <div ref={topRef} className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       <header className="flex items-center justify-between">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-paper-50/50">
