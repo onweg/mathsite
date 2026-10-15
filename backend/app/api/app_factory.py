@@ -15,6 +15,7 @@ from app.infrastructure.ratelimit.base import Limit
 from app.infrastructure.ratelimit.memory import InMemoryRateLimiter
 from app.infrastructure.repositories.chunks_repo import PgChunksRepository
 from app.infrastructure.repositories.materials_repo import PgMaterialsRepository
+from app.infrastructure.repositories.polls_repo import PgPollsRepository
 from app.infrastructure.repositories.quizzes_repo import PgQuizzesRepository
 from app.infrastructure.repositories.students_repo import PgStudentsRepository
 from app.infrastructure.repositories.users_repo import PgUsersRepository
@@ -25,6 +26,7 @@ from app.infrastructure.repositories.weekly_submissions_repo import (
 
 from .middleware import RequestIdMiddleware, register_error_handlers
 from .routers import admin_materials as admin_materials_router
+from .routers import admin_polls as admin_polls_router
 from .routers import admin_quizzes as admin_quizzes_router
 from .routers import admin_students as admin_students_router
 from .routers import admin_weekly as admin_weekly_router
@@ -33,6 +35,7 @@ from .routers import chat as chat_router
 from .routers import embed as embed_router
 from .routers import health as health_router
 from .routers import materials as materials_router
+from .routers import polls as polls_router
 from .routers import quizzes as quizzes_router
 from .routers import rag as rag_router
 from .routers import students as students_router
@@ -66,6 +69,7 @@ async def _lifespan(app: FastAPI):
     app.state.chunks_repo = PgChunksRepository(pool)
     app.state.users_repo = PgUsersRepository(pool)
     app.state.quizzes_repo = PgQuizzesRepository(pool)
+    app.state.polls_repo = PgPollsRepository(pool)
     app.state.weekly_repo = PgWeeklyTasksRepository(pool)
     app.state.weekly_submissions_repo = PgWeeklySubmissionsRepository(pool)
     app.state.materials_repo = PgMaterialsRepository(pool)
@@ -119,6 +123,8 @@ def create_app() -> FastAPI:
     app.include_router(weekly_router.router)
     app.include_router(admin_materials_router.router)
     app.include_router(materials_router.router)
+    app.include_router(admin_polls_router.router)
+    app.include_router(polls_router.router)
     app.include_router(admin_students_router.router)
     app.include_router(students_router.router)
     return app

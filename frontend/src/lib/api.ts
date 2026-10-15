@@ -419,6 +419,106 @@ export const publicWeekly = {
     }).catch(() => null),
 }
 
+// ====== Опросы и обратная связь ======
+
+export type PollKind = 'choice' | 'text'
+
+export type PollOptionDTO = { id: string; position: number; text: string }
+
+export type PollDTO = {
+  id: string
+  title: string
+  question_md: string
+  kind: PollKind
+  multiple: boolean
+  allow_comment: boolean
+  options: PollOptionDTO[]
+}
+
+export type PollAdminDTO = PollDTO & {
+  is_published: boolean
+  answers_count: number
+}
+
+export type PollAnswerDTO = {
+  id: string
+  poll_id: string
+  option_ids: string[]
+  comment: string
+  created_at: string
+}
+
+export type OptionTallyDTO = {
+  option_id: string
+  text: string
+  position: number
+  votes: number
+}
+
+export type PollCommentDTO = {
+  id: string
+  student_name: string
+  class_label: string
+  comment: string
+  created_at: string
+}
+
+export type PollResultsDTO = {
+  poll_id: string
+  total_answers: number
+  tallies: OptionTallyDTO[]
+  comments: PollCommentDTO[]
+}
+
+export const publicPolls = {
+  list: () => apiJson<PollDTO[]>('/polls', { method: 'GET' }),
+  answer: (
+    id: string,
+    body: { option_ids: string[]; comment: string; student_name: string },
+  ) => apiJson<PollAnswerDTO>(`/polls/${id}/answer`, { method: 'POST', body }),
+  /** null — не отвечал или зашёл без QR. */
+  mine: (id: string) =>
+    apiJson<PollAnswerDTO | null>(`/polls/${id}/mine`, { method: 'GET' }).catch(
+      () => null,
+    ),
+}
+
+export const adminPolls = {
+  list: (token: string) => apiJson<PollAdminDTO[]>('/admin/polls', { method: 'GET', token }),
+  get: (token: string, id: string) =>
+    apiJson<PollAdminDTO>(`/admin/polls/${id}`, { method: 'GET', token }),
+  create: (
+    token: string,
+    body: {
+      title: string
+      question_md: string
+      kind: PollKind
+      multiple: boolean
+      allow_comment: boolean
+      options: string[]
+    },
+  ) => apiJson<PollAdminDTO>('/admin/polls', { method: 'POST', token, body }),
+  update: (
+    token: string,
+    id: string,
+    body: {
+      title?: string
+      question_md?: string
+      multiple?: boolean
+      allow_comment?: boolean
+      options?: string[]
+    },
+  ) => apiJson<PollAdminDTO>(`/admin/polls/${id}`, { method: 'PATCH', token, body }),
+  publish: (token: string, id: string) =>
+    apiJson<PollAdminDTO>(`/admin/polls/${id}/publish`, { method: 'POST', token }),
+  unpublish: (token: string, id: string) =>
+    apiJson<PollAdminDTO>(`/admin/polls/${id}/unpublish`, { method: 'POST', token }),
+  results: (token: string, id: string) =>
+    apiJson<PollResultsDTO>(`/admin/polls/${id}/results`, { method: 'GET', token }),
+  delete: (token: string, id: string) =>
+    apiJson<void>(`/admin/polls/${id}`, { method: 'DELETE', token }),
+}
+
 // ====== Материалы ======
 
 export type MaterialStatus = 'pending' | 'indexing' | 'ready' | 'failed'

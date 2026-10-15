@@ -1,6 +1,7 @@
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { Magnetic } from './Magnetic'
 import { useHasQuizzes } from '../lib/useHasQuizzes'
+import { useHasPolls } from '../lib/useHasPolls'
 import { useVoice } from '../lib/voice'
 import { useStudent } from '../lib/student'
 
@@ -12,6 +13,7 @@ const baseLinks = [
 ]
 
 const QUIZZES_LINK = { label: 'Квизы', href: '#quizzes' }
+const POLL_LINK = { label: 'Опрос', href: '#feedback' }
 const CLASSES_LINK = { label: 'Классы', href: '#classes' }
 
 export function Nav() {
@@ -23,7 +25,13 @@ export function Nav() {
   const student = useStudent()
 
   const hasQuizzes = useHasQuizzes()
-  const links = [...baseLinks, ...(hasQuizzes ? [QUIZZES_LINK] : []), CLASSES_LINK]
+  const hasPolls = useHasPolls()
+  const links = [
+    ...baseLinks,
+    ...(hasQuizzes ? [QUIZZES_LINK] : []),
+    ...(hasPolls ? [POLL_LINK] : []),
+    CLASSES_LINK,
+  ]
 
   return (
     <motion.header

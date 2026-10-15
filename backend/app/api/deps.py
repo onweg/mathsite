@@ -20,6 +20,7 @@ from app.core.config import settings
 from app.domain.student.types import Student
 from app.infrastructure.repositories.chunks_repo import ChunksRepository
 from app.infrastructure.repositories.materials_repo import MaterialsRepository
+from app.infrastructure.repositories.polls_repo import PollsRepository
 from app.infrastructure.repositories.quizzes_repo import QuizzesRepository
 from app.infrastructure.repositories.students_repo import StudentsRepository
 from app.infrastructure.repositories.users_repo import UsersRepository
@@ -32,6 +33,7 @@ from app.services.chat_service import ChatService
 from app.services.classifier_service import ClassifierService
 from app.services.indexing_service import IndexingService
 from app.services.materials_service import MaterialsService
+from app.services.polls_service import PollsService
 from app.services.quiz_service import QuizService
 from app.services.rag_service import RagService
 from app.services.students_import_service import StudentsImportService
@@ -128,6 +130,16 @@ def get_quiz_service(
     chunks: Annotated[ChunksRepository, Depends(get_chunks_repo)],
 ) -> QuizService:
     return QuizService(llm, quizzes, chunks)
+
+
+def get_polls_repo(request: Request) -> PollsRepository:
+    return _state(request).polls_repo
+
+
+def get_polls_service(
+    repo: Annotated[PollsRepository, Depends(get_polls_repo)],
+) -> PollsService:
+    return PollsService(repo)
 
 
 def get_weekly_repo(request: Request) -> WeeklyTasksRepository:

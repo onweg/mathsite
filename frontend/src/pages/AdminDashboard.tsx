@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { AdminUser } from '../lib/api'
 import { MaterialsPage } from './admin/MaterialsPage'
+import { PollsPage } from './admin/PollsPage'
 import { QuizzesPage } from './admin/QuizzesPage'
 import { StudentsPage } from './admin/StudentsPage'
 import { WeeklyPage } from './admin/WeeklyPage'
 
-type Tab = 'quizzes' | 'weekly' | 'materials' | 'students'
+type Tab = 'quizzes' | 'weekly' | 'polls' | 'materials' | 'students'
 
 const TABS: { id: Tab; label: string; ready: boolean }[] = [
   { id: 'quizzes', label: 'Квизы', ready: true },
   { id: 'weekly', label: 'Задача недели', ready: true },
+  { id: 'polls', label: 'Опросы', ready: true },
   { id: 'materials', label: 'Материалы', ready: true },
   { id: 'students', label: 'Класс', ready: true },
 ]
@@ -72,6 +74,7 @@ export function AdminDashboard({
       <main className="max-w-4xl mx-auto px-6 py-10">
         {tab === 'quizzes' && <QuizzesPage token={token} />}
         {tab === 'weekly' && <WeeklyPage token={token} />}
+        {tab === 'polls' && <PollsPage token={token} />}
         {tab === 'materials' && <MaterialsPage token={token} />}
         {tab === 'students' && <StudentsPage token={token} />}
       </main>

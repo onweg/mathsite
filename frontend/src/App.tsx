@@ -9,6 +9,7 @@ import { Footer } from './sections/Footer'
 import { Hero } from './sections/Hero'
 import { Marquee } from './sections/Marquee'
 import { MissedClass } from './sections/MissedClass'
+import { Poll } from './sections/Poll'
 import { Quizzes } from './sections/Quizzes'
 import { Sections } from './sections/Sections'
 import { Weekly } from './sections/Weekly'
@@ -47,6 +48,7 @@ function PublicSite() {
           <MissedClass />
           <Weekly />
           <Quizzes />
+          <Poll />
           <Classes />
           <CTA />
           <Footer />
