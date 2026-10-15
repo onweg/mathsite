@@ -37,10 +37,18 @@ export function Preloader({ onDone }: { onDone: () => void }) {
           <div className="font-mono text-xs uppercase tracking-[0.3em] text-paper-50/60">
             Загрузка · Mathematica
           </div>
-          <div className="relative overflow-hidden font-display text-[clamp(5rem,22vw,22rem)] font-light leading-none tracking-tighter text-paper-50">
+          {/* Маска нужна только по вертикали — цифры уезжают вверх. По
+              горизонтали её раскрываем: tracking-tighter делает коробку уже
+              чернил, и overflow-hidden срезал правый бок последней цифры. */}
+          <div
+            className="relative font-display text-[clamp(5rem,22vw,22rem)] font-light leading-none tracking-tighter text-paper-50"
+            style={{ clipPath: 'inset(0 -0.25em)' }}
+          >
             <motion.span
-              initial={{ y: '0%' }}
-              animate={{ y: progress === 100 ? '-100%' : '0%' }}
+              // y: 0 числом, а не '0%' — тогда framer не оставляет transform
+              // и у цифр нет своего слоя отрисовки с границами по коробке
+              initial={{ y: 0 }}
+              animate={{ y: progress === 100 ? '-100%' : 0 }}
               transition={{ duration: 0.8, ease: [0.76, 0, 0.24, 1] }}
               className="block tabular-nums"
             >
