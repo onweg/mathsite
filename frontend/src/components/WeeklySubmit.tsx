@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   HonorEntryDTO,
   WeeklySubmissionDTO,
   fileUrl,
   publicWeekly,
 } from '../lib/api'
+import { anchorScroll } from '../hooks/useLenis'
 import { useStudent } from '../lib/student'
 import { Markdown } from './Markdown'
 
@@ -28,6 +29,17 @@ export function WeeklySubmit({ taskId }: { taskId: string }) {
   const [open, setOpen] = useState(false)
   const [sentAnon, setSentAnon] = useState<WeeklySubmissionDTO | null>(null)
 
+  // Форма и карточка разной высоты. Без якоря страница уезжает под блоком
+  // в момент подмены — пользователь ничего не скроллил, а экран прыгнул.
+  const boxRef = useRef<HTMLDivElement>(null)
+  const restore = useRef<(() => void) | null>(null)
+
+  useLayoutEffect(() => {
+    if (!restore.current) return
+    restore.current()
+    restore.current = null
+  })
+
   useEffect(() => {
     publicWeekly.honor(taskId).then(setHonor)
   }, [taskId])
@@ -41,6 +53,7 @@ export function WeeklySubmit({ taskId }: { taskId: string }) {
   }, [taskId, authed])
 
   function afterSend(s: WeeklySubmissionDTO) {
+    restore.current = anchorScroll(boxRef.current)
     setOpen(false)
     if (authed) setMine(s)
     else setSentAnon(s)
@@ -49,12 +62,15 @@ export function WeeklySubmit({ taskId }: { taskId: string }) {
   const current = mine ?? sentAnon
 
   return (
-    <div className="mt-6 space-y-5">
+    <div ref={boxRef} className="mt-6 space-y-5">
       {current && !open && (
         <SubmissionCard
           submission={current}
           anonymous={!authed}
-          onRedo={() => setOpen(true)}
+          onRedo={() => {
+            restore.current = anchorScroll(boxRef.current)
+            setOpen(true)
+          }}
         />
       )}
 
@@ -230,11 +246,13 @@ function SubmitForm({
           />
         </div>
         {preview && (
-          <img
-            src={preview}
-            alt="Предпросмотр фото решения"
-            className="max-h-64 rounded-2xl border border-paper-50/10 object-contain"
-          />
+          <div className="h-64">
+            <img
+              src={preview}
+              alt="Предпросмотр фото решения"
+              className="h-full w-auto max-w-full rounded-2xl border border-paper-50/10 object-contain"
+            />
+          </div>
         )}
       </div>
 
@@ -302,11 +320,15 @@ function SubmissionCard({
       )}
 
       {submission.image_url && (
-        <img
-          src={fileUrl(submission.image_url)}
-          alt="Фото отправленного решения"
-          className="max-h-64 rounded-2xl border border-paper-50/10 object-contain"
-        />
+        // Высота коробки задана заранее: у <img> до загрузки она нулевая,
+        // и в момент появления картинки страница дёргалась вниз.
+        <div className="h-64">
+          <img
+            src={fileUrl(submission.image_url)}
+            alt="Фото отправленного решения"
+            className="h-full w-auto max-w-full rounded-2xl border border-paper-50/10 object-contain"
+          />
+        </div>
       )}
 
       {submission.teacher_comment && (

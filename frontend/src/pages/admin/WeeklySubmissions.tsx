@@ -185,13 +185,15 @@ function SubmissionRow({
 
       {submission.image_url && (
         <button onClick={() => setZoom((z) => !z)} className="block">
-          <img
-            src={fileUrl(submission.image_url)}
-            alt={`Решение: ${submission.student_name}`}
-            className={`rounded-lg border border-paper-50/10 object-contain transition-all ${
-              zoom ? 'max-h-[80vh]' : 'max-h-56'
-            }`}
-          />
+          {/* высота задана коробке: у <img> до загрузки она нулевая,
+              и список прыгал по мере подгрузки фотографий */}
+          <div className={zoom ? 'h-[80vh]' : 'h-56'}>
+            <img
+              src={fileUrl(submission.image_url)}
+              alt={`Решение: ${submission.student_name}`}
+              className="h-full w-auto max-w-full rounded-lg border border-paper-50/10 object-contain"
+            />
+          </div>
           <span className="mt-1 block text-[10px] uppercase tracking-wider text-paper-50/30">
             {zoom ? 'свернуть' : 'нажми, чтобы увеличить'}
           </span>

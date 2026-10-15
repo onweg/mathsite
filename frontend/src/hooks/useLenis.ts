@@ -41,6 +41,31 @@ export function scrollToId(id: string): void {
   scrollToElement(document.getElementById(id))
 }
 
+/**
+ * Якорь прокрутки вокруг перестройки DOM.
+ *
+ * Запоминает, где элемент стоял на экране, и возвращает функцию, которая
+ * после перерисовки возвращает его туда же, подвинув скролл на разницу.
+ * Нужно там, где блок меняет высоту не по воле пользователя (форма
+ * превращается в карточку) — иначе страница уезжает под ним.
+ *
+ * Поправку обязательно гнать через Lenis: он каждый кадр выставляет позицию
+ * сам и перетёр бы `window.scrollBy`.
+ */
+export function anchorScroll(el: Element | null): () => void {
+  if (!el) return () => {}
+  const before = el.getBoundingClientRect().top
+  return () => {
+    const delta = el.getBoundingClientRect().top - before
+    if (Math.abs(delta) < 1) return
+    if (instance) {
+      instance.scrollTo(instance.scroll + delta, { immediate: true, force: true })
+    } else {
+      window.scrollBy(0, delta)
+    }
+  }
+}
+
 export function useLenis() {
   useEffect(() => {
     const lenis = new Lenis({
