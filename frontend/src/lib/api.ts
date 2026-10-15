@@ -323,11 +323,6 @@ export type WeeklySubmissionAdminDTO = WeeklySubmissionDTO & {
   student_id: string | null
 }
 
-export type HonorEntryDTO = {
-  student_name: string
-  class_label: string
-}
-
 /** Превращает относительный путь из DTO в адрес, который поймёт <img src>. */
 export function fileUrl(path: string): string {
   return `${BASE}${path}`
@@ -422,11 +417,6 @@ export const publicWeekly = {
     apiJson<WeeklySubmissionDTO | null>(`/weekly/${taskId}/submissions/mine`, {
       method: 'GET',
     }).catch(() => null),
-
-  honor: (taskId: string) =>
-    apiJson<HonorEntryDTO[]>(`/weekly/${taskId}/honor`, { method: 'GET' }).catch(
-      () => [] as HonorEntryDTO[],
-    ),
 }
 
 // ====== Материалы ======

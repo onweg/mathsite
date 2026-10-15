@@ -45,7 +45,7 @@ export function Weekly() {
           <Reveal delay={0.25} className="mt-10">
             <p className="max-w-md text-pretty text-base leading-relaxed text-paper-100/80">
               Задача олимпиадного уровня появляется в понедельник. Разбор —
-              в пятницу. Правильные решения попадают на «Доску почёта».
+              в пятницу. Пришли своё решение — текстом или фото тетради.
             </p>
           </Reveal>
         </div>

@@ -1,10 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import {
-  HonorEntryDTO,
-  WeeklySubmissionDTO,
-  fileUrl,
-  publicWeekly,
-} from '../lib/api'
+import { WeeklySubmissionDTO, fileUrl, publicWeekly } from '../lib/api'
 import { anchorScroll } from '../hooks/useLenis'
 import { useStudent } from '../lib/student'
 import { Markdown } from './Markdown'
@@ -25,7 +20,6 @@ export function WeeklySubmit({ taskId }: { taskId: string }) {
   const authed = auth.status === 'authed'
 
   const [mine, setMine] = useState<WeeklySubmissionDTO | null>(null)
-  const [honor, setHonor] = useState<HonorEntryDTO[]>([])
   const [open, setOpen] = useState(false)
   const [sentAnon, setSentAnon] = useState<WeeklySubmissionDTO | null>(null)
 
@@ -39,10 +33,6 @@ export function WeeklySubmit({ taskId }: { taskId: string }) {
     restore.current()
     restore.current = null
   })
-
-  useEffect(() => {
-    publicWeekly.honor(taskId).then(setHonor)
-  }, [taskId])
 
   useEffect(() => {
     if (!authed) {
@@ -95,8 +85,6 @@ export function WeeklySubmit({ taskId }: { taskId: string }) {
           onSent={afterSend}
         />
       )}
-
-      <HonorBoard entries={honor} />
     </div>
   )
 }
@@ -356,32 +344,6 @@ function SubmissionCard({
           отправить заново
         </button>
       )}
-    </div>
-  )
-}
-
-/* ---------- доска почёта ---------- */
-
-function HonorBoard({ entries }: { entries: HonorEntryDTO[] }) {
-  if (entries.length === 0) return null
-  return (
-    <div className="space-y-3 pt-2">
-      <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-gold-500/70">
-        Доска почёта
-      </div>
-      <ul className="flex flex-wrap gap-2">
-        {entries.map((e, i) => (
-          <li
-            key={`${e.student_name}-${i}`}
-            className="rounded-full border border-gold-500/25 bg-gold-500/5 px-4 py-1.5 text-sm text-paper-100/85"
-          >
-            {e.student_name}
-            {e.class_label && (
-              <span className="ml-2 text-paper-50/40">{e.class_label}</span>
-            )}
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }
