@@ -135,7 +135,7 @@ function Card({ item, index }: { item: Item; index: number }) {
         onMouseLeave={handleLeave}
         data-cursor="lg"
         data-cursor-label={item.href ? 'Открыть' : 'Скоро'}
-        className="glow-cursor relative aspect-[0.9] overflow-hidden rounded-2xl border border-paper-50/8 bg-ink-900/70 p-7 transition-[transform,border-color] duration-500 ease-out-expo will-change-transform group-hover:border-paper-50/20 md:p-9"
+        className="glow-cursor relative h-full min-h-[22rem] overflow-hidden rounded-2xl border border-paper-50/8 bg-ink-900/70 p-7 pb-9 transition-[transform,border-color] duration-500 ease-out-expo will-change-transform group-hover:border-paper-50/20 md:min-h-[26rem] md:p-9 md:pb-11"
         style={{ transformStyle: 'preserve-3d' }}
       >
         <div className="relative z-10 flex h-full flex-col">
@@ -199,9 +199,10 @@ function Card({ item, index }: { item: Item; index: number }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-10% 0px' }}
       transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: index * 0.07 }}
+      className="h-full"
     >
       {item.href ? (
-        <a href={item.href} className="block">
+        <a href={item.href} className="block h-full">
           {inner}
         </a>
       ) : (

@@ -22,11 +22,6 @@ export function CTA() {
       </motion.div>
 
       <div className="relative mx-auto flex max-w-[1400px] flex-col items-center px-6 text-center md:px-10">
-        <div className="mb-10 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/60">
-          <span className="h-px w-10 bg-paper-50/40" />
-          <span>Начать · 19.11.2026 — первый урок с классом</span>
-          <span className="h-px w-10 bg-paper-50/40" />
-        </div>
 
         <h2 className="font-display text-[clamp(3rem,9.4vw,9.4rem)] font-light leading-[0.96] tracking-[-0.04em]">
           <RevealText as="span" className="block">Войди по</RevealText>

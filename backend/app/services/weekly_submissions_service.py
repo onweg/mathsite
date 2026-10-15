@@ -107,6 +107,12 @@ class WeeklySubmissionsService:
     async def mine(self, task_id: UUID, student: Student) -> WeeklySubmission | None:
         return await self._repo.get_for_student(task_id, student.id)
 
+    async def list_for_student(
+        self, student_id: UUID
+    ) -> list[tuple[WeeklySubmission, str]]:
+        """История отправок ученика: решение + название задачи."""
+        return await self._repo.list_by_student(student_id)
+
     async def honor_board(self, task_id: UUID) -> list[WeeklySubmission]:
         """Те, кому учитель поставил «верно». Показываем только имя и класс."""
         return await self._repo.list_correct(task_id)

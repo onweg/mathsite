@@ -32,6 +32,12 @@ class WeeklySubmissionsRepository(Protocol):
 
     async def list_by_task(self, task_id: UUID) -> list[WeeklySubmission]: ...
 
+    async def list_by_student(
+        self, student_id: UUID
+    ) -> list[tuple[WeeklySubmission, str]]:
+        """Решения ученика вместе с названием задачи — для его профиля."""
+        ...
+
     async def list_correct(self, task_id: UUID) -> list[WeeklySubmission]: ...
 
     async def counts(self) -> dict[UUID, tuple[int, int]]:
@@ -173,6 +179,23 @@ class PgWeeklySubmissionsRepository:
             )
             rows = await cur.fetchall()
         return [_row(r) for r in rows]
+
+    async def list_by_student(
+        self, student_id: UUID
+    ) -> list[tuple[WeeklySubmission, str]]:
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                f"""
+                SELECT {", ".join("s." + c.strip() for c in _COLS.split(","))}, t.title
+                FROM weekly_submissions s
+                JOIN weekly_tasks t ON t.id = s.task_id
+                WHERE s.student_id = %s
+                ORDER BY s.created_at DESC
+                """,
+                (student_id,),
+            )
+            rows = await cur.fetchall()
+        return [(_row(r), r[12]) for r in rows]
 
     async def list_correct(self, task_id: UUID) -> list[WeeklySubmission]:
         async with self._pool.connection() as conn, conn.cursor() as cur:

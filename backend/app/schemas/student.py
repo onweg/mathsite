@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -63,4 +65,17 @@ class StudentAttemptDTO(BaseModel):
     quiz_title: str
     score: int
     total: int
+    created_at: str
+
+
+class StudentWeeklyDTO(BaseModel):
+    """Отправка ученика по задаче недели — для его профиля."""
+
+    id: str
+    task_id: str
+    task_title: str
+    solution_md: str
+    image_url: str | None
+    status: Literal["new", "correct", "partial", "wrong"]
+    teacher_comment: str | None
     created_at: str
