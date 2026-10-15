@@ -300,6 +300,37 @@ export type WeeklyTaskDTO = {
   body_md: string
   answer_md: string
   is_published: boolean
+  submissions_count: number
+  new_submissions_count: number
+}
+
+export type SubmissionStatus = 'new' | 'correct' | 'partial' | 'wrong'
+
+export type WeeklySubmissionDTO = {
+  id: string
+  task_id: string
+  student_name: string
+  class_label: string
+  solution_md: string
+  /** Путь относительно API, не абсолютный URL — прогонять через `fileUrl`. */
+  image_url: string | null
+  status: SubmissionStatus
+  teacher_comment: string | null
+  created_at: string
+}
+
+export type WeeklySubmissionAdminDTO = WeeklySubmissionDTO & {
+  student_id: string | null
+}
+
+export type HonorEntryDTO = {
+  student_name: string
+  class_label: string
+}
+
+/** Превращает относительный путь из DTO в адрес, который поймёт <img src>. */
+export function fileUrl(path: string): string {
+  return `${BASE}${path}`
 }
 
 export type WeeklyTaskPublicDTO = {
@@ -333,10 +364,69 @@ export const adminWeekly = {
     apiJson<WeeklyTaskDTO>(`/admin/weekly/${id}/unpublish`, { method: 'POST', token }),
   delete: (token: string, id: string) =>
     apiJson<void>(`/admin/weekly/${id}`, { method: 'DELETE', token }),
+  submissions: (token: string, taskId: string) =>
+    apiJson<WeeklySubmissionAdminDTO[]>(`/admin/weekly/${taskId}/submissions`, {
+      method: 'GET',
+      token,
+    }),
+  review: (
+    token: string,
+    submissionId: string,
+    body: { status?: SubmissionStatus; teacher_comment?: string | null },
+  ) =>
+    apiJson<WeeklySubmissionAdminDTO>(`/admin/weekly/submissions/${submissionId}`, {
+      method: 'PATCH',
+      token,
+      body,
+    }),
+  deleteSubmission: (token: string, submissionId: string) =>
+    apiJson<void>(`/admin/weekly/submissions/${submissionId}`, {
+      method: 'DELETE',
+      token,
+    }),
 }
 
 export const publicWeekly = {
   current: () => apiJson<WeeklyTaskPublicDTO | null>('/weekly', { method: 'GET' }),
+
+  /** Отправка решения: текст, фото тетради или и то и другое. */
+  async submit(
+    taskId: string,
+    body: { solution_md: string; student_name: string; file: File | null },
+  ): Promise<WeeklySubmissionDTO> {
+    const fd = new FormData()
+    fd.append('solution_md', body.solution_md)
+    fd.append('student_name', body.student_name)
+    if (body.file) fd.append('file', body.file)
+    const r = await fetch(`${BASE}/weekly/${taskId}/submissions`, {
+      method: 'POST',
+      credentials: 'include',
+      body: fd,
+    })
+    if (!r.ok) {
+      let detail: string | undefined
+      const ct = r.headers.get('content-type') || ''
+      if (ct.includes('application/json')) {
+        const data = await r.json().catch(() => ({}))
+        detail = (data as { detail?: string }).detail
+      }
+      // 413 отдаёт nginx, а не приложение — объясняем по-человечески
+      if (r.status === 413) throw new Error('Фото слишком большое. Сожми или сфотографируй заново.')
+      throw new Error(detail || humanError(r.status))
+    }
+    return (await r.json()) as WeeklySubmissionDTO
+  },
+
+  /** Своё решение и вердикт. null — не отправлял или зашёл без QR. */
+  mine: (taskId: string) =>
+    apiJson<WeeklySubmissionDTO | null>(`/weekly/${taskId}/submissions/mine`, {
+      method: 'GET',
+    }).catch(() => null),
+
+  honor: (taskId: string) =>
+    apiJson<HonorEntryDTO[]>(`/weekly/${taskId}/honor`, { method: 'GET' }).catch(
+      () => [] as HonorEntryDTO[],
+    ),
 }
 
 // ====== Материалы ======

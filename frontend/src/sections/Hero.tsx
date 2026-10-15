@@ -40,7 +40,7 @@ export function Hero() {
           <span>Урок № 2026 — 10 — 07</span>
         </div>
 
-        <h1 className="mt-10 font-display text-[clamp(3rem,11vw,13rem)] font-light leading-[0.9] tracking-[-0.035em]">
+        <h1 className="mt-10 font-display text-[clamp(3rem,10.2vw,12rem)] font-light leading-[0.96] tracking-[-0.035em]">
           <span className="block">
             <RevealText as="span" className="text-paper-50">Матема</RevealText>
             <RevealText as="span" className="italic text-gold-500" delay={0.15}>тика</RevealText>

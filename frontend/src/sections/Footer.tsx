@@ -1,3 +1,11 @@
+// Якоря те же, что у карточек в Sections.tsx — ссылки вели на «#» и прыгали наверх.
+const LINKS = [
+  { title: 'ИИ-теоретик', href: '#ai' },
+  { title: 'Пропустил урок', href: '#missed' },
+  { title: 'Задача недели', href: '#weekly' },
+  { title: 'Вклад в оценку', href: '#quizzes' },
+]
+
 export function Footer() {
   return (
     <footer className="relative overflow-hidden border-t border-paper-50/8 bg-ink-900 pb-10 pt-20">
@@ -7,10 +15,6 @@ export function Footer() {
             <div className="select-none font-display text-5xl font-light leading-none tracking-tight md:text-7xl">
               Mathematica<span className="italic text-gold-500">.</span>
             </div>
-            <p className="mt-6 max-w-sm text-sm leading-relaxed text-paper-100/70">
-              Сайт учителя математики. Прототип для показа коллегам.
-              Разработан вместе с ИИ. 2026.
-            </p>
           </div>
 
           <div>
@@ -18,10 +22,10 @@ export function Footer() {
               Разделы
             </div>
             <ul className="space-y-2 font-serif text-base italic text-paper-100/90">
-              {['ИИ-теоретик', 'Пропустил урок', 'Задача недели', 'Вклад в оценку'].map((t) => (
-                <li key={t}>
-                  <a href="#" data-cursor className="transition-colors hover:text-gold-500">
-                    {t}
+              {LINKS.map((l) => (
+                <li key={l.href}>
+                  <a href={l.href} data-cursor className="transition-colors hover:text-gold-500">
+                    {l.title}
                   </a>
                 </li>
               ))}

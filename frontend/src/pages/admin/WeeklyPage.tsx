@@ -7,12 +7,14 @@ import {
   adminMaterials,
   adminWeekly,
 } from '../../lib/api'
+import { WeeklySubmissions } from './WeeklySubmissions'
 
 type View =
   | { mode: 'list' }
   | { mode: 'create' }
   | { mode: 'generate' }
   | { mode: 'edit'; task: WeeklyTaskDTO }
+  | { mode: 'submissions'; task: WeeklyTaskDTO }
 
 export function WeeklyPage({ token }: { token: string }) {
   const [tasks, setTasks] = useState<WeeklyTaskDTO[] | null>(null)
@@ -53,6 +55,19 @@ export function WeeklyPage({ token }: { token: string }) {
           reload()
           // Сразу в редактор: черновик нейронки всегда нужно вычитать.
           setView({ mode: 'edit', task })
+        }}
+      />
+    )
+  }
+
+  if (view.mode === 'submissions') {
+    return (
+      <WeeklySubmissions
+        token={token}
+        task={view.task}
+        onBack={() => {
+          reload()
+          setView({ mode: 'list' })
         }}
       />
     )
@@ -120,7 +135,23 @@ export function WeeklyPage({ token }: { token: string }) {
                   {t.body_md.slice(0, 80).replace(/\n/g, ' ')}
                 </div>
               </button>
-              <StatusBadge published={t.is_published} />
+              <div className="flex shrink-0 items-center gap-3">
+                <button
+                  onClick={() => setView({ mode: 'submissions', task: t })}
+                  className="rounded-lg border border-paper-50/10 px-3 py-1.5 text-xs text-paper-50/60 transition hover:border-paper-50/30 hover:text-paper-50"
+                >
+                  решения
+                  {t.submissions_count > 0 && (
+                    <span className="ml-2 text-paper-50/40">{t.submissions_count}</span>
+                  )}
+                  {t.new_submissions_count > 0 && (
+                    <span className="ml-2 rounded-full bg-amber-400/90 px-1.5 py-0.5 text-[10px] font-medium text-ink-950">
+                      {t.new_submissions_count}
+                    </span>
+                  )}
+                </button>
+                <StatusBadge published={t.is_published} />
+              </div>
             </li>
           ))}
         </ul>

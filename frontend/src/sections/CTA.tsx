@@ -28,7 +28,7 @@ export function CTA() {
           <span className="h-px w-10 bg-paper-50/40" />
         </div>
 
-        <h2 className="font-display text-[clamp(3rem,10vw,10rem)] font-light leading-[0.9] tracking-[-0.04em]">
+        <h2 className="font-display text-[clamp(3rem,9.4vw,9.4rem)] font-light leading-[0.96] tracking-[-0.04em]">
           <RevealText as="span" className="block">Войди по</RevealText>
           <RevealText as="span" className="block italic text-gold-500" delay={0.1}>
             своему QR

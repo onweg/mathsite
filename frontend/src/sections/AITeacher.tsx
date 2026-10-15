@@ -24,7 +24,7 @@ export function AITeacher() {
             <span className="h-px w-10 bg-paper-50/40" />
             <span>02 · ИИ-теоретик</span>
           </div>
-          <h2 className="font-display text-[clamp(2.4rem,5.5vw,6rem)] font-light leading-[0.95] tracking-tight">
+          <h2 className="font-display text-[clamp(2.3rem,5.2vw,5.6rem)] font-light leading-[1] tracking-tight">
             <RevealText as="span" className="block">Голосом,</RevealText>
             <RevealText as="span" className="block italic text-sage-500" delay={0.1}>
               как с учителем

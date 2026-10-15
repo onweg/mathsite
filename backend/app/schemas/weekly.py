@@ -11,6 +11,8 @@ class WeeklyTaskDTO(BaseModel):
     body_md: str
     answer_md: str
     is_published: bool
+    submissions_count: int = 0
+    new_submissions_count: int = 0
 
 
 class WeeklyTaskPublicDTO(BaseModel):
@@ -39,3 +41,38 @@ class GenerateWeeklyRequest(BaseModel):
     topic: str = Field(min_length=2, max_length=200)
     source_key: str | None = Field(default=None, max_length=64)
     level: Literal["school", "olympiad", "hard"] = "olympiad"
+
+
+# ---------- решения учеников ----------
+
+
+class WeeklySubmissionDTO(BaseModel):
+    """Что видит сам ученик про свою отправку."""
+
+    id: str
+    task_id: str
+    student_name: str
+    class_label: str
+    solution_md: str
+    image_url: str | None
+    status: Literal["new", "correct", "partial", "wrong"]
+    teacher_comment: str | None
+    created_at: str
+
+
+class WeeklySubmissionAdminDTO(WeeklySubmissionDTO):
+    """То же плюс привязка к ученику — для учителя."""
+
+    student_id: str | None
+
+
+class HonorEntryDTO(BaseModel):
+    """Доска почёта: только имя и класс, без текста решения."""
+
+    student_name: str
+    class_label: str
+
+
+class ReviewSubmissionRequest(BaseModel):
+    status: Literal["new", "correct", "partial", "wrong"] | None = None
+    teacher_comment: str | None = Field(default=None, max_length=1000)

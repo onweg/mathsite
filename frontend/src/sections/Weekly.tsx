@@ -1,7 +1,7 @@
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { Markdown } from '../components/Markdown'
-import { Magnetic } from '../components/Magnetic'
+import { WeeklySubmit } from '../components/WeeklySubmit'
 import { RevealText, Reveal } from '../components/RevealText'
 import { WeeklyTaskPublicDTO, publicWeekly } from '../lib/api'
 
@@ -36,7 +36,7 @@ export function Weekly() {
             <span className="h-px w-10 bg-paper-50/40" />
             <span>Задача недели</span>
           </div>
-          <h2 className="font-display text-[clamp(2.4rem,5.5vw,6rem)] font-light leading-[0.95] tracking-tight">
+          <h2 className="font-display text-[clamp(2.3rem,5.2vw,5.6rem)] font-light leading-[1] tracking-tight">
             <RevealText as="span" className="block">Одна задача,</RevealText>
             <RevealText as="span" className="block italic text-gold-500" delay={0.1}>
               одна неделя
@@ -48,19 +48,6 @@ export function Weekly() {
               в пятницу. Правильные решения попадают на «Доску почёта».
             </p>
           </Reveal>
-          <div className="mt-10 flex items-center gap-6">
-            <Magnetic strength={0.4}>
-              <a
-                href="#"
-                data-cursor="lg"
-                data-cursor-label="Решить"
-                className="group inline-flex items-center gap-3 overflow-hidden rounded-full border border-paper-50/20 px-6 py-3 font-mono text-[11px] uppercase tracking-[0.22em] text-paper-50 transition-colors hover:border-gold-500"
-              >
-                <span>Отправить решение</span>
-                <span className="h-1.5 w-1.5 rounded-full bg-gold-500" />
-              </a>
-            </Magnetic>
-          </div>
         </div>
 
         <div className="md:col-span-7">
@@ -84,6 +71,12 @@ export function Weekly() {
               )}
             </article>
           </Reveal>
+
+          {task && (
+            <Reveal delay={0.15}>
+              <WeeklySubmit taskId={task.id} />
+            </Reveal>
+          )}
         </div>
       </div>
     </section>

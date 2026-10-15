@@ -19,6 +19,9 @@ from app.infrastructure.repositories.quizzes_repo import PgQuizzesRepository
 from app.infrastructure.repositories.students_repo import PgStudentsRepository
 from app.infrastructure.repositories.users_repo import PgUsersRepository
 from app.infrastructure.repositories.weekly_repo import PgWeeklyTasksRepository
+from app.infrastructure.repositories.weekly_submissions_repo import (
+    PgWeeklySubmissionsRepository,
+)
 
 from .middleware import RequestIdMiddleware, register_error_handlers
 from .routers import admin_materials as admin_materials_router
@@ -64,6 +67,7 @@ async def _lifespan(app: FastAPI):
     app.state.users_repo = PgUsersRepository(pool)
     app.state.quizzes_repo = PgQuizzesRepository(pool)
     app.state.weekly_repo = PgWeeklyTasksRepository(pool)
+    app.state.weekly_submissions_repo = PgWeeklySubmissionsRepository(pool)
     app.state.materials_repo = PgMaterialsRepository(pool)
     app.state.students_repo = PgStudentsRepository(pool)
     app.state.rate_limiter = InMemoryRateLimiter((

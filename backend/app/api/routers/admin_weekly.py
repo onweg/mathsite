@@ -7,27 +7,51 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import get_current_admin, get_weekly_service
+from app.api.deps import (
+    get_current_admin,
+    get_weekly_service,
+    get_weekly_submissions_service,
+)
 from app.domain.auth.types import User
-from app.domain.weekly.types import WeeklyTask
+from app.domain.weekly.types import WeeklySubmission, WeeklyTask
 from app.schemas.weekly import (
     CreateWeeklyRequest,
     GenerateWeeklyRequest,
+    ReviewSubmissionRequest,
     UpdateWeeklyRequest,
+    WeeklySubmissionAdminDTO,
     WeeklyTaskDTO,
 )
 from app.services.weekly_service import WeeklyTaskService
+from app.services.weekly_submissions_service import WeeklySubmissionsService
 
 router = APIRouter(prefix="/admin/weekly", tags=["admin:weekly"])
 
 
-def _dto(t: WeeklyTask) -> WeeklyTaskDTO:
+def _dto(t: WeeklyTask, counts: tuple[int, int] = (0, 0)) -> WeeklyTaskDTO:
     return WeeklyTaskDTO(
         id=str(t.id),
         title=t.title,
         body_md=t.body_md,
         answer_md=t.answer_md,
         is_published=t.is_published,
+        submissions_count=counts[0],
+        new_submissions_count=counts[1],
+    )
+
+
+def _submission_dto(s: WeeklySubmission) -> WeeklySubmissionAdminDTO:
+    return WeeklySubmissionAdminDTO(
+        id=str(s.id),
+        task_id=str(s.task_id),
+        student_id=str(s.student_id) if s.student_id else None,
+        student_name=s.student_name,
+        class_label=s.class_label,
+        solution_md=s.solution_md,
+        image_url=f"/weekly/images/{s.image_filename}" if s.image_filename else None,
+        status=s.status,
+        teacher_comment=s.teacher_comment,
+        created_at=s.created_at.isoformat(),
     )
 
 
@@ -35,9 +59,11 @@ def _dto(t: WeeklyTask) -> WeeklyTaskDTO:
 async def list_all(
     _: Annotated[User, Depends(get_current_admin)],
     svc: Annotated[WeeklyTaskService, Depends(get_weekly_service)],
+    subs: Annotated[WeeklySubmissionsService, Depends(get_weekly_submissions_service)],
 ) -> list[WeeklyTaskDTO]:
     tasks = await svc.list()
-    return [_dto(t) for t in tasks]
+    counts = await subs.counts()
+    return [_dto(t, counts.get(t.id, (0, 0))) for t in tasks]
 
 
 @router.post("", response_model=WeeklyTaskDTO)
@@ -69,6 +95,41 @@ async def generate(
         created_by=user.id,
     )
     return _dto(task)
+
+
+@router.patch(
+    "/submissions/{submission_id}", response_model=WeeklySubmissionAdminDTO
+)
+async def review_submission(
+    submission_id: UUID,
+    body: ReviewSubmissionRequest,
+    _: Annotated[User, Depends(get_current_admin)],
+    subs: Annotated[WeeklySubmissionsService, Depends(get_weekly_submissions_service)],
+) -> WeeklySubmissionAdminDTO:
+    """Вердикт учителя: верно / частично / неверно + комментарий ученику."""
+    s = await subs.review(
+        submission_id, status=body.status, teacher_comment=body.teacher_comment
+    )
+    return _submission_dto(s)
+
+
+@router.delete("/submissions/{submission_id}", status_code=204, response_model=None)
+async def delete_submission(
+    submission_id: UUID,
+    _: Annotated[User, Depends(get_current_admin)],
+    subs: Annotated[WeeklySubmissionsService, Depends(get_weekly_submissions_service)],
+) -> None:
+    await subs.delete(submission_id)
+
+
+@router.get("/{task_id}/submissions", response_model=list[WeeklySubmissionAdminDTO])
+async def list_submissions(
+    task_id: UUID,
+    _: Annotated[User, Depends(get_current_admin)],
+    subs: Annotated[WeeklySubmissionsService, Depends(get_weekly_submissions_service)],
+) -> list[WeeklySubmissionAdminDTO]:
+    """Непроверенные сверху, дальше по свежести."""
+    return [_submission_dto(s) for s in await subs.list_for_task(task_id)]
 
 
 @router.get("/{task_id}", response_model=WeeklyTaskDTO)

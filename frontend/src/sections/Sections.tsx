@@ -78,7 +78,7 @@ export function Sections() {
               <span className="h-px w-10 bg-paper-50/40" />
               <span>Что внутри · 06 разделов</span>
             </div>
-            <h2 className="max-w-4xl font-display text-[clamp(2.6rem,6.5vw,7rem)] font-light leading-[0.95] tracking-tight">
+            <h2 className="max-w-4xl font-display text-[clamp(2.5rem,6.1vw,6.6rem)] font-light leading-[1] tracking-tight">
               <RevealText as="span" className="block">Один сайт —</RevealText>
               <RevealText as="span" className="block italic text-gold-500" delay={0.1}>
                 шесть сценариев

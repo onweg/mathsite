@@ -24,6 +24,9 @@ from app.infrastructure.repositories.quizzes_repo import QuizzesRepository
 from app.infrastructure.repositories.students_repo import StudentsRepository
 from app.infrastructure.repositories.users_repo import UsersRepository
 from app.infrastructure.repositories.weekly_repo import WeeklyTasksRepository
+from app.infrastructure.repositories.weekly_submissions_repo import (
+    WeeklySubmissionsRepository,
+)
 from app.services.auth_service import AuthService
 from app.services.chat_service import ChatService
 from app.services.classifier_service import ClassifierService
@@ -34,6 +37,7 @@ from app.services.rag_service import RagService
 from app.services.students_import_service import StudentsImportService
 from app.services.students_service import StudentsService
 from app.services.weekly_service import WeeklyTaskService
+from app.services.weekly_submissions_service import WeeklySubmissionsService
 
 STUDENT_COOKIE_NAME = "mathsite_student"
 STUDENT_COOKIE_MAX_AGE = 365 * 24 * 3600  # 1 год
@@ -136,6 +140,21 @@ def get_weekly_service(
     chunks: Annotated[ChunksRepository, Depends(get_chunks_repo)],
 ) -> WeeklyTaskService:
     return WeeklyTaskService(repo, llm, chunks)
+
+
+def get_weekly_submissions_repo(request: Request) -> WeeklySubmissionsRepository:
+    return _state(request).weekly_submissions_repo
+
+
+def get_weekly_submissions_service(
+    repo: Annotated[
+        WeeklySubmissionsRepository, Depends(get_weekly_submissions_repo)
+    ],
+    tasks: Annotated[WeeklyTasksRepository, Depends(get_weekly_repo)],
+) -> WeeklySubmissionsService:
+    return WeeklySubmissionsService(
+        repo, tasks, upload_dir=Path(settings.upload_dir) / "weekly"
+    )
 
 
 def get_materials_repo(request: Request) -> MaterialsRepository:

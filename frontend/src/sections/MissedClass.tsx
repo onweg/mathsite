@@ -102,7 +102,7 @@ export function MissedClass() {
             <span>04 · Пропустил урок?</span>
           </div>
 
-          <h2 className="font-display text-[clamp(2.6rem,7vw,8rem)] font-light leading-[0.92] tracking-[-0.03em]">
+          <h2 className="font-display text-[clamp(2.6rem,6.6vw,7.4rem)] font-light leading-[0.98] tracking-[-0.03em]">
             <RevealText as="span" className="block">Нейросеть</RevealText>
             <RevealText as="span" className="block italic text-gold-500" delay={0.1}>
               читает учебник
