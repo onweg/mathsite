@@ -14,14 +14,21 @@ from app.api.deps import (
     get_quiz_service,
     get_rate_limiter,
     get_students_service,
+    get_weekly_submissions_service,
     is_prod,
 )
 from app.core.errors import NotAuthenticated, RateLimited
 from app.domain.student.types import Student
 from app.infrastructure.ratelimit.base import RateLimiter
-from app.schemas.student import ActivateRequest, StudentAttemptDTO, StudentPublicDTO
+from app.schemas.student import (
+    ActivateRequest,
+    StudentAttemptDTO,
+    StudentPublicDTO,
+    StudentWeeklyDTO,
+)
 from app.services.quiz_service import QuizService
 from app.services.students_service import StudentsService
+from app.services.weekly_submissions_service import WeeklySubmissionsService
 
 router = APIRouter(prefix="/students", tags=["students"])
 
@@ -87,4 +94,28 @@ async def my_attempts(
             created_at=a.created_at.isoformat(),
         )
         for a in attempts
+    ]
+
+
+@router.get("/me/weekly", response_model=list[StudentWeeklyDTO])
+async def my_weekly(
+    student: Annotated[Student, Depends(get_current_student)],
+    weekly: Annotated[
+        WeeklySubmissionsService, Depends(get_weekly_submissions_service)
+    ],
+) -> list[StudentWeeklyDTO]:
+    """История решений задачи недели: что отправил и как проверил учитель."""
+    rows = await weekly.list_for_student(student.id)
+    return [
+        StudentWeeklyDTO(
+            id=str(s.id),
+            task_id=str(s.task_id),
+            task_title=title,
+            solution_md=s.solution_md,
+            image_url=f"/weekly/images/{s.image_filename}" if s.image_filename else None,
+            status=s.status,
+            teacher_comment=s.teacher_comment,
+            created_at=s.created_at.isoformat(),
+        )
+        for s, title in rows
     ]

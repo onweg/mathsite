@@ -507,6 +507,18 @@ export type StudentAttemptDTO = {
   created_at: string
 }
 
+export type StudentWeeklyDTO = {
+  id: string
+  task_id: string
+  task_title: string
+  solution_md: string
+  /** Путь относительно API — прогонять через `fileUrl`. */
+  image_url: string | null
+  status: SubmissionStatus
+  teacher_comment: string | null
+  created_at: string
+}
+
 export const studentAuth = {
   activate: (token: string) =>
     apiJson<StudentPublicDTO>('/students/activate', {
@@ -520,6 +532,8 @@ export const studentAuth = {
   logout: () => apiJson<void>('/students/logout', { method: 'POST' }),
   myAttempts: () =>
     apiJson<StudentAttemptDTO[]>('/students/me/attempts', { method: 'GET' }),
+  myWeekly: () =>
+    apiJson<StudentWeeklyDTO[]>('/students/me/weekly', { method: 'GET' }),
 }
 
 export const adminStudents = {

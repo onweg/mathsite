@@ -104,16 +104,25 @@ function Unit({
       // раскладку и базовую линию не влияет вообще.
       style={landed ? undefined : { clipPath: 'inset(0)' }}
     >
-      <motion.span
-        // 170%: уехать нужно и за нижний padding, иначе слово выглядывает
-        initial={{ y: '170%' }}
-        animate={inView ? { y: '0%' } : { y: '170%' }}
-        transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay }}
-        onAnimationComplete={() => inView && setLanded(true)}
-        className="inline-block"
-      >
-        {text}
-      </motion.span>
+      {landed ? (
+        // Долетело — отдаём обычный span без transform. Пока transform висит,
+        // у слова свой слой отрисовки с границами по прямоугольнику раскладки,
+        // а курсив рисует чернила правее него (хвост «R», свош «Q»). При
+        // частичной перерисовке во время скролла этот хвост затирался и
+        // возвращался только на полном кадре.
+        <span className="inline-block">{text}</span>
+      ) : (
+        <motion.span
+          // 170%: уехать нужно и за нижний padding, иначе слово выглядывает
+          initial={{ y: '170%' }}
+          animate={inView ? { y: '0%' } : { y: '170%' }}
+          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay }}
+          onAnimationComplete={() => inView && setLanded(true)}
+          className="inline-block"
+        >
+          {text}
+        </motion.span>
+      )}
     </span>
   )
 }

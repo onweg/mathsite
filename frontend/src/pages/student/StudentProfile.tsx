@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react'
-import { StudentAttemptDTO, studentAuth } from '../../lib/api'
+import {
+  StudentAttemptDTO,
+  StudentWeeklyDTO,
+  fileUrl,
+  studentAuth,
+} from '../../lib/api'
+import { Markdown } from '../../components/Markdown'
 import { useStudent } from '../../lib/student'
 
 export function StudentProfile() {
@@ -14,6 +20,7 @@ export function StudentProfile() {
 
   const auth = useStudent()
   const [attempts, setAttempts] = useState<StudentAttemptDTO[] | null>(null)
+  const [weekly, setWeekly] = useState<StudentWeeklyDTO[] | null>(null)
 
   useEffect(() => {
     if (auth.status !== 'authed') return
@@ -21,6 +28,10 @@ export function StudentProfile() {
       .myAttempts()
       .then(setAttempts)
       .catch(() => setAttempts([]))
+    studentAuth
+      .myWeekly()
+      .then(setWeekly)
+      .catch(() => setWeekly([]))
   }, [auth.status])
 
   if (auth.status === 'loading') {
@@ -116,13 +127,113 @@ export function StudentProfile() {
           )}
         </section>
 
-        <div className="text-center text-xs text-paper-50/40">
+        <section className="rounded-2xl border border-paper-50/10 bg-ink-900/40 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm uppercase tracking-widest text-paper-50/60">
+              Задача недели
+            </h2>
+            {weekly && weekly.length > 0 && (
+              <div className="font-mono text-xs text-paper-50/60">
+                решено {weekly.filter((w) => w.status === 'correct').length} из{' '}
+                {weekly.length}
+              </div>
+            )}
+          </div>
+
+          {weekly === null ? (
+            <div className="text-paper-50/50 text-sm">загрузка…</div>
+          ) : weekly.length === 0 ? (
+            <p className="text-paper-50/60 text-sm">
+              Ты ещё не присылал решений. Задача недели — на главной, решение
+              можно отправить текстом или фотографией тетради.
+            </p>
+          ) : (
+            <ul className="divide-y divide-paper-50/5">
+              {weekly.map((w) => (
+                <WeeklyRow key={w.id} item={w} />
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <div className="flex items-center justify-center gap-6 text-xs text-paper-50/40">
           <a href="/#quizzes" className="hover:text-paper-50/70">
             Пройти ещё квиз
+          </a>
+          <a href="/#weekly" className="hover:text-paper-50/70">
+            К задаче недели
           </a>
         </div>
       </main>
     </div>
+  )
+}
+
+const WEEKLY_STATUS: Record<
+  StudentWeeklyDTO['status'],
+  { label: string; className: string }
+> = {
+  new: { label: 'на проверке', className: 'text-amber-300/90' },
+  correct: { label: 'верно', className: 'text-emerald-300' },
+  partial: { label: 'почти', className: 'text-sky-300' },
+  wrong: { label: 'пока неверно', className: 'text-red-300/90' },
+}
+
+function WeeklyRow({ item }: { item: StudentWeeklyDTO }) {
+  const [open, setOpen] = useState(false)
+  const st = WEEKLY_STATUS[item.status]
+
+  return (
+    <li className="py-3 space-y-3">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-3 text-left"
+      >
+        <div className="min-w-0">
+          <div className="text-paper-50 truncate">{item.task_title}</div>
+          <div className="text-[11px] text-paper-50/40 mt-0.5">
+            {formatDate(item.created_at)}
+          </div>
+        </div>
+        <span className={`font-mono text-xs shrink-0 ${st.className}`}>
+          {st.label}
+        </span>
+      </button>
+
+      {open && (
+        <div className="space-y-3 pl-1">
+          {item.solution_md && (
+            <div className="text-sm leading-relaxed text-paper-100/75">
+              <Markdown text={item.solution_md} />
+            </div>
+          )}
+          {item.image_url && (
+            // высота коробки задана заранее — иначе список прыгает,
+            // когда фото догрузится
+            <div className="h-56">
+              <img
+                src={fileUrl(item.image_url)}
+                alt={`Решение: ${item.task_title}`}
+                className="h-full w-auto max-w-full rounded-xl border border-paper-50/10 object-contain"
+              />
+            </div>
+          )}
+          {item.teacher_comment && (
+            <div className="rounded-xl border border-gold-500/30 bg-gold-500/5 px-3 py-2">
+              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-gold-500/80">
+                учитель
+              </div>
+              <p className="mt-1.5 text-sm leading-relaxed text-paper-100/85">
+                {item.teacher_comment}
+              </p>
+            </div>
+          )}
+          {!item.solution_md && !item.image_url && !item.teacher_comment && (
+            <p className="text-sm text-paper-50/40">Нечего показать.</p>
+          )}
+        </div>
+      )}
+    </li>
   )
 }
 

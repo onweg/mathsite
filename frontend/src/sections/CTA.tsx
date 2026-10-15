@@ -1,6 +1,5 @@
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { useRef } from 'react'
-import { Magnetic } from '../components/Magnetic'
 import { RevealText } from '../components/RevealText'
 
 export function CTA() {
@@ -22,7 +21,6 @@ export function CTA() {
       </motion.div>
 
       <div className="relative mx-auto flex max-w-[1400px] flex-col items-center px-6 text-center md:px-10">
-
         <h2 className="font-display text-[clamp(3rem,9.4vw,9.4rem)] font-light leading-[0.96] tracking-[-0.04em]">
           <RevealText as="span" className="block">Войди по</RevealText>
           <RevealText as="span" className="block italic text-gold-500" delay={0.1}>
@@ -40,35 +38,6 @@ export function CTA() {
           Один раз показать камере — и у тебя своя страница с прогрессом,
           историей ответов и персональной «Задачей недели».
         </motion.p>
-
-        <div className="mt-14 flex flex-wrap items-center justify-center gap-6">
-          <Magnetic strength={0.5}>
-            <a
-              href="#"
-              data-cursor="lg"
-              data-cursor-label="Старт"
-              className="group relative inline-flex items-center gap-4 overflow-hidden rounded-full bg-gold-500 px-9 py-5 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-950"
-            >
-              <span className="relative z-10">Открыть демо-вход</span>
-              <svg
-                className="relative z-10 transition-transform duration-500 group-hover:translate-x-1"
-                width="14" height="10" viewBox="0 0 14 10" fill="none">
-                <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span className="absolute inset-0 translate-y-full bg-paper-50 transition-transform duration-700 ease-out-expo group-hover:translate-y-0" />
-            </a>
-          </Magnetic>
-          <Magnetic strength={0.3}>
-            <a
-              href="/admin"
-              data-cursor
-              data-cursor-label="Админ"
-              className="font-mono text-[11px] uppercase tracking-[0.22em] text-paper-50/80 transition-colors hover:text-paper-50"
-            >
-              Я учитель — войти в админку
-            </a>
-          </Magnetic>
-        </div>
       </div>
     </section>
   )
