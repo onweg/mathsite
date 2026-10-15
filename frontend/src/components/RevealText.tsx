@@ -1,5 +1,5 @@
 import { motion, useInView } from 'framer-motion'
-import { ReactNode, useRef } from 'react'
+import { Fragment, ReactNode, useRef, useState } from 'react'
 
 type Props = {
   children: string
@@ -10,6 +10,15 @@ type Props = {
   by?: 'word' | 'char' | 'line'
 }
 
+/**
+ * Слово выезжает снизу из-под обрезки.
+ *
+ * Обрезка нужна только на время полёта. Дальше она снимается: у курсивного
+ * Fraunces хвосты («у», «р», свош запятой) и наклон заглавных («К», «Q»)
+ * выходят за строку и вправо за ширину слова, а `overflow-hidden` срезал их
+ * ровной линией — и по вертикали, и по горизонтали. Пока слово летит,
+ * запас дают padding'и; как только долетело — режем нечем.
+ */
 export function RevealText({
   children,
   as = 'span',
@@ -30,42 +39,76 @@ export function RevealText({
 
   const Comp = motion[as] as any
 
+  // Вызывающий код передаёт `block`, чтобы строки заголовка шли одна под
+  // другой. Раньше класс дописывался к жёсткому `inline-block`, а в CSS-выдаче
+  // Tailwind `.inline-block` стоит ПОСЛЕ `.block` и побеждал независимо от
+  // порядка в атрибуте — все строки схлопывались в одну, и слова из соседних
+  // строк («тесты,» + «мгновенная») слипались. Своё значение подставляем
+  // только если вызывающий не задал display сам.
+  const hasDisplay = /(^|\s)(block|inline-block|inline|flex|inline-flex|grid|hidden)(\s|$)/.test(
+    className,
+  )
+
   return (
     <Comp
       ref={ref}
-      className={`inline-block select-none ${className}`}
+      className={`${hasDisplay ? '' : 'inline-block'} select-none ${className}`}
       aria-label={children}
     >
       <span className="sr-only">{children}</span>
       <span aria-hidden className="inline-block">
         {units.map((u, i) => (
-          // Коробка обрезки выше строки: у курсивного Fraunces выносные
-          // элементы («у», «р», свош Q) вылезают за line-height, и при
-          // leading-[0.9] их срезало. padding расширяет видимую область,
-          // отрицательный margin возвращает высоту строки на место —
-          // margin-box inline-block'а и задаёт высоту строки.
-          <span
-            key={i}
-            className="inline-block overflow-hidden align-baseline pt-[0.18em] pb-[0.3em] -mt-[0.18em] -mb-[0.3em]"
-          >
-            <motion.span
-              // 150%, а не 110%: уехать нужно ещё и за нижний padding
-              initial={{ y: '150%' }}
-              animate={inView ? { y: '0%' } : { y: '150%' }}
-              transition={{
-                duration: 0.9,
-                ease: [0.22, 1, 0.36, 1],
-                delay: delay + i * stagger,
-              }}
-              className="inline-block"
-            >
-              {u === ' ' ? ' ' : u}
-              {by === 'word' && i < units.length - 1 ? ' ' : null}
-            </motion.span>
-          </span>
+          // Пробел — отдельным текстовым узлом МЕЖДУ слов, а не внутри слова.
+          // Внутри он оказывался последним символом inline-block'а, и браузер
+          // его схлопывал: «как с учителем» рендерилось как «каксучителем».
+          <Fragment key={i}>
+            {u === ' ' ? (
+              ' '
+            ) : (
+              <Unit text={u} inView={inView} delay={delay + i * stagger} />
+            )}
+            {by === 'word' && i < units.length - 1 ? ' ' : null}
+          </Fragment>
         ))}
       </span>
     </Comp>
+  )
+}
+
+function Unit({
+  text,
+  inView,
+  delay,
+}: {
+  text: string
+  inView: boolean
+  delay: number
+}) {
+  const [landed, setLanded] = useState(false)
+
+  return (
+    <span
+      className={
+        'inline-block align-baseline ' +
+        // Запас по вертикали на время полёта; отрицательный margin той же
+        // величины возвращает высоту строки — у inline-block её задаёт
+        // margin-box. По горизонтали запас не нужен: замер ink-метрик Fraunces
+        // дал свес вправо максимум 0.027em, а -mx съедал пробел между словами.
+        'pt-[0.22em] pb-[0.36em] -mt-[0.22em] -mb-[0.36em] ' +
+        (landed ? 'overflow-visible' : 'overflow-hidden')
+      }
+    >
+      <motion.span
+        // 170%: уехать нужно и за нижний padding, иначе слово выглядывает
+        initial={{ y: '170%' }}
+        animate={inView ? { y: '0%' } : { y: '170%' }}
+        transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay }}
+        onAnimationComplete={() => inView && setLanded(true)}
+        className="inline-block"
+      >
+        {text}
+      </motion.span>
+    </span>
   )
 }
 
