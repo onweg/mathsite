@@ -34,7 +34,7 @@ export function Classes() {
   const y = useTransform(scrollYProgress, [0, 1], ['10%', '-10%'])
 
   return (
-    <section id="classes" ref={ref} className="relative scroll-mt-24 py-32 md:py-44">
+    <section id="classes" ref={ref} className="relative scroll-mt-24 pt-32 pb-16 md:pt-44 md:pb-20">
       <div className="mx-auto max-w-[1700px] px-6 md:px-10">
         <header className="mb-20 flex flex-col items-start justify-between gap-8 md:flex-row md:items-end">
           <h2 className="max-w-3xl font-display text-[clamp(2.3rem,5.2vw,5.6rem)] font-light leading-[1] tracking-tight">

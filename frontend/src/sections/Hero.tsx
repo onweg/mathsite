@@ -35,10 +35,6 @@ export function Hero() {
         style={{ y: yTitle, opacity }}
         className="relative mx-auto flex max-w-[1700px] flex-col px-6 md:px-10"
       >
-        <div className="flex select-none items-center gap-3 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/60">
-          <span className="h-px w-10 bg-paper-50/40" />
-          <span>Урок № 2026 — 10 — 07</span>
-        </div>
 
         <h1 className="mt-10 font-display text-[clamp(3rem,10.2vw,12rem)] font-light leading-[0.96] tracking-[-0.035em]">
           <span className="block">

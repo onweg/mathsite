@@ -10,7 +10,7 @@ export function CTA() {
   const y = useTransform(scrollYProgress, [0, 1], ['10%', '-10%'])
 
   return (
-    <section id="enter" ref={ref} className="relative py-40 md:py-56">
+    <section id="enter" ref={ref} className="relative pt-16 pb-40 md:pt-20 md:pb-56">
       <motion.div
         aria-hidden
         style={{ scale, y }}

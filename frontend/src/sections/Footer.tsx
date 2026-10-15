@@ -17,7 +17,7 @@ export function Footer() {
             </div>
           </div>
 
-          <div>
+          <div className="md:col-start-4">
             <div className="mb-5 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/50">
               Разделы
             </div>
