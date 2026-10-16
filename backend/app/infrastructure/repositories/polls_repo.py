@@ -246,7 +246,7 @@ class PgPollsRepository:
                     f"""
                     INSERT INTO poll_answers
                         (poll_id, student_id, student_name, class_label, option_ids, comment)
-                    VALUES (%s, NULL, %s, %s, %s, %s)
+                    VALUES (%s, NULL, %s, %s, %s::uuid[], %s)
                     RETURNING {_ANSWER_COLS}
                     """,
                     (poll_id, student_name, class_label, option_ids, comment),
@@ -256,7 +256,7 @@ class PgPollsRepository:
                     f"""
                     INSERT INTO poll_answers
                         (poll_id, student_id, student_name, class_label, option_ids, comment)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s::uuid[], %s)
                     ON CONFLICT (poll_id, student_id) WHERE student_id IS NOT NULL
                     DO UPDATE SET
                         student_name = EXCLUDED.student_name,

@@ -50,7 +50,7 @@ def _quiz_to_dto(quiz: Quiz) -> QuizDTO:
     )
 
 
-def _summary(quiz: Quiz) -> QuizSummaryDTO:
+def _summary(quiz: Quiz, items_count: int) -> QuizSummaryDTO:
     return QuizSummaryDTO(
         id=str(quiz.id),
         title=quiz.title,
@@ -58,7 +58,7 @@ def _summary(quiz: Quiz) -> QuizSummaryDTO:
         difficulty=quiz.difficulty,
         status=quiz.status,
         source_key=quiz.source_key,
-        items_count=len(quiz.items),
+        items_count=items_count,
     )
 
 
@@ -117,7 +117,8 @@ async def list_all(
     svc: Annotated[QuizService, Depends(get_quiz_service)],
 ) -> list[QuizSummaryDTO]:
     quizzes = await svc.list()
-    return [_summary(q) for q in quizzes]
+    counts = await svc.items_counts()
+    return [_summary(q, counts.get(q.id, 0)) for q in quizzes]
 
 
 @router.get("/{quiz_id}", response_model=QuizDTO)

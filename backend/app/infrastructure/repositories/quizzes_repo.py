@@ -42,6 +42,10 @@ class QuizzesRepository(Protocol):
 
     async def list(self, status: QuizStatus | None = None) -> list[Quiz]: ...
 
+    async def items_counts(self) -> dict[UUID, int]:
+        """quiz_id → число вопросов. `list` вопросы не грузит."""
+        ...
+
     async def get(self, quiz_id: UUID) -> Quiz | None: ...
 
     async def update_meta(
@@ -186,6 +190,14 @@ class PgQuizzesRepository:
             )
             for r in rows
         ]
+
+    async def items_counts(self) -> dict[UUID, int]:
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                "SELECT quiz_id, COUNT(*) FROM quiz_items GROUP BY quiz_id"
+            )
+            rows = await cur.fetchall()
+        return {r[0]: r[1] for r in rows}
 
     async def get(self, quiz_id: UUID) -> Quiz | None:
         async with self._pool.connection() as conn, conn.cursor() as cur:

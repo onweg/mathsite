@@ -142,6 +142,10 @@ class QuizService:
     async def list(self, status: QuizStatus | None = None) -> list[Quiz]:
         return await self._quizzes.list(status)
 
+    async def items_counts(self) -> dict[UUID, int]:
+        """Число вопросов по квизам: в списках сами вопросы не читаем."""
+        return await self._quizzes.items_counts()
+
     async def get(self, quiz_id: UUID) -> Quiz:
         quiz = await self._quizzes.get(quiz_id)
         if not quiz:

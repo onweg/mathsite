@@ -21,7 +21,7 @@ from app.services.quiz_service import QuizService
 router = APIRouter(prefix="/quizzes", tags=["quizzes"])
 
 
-def _summary(quiz: Quiz) -> QuizSummaryDTO:
+def _summary(quiz: Quiz, items_count: int) -> QuizSummaryDTO:
     return QuizSummaryDTO(
         id=str(quiz.id),
         title=quiz.title,
@@ -29,7 +29,7 @@ def _summary(quiz: Quiz) -> QuizSummaryDTO:
         difficulty=quiz.difficulty,
         status=quiz.status,
         source_key=quiz.source_key,
-        items_count=0,
+        items_count=items_count,
     )
 
 
@@ -56,7 +56,9 @@ def _public(quiz: Quiz) -> QuizPublicDTO:
 async def list_published(
     svc: Annotated[QuizService, Depends(get_quiz_service)],
 ) -> list[QuizSummaryDTO]:
-    return [_summary(q) for q in await svc.list(status="published")]
+    quizzes = await svc.list(status="published")
+    counts = await svc.items_counts()
+    return [_summary(q, counts.get(q.id, 0)) for q in quizzes]
 
 
 @router.get("/{quiz_id}", response_model=QuizPublicDTO)

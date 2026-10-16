@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Markdown } from '../components/Markdown'
 import { RevealText, Reveal } from '../components/RevealText'
 import { PollAnswerDTO, PollDTO, publicPolls } from '../lib/api'
+import { loadOpenPolls } from '../lib/useHasPolls'
 import { anchorScroll } from '../hooks/useLenis'
 import { useStudent } from '../lib/student'
 
@@ -23,10 +24,7 @@ export function Poll() {
   const [polls, setPolls] = useState<PollDTO[] | null>(null)
 
   useEffect(() => {
-    publicPolls
-      .list()
-      .then(setPolls)
-      .catch(() => setPolls([]))
+    loadOpenPolls().then(setPolls)
   }, [])
 
   if (polls !== null && polls.length === 0) return null
