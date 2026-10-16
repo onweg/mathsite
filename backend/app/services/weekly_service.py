@@ -1,8 +1,8 @@
 """WeeklyTaskService — use case управления задачей недели.
 
-Инвариант: одновременно опубликована максимум одна задача недели — последняя,
-на которой учитель нажал «опубликовать». Публикация новой автоматически снимает
-прежние (всё равно показывается только latest_published).
+Инвариант: одновременно опубликована ровно одна задача недели — та, на которой
+учитель нажал «опубликовать». Публикация новой снимает прежнюю в одной
+транзакции, поэтому двух опубликованных не бывает даже на мгновение.
 """
 
 from __future__ import annotations
@@ -134,7 +134,9 @@ class WeeklyTaskService:
         return await self.get(task_id)
 
     async def publish(self, task_id: UUID) -> WeeklyTask:
-        await self._repo.update(task_id, is_published=True)
+        """Публикация новой задачи снимает прежнюю: на сайте всегда одна."""
+        await self.get(task_id)  # 404, если задачи нет
+        await self._repo.publish_only(task_id)
         return await self.get(task_id)
 
     async def unpublish(self, task_id: UUID) -> WeeklyTask:

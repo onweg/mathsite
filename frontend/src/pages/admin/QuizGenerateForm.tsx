@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Difficulty, QuizDTO, Source, adminQuizzes } from '../../lib/api'
+import { ApiError, Difficulty, QuizDTO, Source, adminQuizzes } from '../../lib/api'
 
 const SOURCES: { value: Source | ''; label: string }[] = [
   { value: '', label: 'весь материал' },
@@ -26,9 +26,10 @@ export function QuizGenerateForm({
   const [count, setCount] = useState(5)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Тема не нашлась в учебнике — предлагаем написать по программе 8 класса
+  const [noSource, setNoSource] = useState(false)
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
+  async function run(allowWithoutSource: boolean) {
     setBusy(true)
     setError(null)
     try {
@@ -38,13 +39,26 @@ export function QuizGenerateForm({
         source_key: source || null,
         difficulty,
         items_count: count,
+        allow_without_source: allowWithoutSource,
       })
       onDone(quiz)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'ошибка генерации')
+      if (e instanceof ApiError && e.code === 'no_source_material') {
+        setNoSource(true)
+        setError(null)
+      } else {
+        setNoSource(false)
+        setError(e instanceof Error ? e.message : 'ошибка генерации')
+      }
     } finally {
       setBusy(false)
     }
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setNoSource(false)
+    run(false)
   }
 
   return (
@@ -128,6 +142,28 @@ export function QuizGenerateForm({
       {error && (
         <div className="text-sm text-red-400/90 border border-red-500/30 bg-red-500/10 rounded-lg px-3 py-2">
           {error}
+        </div>
+      )}
+
+      {noSource && (
+        <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-3">
+          <p className="text-sm text-amber-200/90">
+            По теме «{topic.trim()}» в выбранном источнике ничего не нашлось.
+            Можно сменить источник или формулировку — либо сгенерировать без
+            учебника, по программе 8 класса.
+          </p>
+          <p className="text-xs text-paper-50/40">
+            Без учебника вопросы пишутся из общих знаний модели, поэтому
+            вычитай черновик внимательнее обычного.
+          </p>
+          <button
+            type="button"
+            onClick={() => run(true)}
+            disabled={busy}
+            className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-2 text-sm text-paper-50 transition hover:border-amber-400 disabled:opacity-50"
+          >
+            {busy ? 'генерируем…' : 'сгенерировать без учебника'}
+          </button>
         </div>
       )}
 

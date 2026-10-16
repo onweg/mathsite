@@ -75,6 +75,7 @@ async def generate(
         difficulty=body.difficulty,
         items_count=body.items_count,
         created_by=user.id,
+        allow_without_source=body.allow_without_source,
     )
     return _quiz_to_dto(quiz)
 

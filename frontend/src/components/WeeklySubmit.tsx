@@ -1,8 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { WeeklySubmissionDTO, fileUrl, publicWeekly } from '../lib/api'
+import { WeeklySubmissionDTO, publicWeekly } from '../lib/api'
 import { anchorScroll } from '../hooks/useLenis'
 import { useStudent } from '../lib/student'
-import { Markdown } from './Markdown'
 
 const NAME_KEY = 'mathsite.student.name'
 const MAX_PHOTO_MB = 8
@@ -54,7 +53,7 @@ export function WeeklySubmit({ taskId }: { taskId: string }) {
   return (
     <div ref={boxRef} className="mt-6 space-y-5">
       {current && !open && (
-        <SubmissionCard
+        <SubmittedLine
           submission={current}
           anonymous={!authed}
           onRedo={() => {
@@ -280,7 +279,7 @@ const STATUS: Record<
   wrong: { label: 'пока неверно', className: 'text-red-300/90' },
 }
 
-function SubmissionCard({
+function SubmittedLine({
   submission,
   anonymous,
   onRedo,
@@ -291,58 +290,32 @@ function SubmissionCard({
 }) {
   const s = STATUS[submission.status]
   return (
-    <div className="space-y-4 rounded-3xl border border-paper-50/10 bg-ink-950/60 p-6 md:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-paper-50/50">
-          решение отправлено
-        </div>
-        <div className={`font-mono text-[10px] uppercase tracking-[0.25em] ${s.className}`}>
-          {s.label}
-        </div>
-      </div>
-
-      {submission.solution_md && (
-        <div className="text-sm leading-relaxed text-paper-100/80">
-          <Markdown text={submission.solution_md} />
-        </div>
-      )}
-
-      {submission.image_url && (
-        // Высота коробки задана заранее: у <img> до загрузки она нулевая,
-        // и в момент появления картинки страница дёргалась вниз.
-        <div className="h-64">
-          <img
-            src={fileUrl(submission.image_url)}
-            alt="Фото отправленного решения"
-            className="h-full w-auto max-w-full rounded-2xl border border-paper-50/10 object-contain"
-          />
-        </div>
-      )}
-
-      {submission.teacher_comment && (
-        <div className="rounded-2xl border border-gold-500/30 bg-gold-500/5 px-4 py-3">
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-gold-500/80">
-            учитель
-          </div>
-          <p className="mt-2 text-sm leading-relaxed text-paper-100/85">
-            {submission.teacher_comment}
-          </p>
-        </div>
-      )}
-
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border border-paper-50/10 bg-ink-950/60 px-5 py-4">
+      <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-paper-50/50">
+        решение отправлено
+      </span>
+      <span className={`font-mono text-[10px] uppercase tracking-[0.25em] ${s.className}`}>
+        {s.label}
+      </span>
       {anonymous ? (
-        <p className="text-[11px] leading-relaxed text-paper-50/40">
-          Ты отправил решение без входа по QR — проверку учителя здесь увидеть
-          не получится. Зайди по своему QR-коду, и следующая отправка попадёт в
-          твой профиль.
-        </p>
+        <span className="text-[11px] text-paper-50/40">
+          Без входа по QR проверку учителя здесь не увидеть.
+        </span>
       ) : (
-        <button
-          onClick={onRedo}
-          className="font-mono text-[10px] uppercase tracking-[0.2em] text-paper-50/50 transition hover:text-gold-500"
-        >
-          отправить заново
-        </button>
+        <>
+          <a
+            href="/me"
+            className="font-mono text-[10px] uppercase tracking-[0.2em] text-paper-50/50 transition hover:text-gold-500"
+          >
+            смотреть в профиле
+          </a>
+          <button
+            onClick={onRedo}
+            className="font-mono text-[10px] uppercase tracking-[0.2em] text-paper-50/50 transition hover:text-gold-500"
+          >
+            отправить заново
+          </button>
+        </>
       )}
     </div>
   )

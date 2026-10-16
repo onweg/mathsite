@@ -13,6 +13,7 @@ from app.api.deps import (
     get_current_student,
     get_quiz_service,
     get_rate_limiter,
+    get_polls_service,
     get_students_service,
     get_weekly_submissions_service,
     is_prod,
@@ -23,10 +24,12 @@ from app.infrastructure.ratelimit.base import RateLimiter
 from app.schemas.student import (
     ActivateRequest,
     StudentAttemptDTO,
+    StudentPollAnswerDTO,
     StudentPublicDTO,
     StudentWeeklyDTO,
 )
 from app.services.quiz_service import QuizService
+from app.services.polls_service import PollsService
 from app.services.students_service import StudentsService
 from app.services.weekly_submissions_service import WeeklySubmissionsService
 
@@ -119,3 +122,26 @@ async def my_weekly(
         )
         for s, title in rows
     ]
+
+
+@router.get("/me/polls", response_model=list[StudentPollAnswerDTO])
+async def my_polls(
+    student: Annotated[Student, Depends(get_current_student)],
+    polls: Annotated[PollsService, Depends(get_polls_service)],
+) -> list[StudentPollAnswerDTO]:
+    """История ответов на опросы: что выбрал и что написал."""
+    rows = await polls.my_answers(student)
+    out: list[StudentPollAnswerDTO] = []
+    for answer, title, options in rows:
+        by_id = {o.id: o.text for o in options}
+        out.append(
+            StudentPollAnswerDTO(
+                id=str(answer.id),
+                poll_id=str(answer.poll_id),
+                poll_title=title,
+                chosen=[by_id[o] for o in answer.option_ids if o in by_id],
+                comment=answer.comment,
+                created_at=answer.created_at.isoformat(),
+            )
+        )
+    return out

@@ -46,6 +46,10 @@ class QuizzesRepository(Protocol):
         """quiz_id → число вопросов. `list` вопросы не грузит."""
         ...
 
+    async def attempted_ids(self, student_id: UUID) -> set[UUID]:
+        """Квизы, которые ученик уже проходил."""
+        ...
+
     async def get(self, quiz_id: UUID) -> Quiz | None: ...
 
     async def update_meta(
@@ -198,6 +202,15 @@ class PgQuizzesRepository:
             )
             rows = await cur.fetchall()
         return {r[0]: r[1] for r in rows}
+
+    async def attempted_ids(self, student_id: UUID) -> set[UUID]:
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                "SELECT DISTINCT quiz_id FROM quiz_attempts WHERE student_id = %s",
+                (student_id,),
+            )
+            rows = await cur.fetchall()
+        return {r[0] for r in rows}
 
     async def get(self, quiz_id: UUID) -> Quiz | None:
         async with self._pool.connection() as conn, conn.cursor() as cur:

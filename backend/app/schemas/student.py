@@ -79,3 +79,14 @@ class StudentWeeklyDTO(BaseModel):
     status: Literal["new", "correct", "partial", "wrong"]
     teacher_comment: str | None
     created_at: str
+
+
+class StudentPollAnswerDTO(BaseModel):
+    """Ответ ученика на опрос — для его профиля."""
+
+    id: str
+    poll_id: str
+    poll_title: str
+    chosen: list[str]
+    comment: str
+    created_at: str

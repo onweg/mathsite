@@ -63,3 +63,13 @@ class NotFound(DomainError):
 class Conflict(DomainError):
     code = "conflict"
     status_code = 409
+
+
+class NoSourceMaterial(Conflict):
+    """По теме ничего не нашлось в выбранном источнике.
+
+    Отдельный код нужен фронту: на этой ошибке он предлагает сгенерировать
+    без учебника, а не просто показывает текст.
+    """
+
+    code = "no_source_material"

@@ -69,6 +69,8 @@ class GenerateRequest(BaseModel):
     source_key: Literal["textbook_8_algebra", "textbook_8_geometry", "olympiad"] | None = None
     difficulty: Literal["easy", "medium", "hard"] = "medium"
     items_count: int = Field(default=5, ge=1, le=15)
+    # true — генерировать по программе 8 класса, если в учебнике ничего не нашлось
+    allow_without_source: bool = False
 
 
 class CreateQuizRequest(BaseModel):

@@ -57,8 +57,10 @@ def answer_dto(a: PollAnswer) -> PollAnswerDTO:
 @router.get("", response_model=list[PollDTO])
 async def list_open(
     svc: Annotated[PollsService, Depends(get_polls_service)],
+    student: Annotated[Student | None, Depends(get_optional_student)] = None,
 ) -> list[PollDTO]:
-    return [poll_dto(p) for p in await svc.list_published()]
+    """Только те, на которые ученик ещё не отвечал. Анониму — все открытые."""
+    return [poll_dto(p) for p in await svc.list_published(student)]
 
 
 @router.post("/{poll_id}/answer", response_model=PollAnswerDTO)

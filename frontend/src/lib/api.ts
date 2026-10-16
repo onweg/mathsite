@@ -18,6 +18,18 @@ function humanError(status: number): string {
   return 'Что-то пошло не так. Попробуй ещё раз.'
 }
 
+/** Ошибка API с машинным кодом: по нему фронт различает ситуации. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly code: string | null = null,
+    readonly status = 0,
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; text: string }
 export type Topic = 'algebra' | 'geometry'
 
@@ -236,12 +248,14 @@ async function apiJson<T>(
   if (!r.ok) {
     // Пробуем вытащить detail из JSON. HTML от nginx / голый 500 — наружу не отдаём.
     let detail: string | undefined
+    let code: string | null = null
     const ct = r.headers.get('content-type') || ''
     if (ct.includes('application/json')) {
       const data = await r.json().catch(() => ({}))
       detail = (data as { detail?: string }).detail
+      code = (data as { code?: string }).code ?? null
     }
-    throw new Error(detail || humanError(r.status))
+    throw new ApiError(detail || humanError(r.status), code, r.status)
   }
   return (await r.json()) as T
 }
@@ -259,6 +273,8 @@ export const adminQuizzes = {
       source_key: Source | null
       difficulty: Difficulty
       items_count: number
+      /** true — писать по программе 8 класса, если в учебнике ничего не нашлось */
+      allow_without_source?: boolean
     },
   ) => apiJson<QuizDTO>('/admin/quizzes/generate', { method: 'POST', token, body }),
   /** Квиз руками, без нейросети. Вопросы можно прислать сразу или добавить потом. */
@@ -636,6 +652,15 @@ export type StudentWeeklyDTO = {
   created_at: string
 }
 
+export type StudentPollAnswerDTO = {
+  id: string
+  poll_id: string
+  poll_title: string
+  chosen: string[]
+  comment: string
+  created_at: string
+}
+
 export const studentAuth = {
   activate: (token: string) =>
     apiJson<StudentPublicDTO>('/students/activate', {
@@ -651,6 +676,8 @@ export const studentAuth = {
     apiJson<StudentAttemptDTO[]>('/students/me/attempts', { method: 'GET' }),
   myWeekly: () =>
     apiJson<StudentWeeklyDTO[]>('/students/me/weekly', { method: 'GET' }),
+  myPolls: () =>
+    apiJson<StudentPollAnswerDTO[]>('/students/me/polls', { method: 'GET' }),
 }
 
 export const adminStudents = {

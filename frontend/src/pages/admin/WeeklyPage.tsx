@@ -37,7 +37,11 @@ export function WeeklyPage({ token }: { token: string }) {
     return (
       <WeeklyEditor
         token={token}
-        onCancel={() => setView({ mode: 'list' })}
+        publishedOther={tasks?.find((t) => t.is_published) ?? null}
+        onCancel={() => {
+          reload()
+          setView({ mode: 'list' })
+        }}
         onDone={() => {
           reload()
           setView({ mode: 'list' })
@@ -74,11 +78,20 @@ export function WeeklyPage({ token }: { token: string }) {
   }
 
   if (view.mode === 'edit') {
+    // Задача, опубликованная прямо сейчас, — не считая открытую в редакторе.
+    // Нужна, чтобы предупредить: публикация новой снимет её с сайта.
+    const published = tasks?.find((t) => t.is_published && t.id !== view.task.id)
     return (
       <WeeklyEditor
         token={token}
         task={view.task}
-        onCancel={() => setView({ mode: 'list' })}
+        publishedOther={published ?? null}
+        onCancel={() => {
+          // Без перезагрузки список показывал бы устаревший статус:
+          // учитель публикует, выходит «назад» и видит «черновик».
+          reload()
+          setView({ mode: 'list' })
+        }}
         onDone={() => {
           reload()
           setView({ mode: 'list' })
@@ -181,11 +194,14 @@ function StatusBadge({ published }: { published: boolean }) {
 function WeeklyEditor({
   token,
   task,
+  publishedOther,
   onCancel,
   onDone,
 }: {
   token: string
   task?: WeeklyTaskDTO
+  /** Задача, которая сейчас висит на сайте, если это не редактируемая. */
+  publishedOther?: WeeklyTaskDTO | null
   onCancel: () => void
   onDone: () => void
 }) {
@@ -226,6 +242,17 @@ function WeeklyEditor({
   async function publish() {
     if (!current) {
       setError('сначала сохрани')
+      return
+    }
+    // На сайте всегда одна задача недели: публикация новой снимает прежнюю.
+    if (
+      publishedOther &&
+      !confirm(
+        `Сейчас на сайте висит «${publishedOther.title}».\n\n` +
+          `Опубликовать «${current.title}» вместо неё? ` +
+          `Прежняя задача уйдёт с сайта, решения по ней сохранятся.`,
+      )
+    ) {
       return
     }
     setBusy(true)
@@ -365,13 +392,20 @@ function WeeklyEditor({
               снять с публикации
             </button>
           ) : (
-            <button
-              onClick={publish}
-              disabled={busy}
-              className="rounded-lg bg-emerald-500/90 text-ink-950 px-4 py-2 text-sm font-medium hover:bg-emerald-400 disabled:opacity-50"
-            >
-              опубликовать
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={publish}
+                disabled={busy}
+                className="rounded-lg bg-emerald-500/90 text-ink-950 px-4 py-2 text-sm font-medium hover:bg-emerald-400 disabled:opacity-50"
+              >
+                опубликовать
+              </button>
+              {publishedOther && (
+                <span className="text-[11px] text-amber-300/70">
+                  заменит «{publishedOther.title}» на сайте
+                </span>
+              )}
+            </div>
           ))}
 
         {current && (

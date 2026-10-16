@@ -7,7 +7,7 @@ import unicodedata
 from dataclasses import replace
 from uuid import UUID
 
-from app.core.errors import Conflict, LLMBadResponse, NotFound
+from app.core.errors import Conflict, LLMBadResponse, NoSourceMaterial, NotFound
 from app.domain.chat.types import Message
 from app.domain.quiz.generation import build_generation_prompt, parse_generation
 from app.domain.quiz.types import (
@@ -60,8 +60,14 @@ class QuizService:
         difficulty: Difficulty,
         items_count: int,
         created_by: UUID,
+        allow_without_source: bool = False,
     ) -> Quiz:
-        """Сгенерировать черновик квиза: RAG → LLM → валидация → draft в БД."""
+        """Черновик квиза: RAG → LLM → валидация → draft в БД.
+
+        Если по теме ничего не нашлось, поднимаем NoSourceMaterial — фронт по
+        этому коду предлагает повторить с allow_without_source, и тогда
+        вопросы пишутся по программе 8 класса без опоры на учебник.
+        """
         q_vec = await self._llm.embed(topic, kind="query")
         hits = await self._chunks.semantic_search(
             q_vec,
@@ -69,10 +75,9 @@ class QuizService:
             limit=_RAG_LIMIT,
             min_similarity=_RAG_MIN_SIM,
         )
-        if not hits:
-            raise Conflict(
-                f"По теме «{topic}» не нашлось материала в выбранном источнике. "
-                f"Выберите другой источник или смените формулировку темы."
+        if not hits and not allow_without_source:
+            raise NoSourceMaterial(
+                f"По теме «{topic}» не нашлось материала в выбранном источнике."
             )
 
         fragments = [h.text for h in hits]
@@ -82,32 +87,46 @@ class QuizService:
             items_count=items_count,
             source_fragments=fragments,
         )
-        reply = await self._llm.chat(
-            messages=[
-                Message(role="system", text=_SYSTEM_PROMPT),
-                Message(role="user", text=user_prompt),
-            ],
-            temperature=0.3,
-            max_tokens=4000,
-        )
 
-        items = parse_generation(reply.text)
-        if len(items) == 0:
-            raise LLMBadResponse("модель вернула пустой список вопросов")
+        # Вторая попытка холоднее: модель регулярно ломает JSON на LaTeX'е,
+        # и дешевле переспросить, чем заставлять учителя жать кнопку заново.
+        items: list[QuizItem] = []
+        last_error: LLMBadResponse | None = None
+        for attempt, temperature in enumerate((0.3, 0.1), start=1):
+            reply = await self._llm.chat(
+                messages=[
+                    Message(role="system", text=_SYSTEM_PROMPT),
+                    Message(role="user", text=user_prompt),
+                ],
+                temperature=temperature,
+                max_tokens=4000,
+            )
+            try:
+                items = parse_generation(reply.text)
+            except LLMBadResponse as e:
+                last_error = e
+                log.warning("quiz generation attempt %d failed: %s", attempt, e)
+                continue
+            if items:
+                break
+            last_error = LLMBadResponse("модель вернула пустой список вопросов")
+
+        if not items:
+            raise last_error or LLMBadResponse("модель не вернула вопросы")
 
         draft = Quiz(
             id=None,
             title=title.strip() or topic.strip(),
             topic=topic.strip(),
-            source_key=source_key,
+            source_key=source_key if hits else None,
             difficulty=difficulty,
             status="draft",
             items=items,
         )
         saved = await self._quizzes.create(draft, created_by)
         log.info(
-            "quiz generated · id=%s · topic=%s · items=%d",
-            saved.id, topic, len(items),
+            "quiz generated · id=%s · topic=%s · items=%d · chunks=%d",
+            saved.id, topic, len(items), len(hits),
         )
         return saved
 
@@ -141,6 +160,18 @@ class QuizService:
 
     async def list(self, status: QuizStatus | None = None) -> list[Quiz]:
         return await self._quizzes.list(status)
+
+    async def list_published_for(self, student: Student | None) -> list[Quiz]:
+        """Опубликованные квизы, кроме уже пройденных этим учеником.
+
+        Главная показывает только то, что ещё не сделано; пройденное видно
+        в профиле, оттуда же можно пройти заново по прямой ссылке.
+        """
+        quizzes = await self._quizzes.list(status="published")
+        if not student:
+            return quizzes
+        done = await self._quizzes.attempted_ids(student.id)
+        return [q for q in quizzes if q.id not in done]
 
     async def items_counts(self) -> dict[UUID, int]:
         """Число вопросов по квизам: в списках сами вопросы не читаем."""

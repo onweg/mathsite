@@ -11,7 +11,7 @@ import logging
 from uuid import UUID
 
 from app.core.errors import Conflict, NotFound
-from app.domain.poll.types import Poll, PollAnswer, PollKind, PollResults
+from app.domain.poll.types import Poll, PollAnswer, PollKind, PollOption, PollResults
 from app.domain.student.types import Student
 from app.infrastructure.repositories.polls_repo import PollsRepository
 
@@ -30,8 +30,19 @@ class PollsService:
     async def list(self) -> list[Poll]:
         return await self._repo.list()
 
-    async def list_published(self) -> list[Poll]:
-        return await self._repo.list(published_only=True)
+    async def list_published(self, student: Student | None = None) -> list[Poll]:
+        """Открытые опросы. Вошедшему по QR не показываем те, где он уже ответил:
+        главная страница держит только актуальное, история живёт в профиле."""
+        polls = await self._repo.list(published_only=True)
+        if not student:
+            return polls
+        answered = await self._repo.answered_ids(student.id)
+        return [p for p in polls if p.id not in answered]
+
+    async def my_answers(
+        self, student: Student
+    ) -> list[tuple[PollAnswer, str, list[PollOption]]]:
+        return await self._repo.answers_by_student(student.id)
 
     async def get(self, poll_id: UUID) -> Poll:
         poll = await self._repo.get(poll_id)

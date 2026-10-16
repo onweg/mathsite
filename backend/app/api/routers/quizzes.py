@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 from typing import Annotated
 from uuid import UUID
 
@@ -34,6 +35,13 @@ def _summary(quiz: Quiz, items_count: int) -> QuizSummaryDTO:
 
 
 def _public(quiz: Quiz) -> QuizPublicDTO:
+    """Варианты отдаём в случайном порядке — на каждое открытие свой.
+
+    Перемешиваем только порядок в списке, id вариантов остаются при своих
+    текстах. Поэтому проверка ответа не меняется: ученик присылает id, а он
+    по-прежнему сравнивается с correct_answer. Подписи «а/б/в/г» фронт рисует
+    по позиции в списке, а не по id.
+    """
     return QuizPublicDTO(
         id=str(quiz.id),
         title=quiz.title,
@@ -45,7 +53,10 @@ def _public(quiz: Quiz) -> QuizPublicDTO:
                 "position": it.position,
                 "kind": it.kind,
                 "question_md": it.question_md,
-                "choices": [{"id": c.id, "text": c.text} for c in it.choices],
+                "choices": [
+                    {"id": c.id, "text": c.text}
+                    for c in random.sample(it.choices, len(it.choices))
+                ],
             }
             for it in quiz.items
         ],
@@ -55,8 +66,10 @@ def _public(quiz: Quiz) -> QuizPublicDTO:
 @router.get("", response_model=list[QuizSummaryDTO])
 async def list_published(
     svc: Annotated[QuizService, Depends(get_quiz_service)],
+    student: Annotated[Student | None, Depends(get_optional_student)] = None,
 ) -> list[QuizSummaryDTO]:
-    quizzes = await svc.list(status="published")
+    """Только непройденные — для вошедшего по QR. Анониму отдаём все."""
+    quizzes = await svc.list_published_for(student)
     counts = await svc.items_counts()
     return [_summary(q, counts.get(q.id, 0)) for q in quizzes]
 

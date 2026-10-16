@@ -64,6 +64,16 @@ class PollsRepository(Protocol):
 
     async def counts(self) -> dict[UUID, int]: ...
 
+    async def answered_ids(self, student_id: UUID) -> set[UUID]:
+        """Опросы, на которые ученик уже ответил."""
+        ...
+
+    async def answers_by_student(
+        self, student_id: UUID
+    ) -> list[tuple[PollAnswer, str, list[PollOption]]]:
+        """Ответы ученика + заголовок опроса + его варианты — для профиля."""
+        ...
+
 
 _POLL_COLS = (
     "id, title, question_md, kind, multiple, allow_comment, is_published, "
@@ -328,3 +338,44 @@ class PgPollsRepository:
             )
             rows = await cur.fetchall()
         return {r[0]: r[1] for r in rows}
+
+    async def answered_ids(self, student_id: UUID) -> set[UUID]:
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                "SELECT poll_id FROM poll_answers WHERE student_id = %s",
+                (student_id,),
+            )
+            rows = await cur.fetchall()
+        return {r[0] for r in rows}
+
+    async def answers_by_student(
+        self, student_id: UUID
+    ) -> list[tuple[PollAnswer, str, list[PollOption]]]:
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                f"""
+                SELECT {", ".join("a." + c.strip() for c in _ANSWER_COLS.split(","))},
+                       p.title
+                FROM poll_answers a
+                JOIN polls p ON p.id = a.poll_id
+                WHERE a.student_id = %s
+                ORDER BY a.created_at DESC
+                """,
+                (student_id,),
+            )
+            rows = await cur.fetchall()
+            if not rows:
+                return []
+            poll_ids = [r[1] for r in rows]
+            await cur.execute(
+                "SELECT poll_id, id, position, text FROM poll_options "
+                "WHERE poll_id = ANY(%s) ORDER BY poll_id, position",
+                (poll_ids,),
+            )
+            opt_rows = await cur.fetchall()
+        by_poll: dict[UUID, list[PollOption]] = {}
+        for o in opt_rows:
+            by_poll.setdefault(o[0], []).append(
+                PollOption(id=o[1], position=o[2], text=o[3])
+            )
+        return [(_answer(r), r[9], by_poll.get(r[1], [])) for r in rows]

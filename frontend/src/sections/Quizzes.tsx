@@ -12,6 +12,10 @@ import { useStudent } from '../lib/student'
 
 const NAME_KEY = 'mathsite.student.name'
 
+// Подписи вариантов считаем от позиции: сервер отдаёт их перемешанными,
+// id остаются привязаны к текстам, поэтому по id подписывать нельзя.
+const CHOICE_LABELS = ['а', 'б', 'в', 'г', 'д', 'е']
+
 type Screen =
   | { kind: 'list' }
   | { kind: 'intro'; quiz: QuizSummaryDTO }
@@ -319,7 +323,7 @@ function QuizRunner({
               </div>
             </div>
             <div className="space-y-2">
-              {item.choices.map((c) => {
+              {item.choices.map((c, idx) => {
                 const selected = answers[item.id] === c.id
                 return (
                   <button
@@ -336,7 +340,7 @@ function QuizRunner({
                         selected ? 'text-gold-500' : 'text-paper-50/40'
                       }`}
                     >
-                      {c.id}
+                      {CHOICE_LABELS[idx] ?? idx + 1}
                     </span>
                     <div className="flex-1 text-paper-50/90">
                       <Markdown text={c.text} />

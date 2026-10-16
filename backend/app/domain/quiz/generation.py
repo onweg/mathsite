@@ -41,6 +41,7 @@ _PROMPT_HEADER = """Ты составляешь тест по математик
 - Используй ТОЛЬКО материал ниже в разделе «Источник». Ничего не выдумывай.
 - Отвечай строго валидным JSON по приведённой схеме. Без комментариев, без текста до/после.
 - Формат математики — LaTeX inline: $x^2 + 1$. Блочных формул не используй.
+- Внутри JSON обратные слэши удваивай: \\\\frac, \\\\sqrt, \\\\le.
 - Все вопросы — multiple choice (kind="mcq"), 4 варианта (id: "a","b","c","d").
 - Один правильный вариант, в поле correct_answer указывай его id.
 - Не ставь правильный вариант всегда первым: распределяй его по разным позициям.
@@ -82,15 +83,28 @@ def build_generation_prompt(
     items_count: int,
     source_fragments: list[str],
 ) -> str:
-    """Собрать user-промпт для LLM. source_fragments — тексты RAG-чанков."""
-    fragments = "\n\n---\n\n".join(source_fragments)
-    return (
-        _PROMPT_HEADER
-        + f"\nТема: {topic}\n"
-        + f"Сложность: {difficulty}. {_DIFFICULTY_HINT[difficulty]}\n"
-        + f"Количество вопросов: {items_count}.\n\n"
-        + f"Источник:\n{fragments}\n"
+    """Собрать user-промпт для LLM.
+
+    source_fragments — тексты RAG-чанков. Пустой список означает генерацию
+    без учебника: правило «только материал ниже» в этом случае заменяем на
+    программу 8 класса, иначе модель упрётся в отсутствующий источник.
+    """
+    head = _PROMPT_HEADER
+    if not source_fragments:
+        head = head.replace(
+            "- Используй ТОЛЬКО материал ниже в разделе «Источник». Ничего не выдумывай.",
+            "- Опирайся на школьную программу алгебры и геометрии 8 класса.\n"
+            "- Не выдумывай экзотических обозначений и тем вне программы.",
+        )
+    tail = (
+        f"\nТема: {topic}\n"
+        f"Сложность: {difficulty}. {_DIFFICULTY_HINT[difficulty]}\n"
+        f"Количество вопросов: {items_count}.\n"
     )
+    if source_fragments:
+        fragments = "\n\n---\n\n".join(source_fragments)
+        tail += f"\nИсточник:\n{fragments}\n"
+    return head + tail
 
 
 def parse_generation(

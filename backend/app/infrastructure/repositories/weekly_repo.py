@@ -33,6 +33,10 @@ class WeeklyTasksRepository(Protocol):
 
     async def delete(self, task_id: UUID) -> None: ...
 
+    async def publish_only(self, task_id: UUID) -> None:
+        """Опубликовать одну задачу, сняв публикацию со всех остальных."""
+        ...
+
 
 def _row_to_task(row) -> WeeklyTask:
     return WeeklyTask(
@@ -123,6 +127,22 @@ class PgWeeklyTasksRepository:
             await cur.execute(
                 f"UPDATE weekly_tasks SET {', '.join(sets)} WHERE id = %s",  # noqa: S608
                 params,
+            )
+            await conn.commit()
+
+    async def publish_only(self, task_id: UUID) -> None:
+        # Обе команды в одной транзакции: между ними не должно быть момента,
+        # когда опубликованы две задачи или ни одной.
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                "UPDATE weekly_tasks SET is_published = FALSE, updated_at = NOW() "
+                "WHERE is_published = TRUE AND id <> %s",
+                (task_id,),
+            )
+            await cur.execute(
+                "UPDATE weekly_tasks SET is_published = TRUE, updated_at = NOW() "
+                "WHERE id = %s",
+                (task_id,),
             )
             await conn.commit()
 

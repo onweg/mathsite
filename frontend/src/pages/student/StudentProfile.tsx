@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   StudentAttemptDTO,
+  StudentPollAnswerDTO,
   StudentWeeklyDTO,
   fileUrl,
   studentAuth,
@@ -21,6 +22,7 @@ export function StudentProfile() {
   const auth = useStudent()
   const [attempts, setAttempts] = useState<StudentAttemptDTO[] | null>(null)
   const [weekly, setWeekly] = useState<StudentWeeklyDTO[] | null>(null)
+  const [polls, setPolls] = useState<StudentPollAnswerDTO[] | null>(null)
 
   useEffect(() => {
     if (auth.status !== 'authed') return
@@ -32,6 +34,10 @@ export function StudentProfile() {
       .myWeekly()
       .then(setWeekly)
       .catch(() => setWeekly([]))
+    studentAuth
+      .myPolls()
+      .then(setPolls)
+      .catch(() => setPolls([]))
   }, [auth.status])
 
   if (auth.status === 'loading') {
@@ -156,14 +162,61 @@ export function StudentProfile() {
           )}
         </section>
 
-        <div className="flex items-center justify-center gap-6 text-xs text-paper-50/40">
+        <section className="rounded-2xl border border-paper-50/10 bg-ink-900/40 p-6 space-y-4">
+          <h2 className="text-sm uppercase tracking-widest text-paper-50/60">
+            Мои ответы на опросы
+          </h2>
+
+          {polls === null ? (
+            <div className="text-paper-50/50 text-sm">загрузка…</div>
+          ) : polls.length === 0 ? (
+            <p className="text-paper-50/60 text-sm">
+              Пока ничего не отвечал. Опросы появляются на главной, когда
+              учитель их открывает.
+            </p>
+          ) : (
+            <ul className="divide-y divide-paper-50/5">
+              {polls.map((p) => (
+                <li key={p.id} className="py-3 space-y-2">
+                  <div className="text-paper-50">{p.poll_title}</div>
+                  {p.chosen.length > 0 && (
+                    <ul className="flex flex-wrap gap-2">
+                      {p.chosen.map((t, i) => (
+                        <li
+                          key={i}
+                          className="rounded-full border border-sage-500/30 bg-sage-500/5 px-3 py-1 text-xs text-paper-100/85"
+                        >
+                          {t}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {p.comment && (
+                    <p className="text-sm leading-relaxed text-paper-100/70">
+                      {p.comment}
+                    </p>
+                  )}
+                  <div className="text-[11px] text-paper-50/40">
+                    {formatDate(p.created_at)}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-paper-50/40">
           <a href="/#quizzes" className="hover:text-paper-50/70">
-            Пройти ещё квиз
+            На главную, к заданиям
           </a>
           <a href="/#weekly" className="hover:text-paper-50/70">
             К задаче недели
           </a>
         </div>
+        <p className="text-center text-[11px] leading-relaxed text-paper-50/30">
+          На главной показывается только то, что ты ещё не проходил. Всё
+          сделанное собирается здесь.
+        </p>
       </main>
     </div>
   )
