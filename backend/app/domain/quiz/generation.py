@@ -7,6 +7,8 @@
 from __future__ import annotations
 
 import json
+import random
+import re
 from typing import Literal
 
 from pydantic import BaseModel, Field, ValidationError
@@ -41,6 +43,7 @@ _PROMPT_HEADER = """Ты составляешь тест по математик
 - Формат математики — LaTeX inline: $x^2 + 1$. Блочных формул не используй.
 - Все вопросы — multiple choice (kind="mcq"), 4 варианта (id: "a","b","c","d").
 - Один правильный вариант, в поле correct_answer указывай его id.
+- Не ставь правильный вариант всегда первым: распределяй его по разным позициям.
 - Варианты должны быть правдоподобно похожи, различия — тонкие (знак, степень, порядок, типичная ошибка).
 - Короткие формулировки. Текст условия — не длиннее 2 предложений.
 - Разнообразь: расчётные, концептуальные, на преобразование.
@@ -90,7 +93,9 @@ def build_generation_prompt(
     )
 
 
-def parse_generation(raw: str) -> list[QuizItem]:
+def parse_generation(
+    raw: str, *, rng: random.Random | None = None
+) -> list[QuizItem]:
     """Распарсить ответ LLM и смапить в доменные QuizItem (id=None, position задаст сервис)."""
     try:
         payload = json.loads(extract_json(raw))
@@ -109,18 +114,69 @@ def parse_generation(raw: str) -> list[QuizItem]:
             raise LLMBadResponse(
                 f"item {i}: correct_answer={g.correct_answer!r} не входит в варианты {sorted(ids)}"
             )
+        choices, correct = shuffle_choices(
+            [Choice(id=c.id, text=c.text.strip()) for c in g.choices],
+            g.correct_answer,
+            rng=rng,
+        )
         items.append(
             QuizItem(
                 id=None,
                 position=i + 1,
                 kind="mcq",
                 question_md=g.question_md.strip(),
-                choices=[Choice(id=c.id, text=c.text.strip()) for c in g.choices],
-                correct_answer=g.correct_answer,
+                choices=choices,
+                correct_answer=correct,
                 explanation=(g.explanation or "").strip() or None,
             )
         )
     return items
 
 
-__all__ = ["build_generation_prompt", "parse_generation", "ItemKind"]
+_LETTERS = "abcdefgh"
+
+# «все перечисленные», «ни один из вариантов» и подобные обязаны остаться
+# последними — перемешанные, они выглядят поломкой.
+_KEEP_LAST_RE = re.compile(
+    r"^\s*(все (из )?перечислен|всё (из )?перечислен|ни один|ни одно|никакой|"
+    r"нет верного|нет правильного|другое|все варианты|оба варианта)",
+    re.IGNORECASE,
+)
+
+
+def shuffle_choices(
+    choices: list[Choice],
+    correct_id: str,
+    *,
+    rng: random.Random | None = None,
+) -> tuple[list[Choice], str]:
+    """Перемешать варианты и перевыдать id a/b/c/d.
+
+    Модель почти всегда ставит правильный ответ первым, и у всего теста
+    ответ оказывается «А». Порядок задаём здесь, id присваиваем заново по
+    новой позиции, а correct_answer переносим на ту же карточку.
+    """
+    r = rng or random
+    movable = [c for c in choices if not _KEEP_LAST_RE.match(c.text)]
+    pinned = [c for c in choices if _KEEP_LAST_RE.match(c.text)]
+
+    order = list(range(len(movable)))
+    r.shuffle(order)
+    ordered = [movable[i] for i in order] + pinned
+
+    out: list[Choice] = []
+    new_correct = correct_id
+    for i, c in enumerate(ordered):
+        letter = _LETTERS[i] if i < len(_LETTERS) else str(i + 1)
+        out.append(Choice(id=letter, text=c.text))
+        if c.id == correct_id:
+            new_correct = letter
+    return out, new_correct
+
+
+__all__ = [
+    "build_generation_prompt",
+    "parse_generation",
+    "shuffle_choices",
+    "ItemKind",
+]

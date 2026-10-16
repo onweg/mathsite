@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { QuizDTO, adminQuizzes } from '../../lib/api'
+import { QuizDTO, QuizItemDTO, adminQuizzes } from '../../lib/api'
 import { QuizAttempts } from './QuizAttempts'
 import { QuizItemCard } from './QuizItemCard'
+import { blankItem } from './QuizManualForm'
 
 export function QuizEditor({
   token,
@@ -52,6 +53,40 @@ export function QuizEditor({
     } finally {
       setBusy(false)
     }
+  }
+
+  /**
+   * Добавление и удаление вопросов идут через полную замену списка — отдельных
+   * ручек на один вопрос в API нет. Побочный эффект: у всех вопросов меняются
+   * id, поэтому операция доступна только у черновика. У опубликованного квиза
+   * это разорвало бы связь уже сданных попыток с вопросами.
+   */
+  async function saveItems(items: Omit<QuizItemDTO, 'id'>[]) {
+    if (!quiz) return
+    setBusy(true)
+    setError(null)
+    try {
+      setQuiz(await adminQuizzes.replaceItems(token, quiz.id, items))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'не удалось сохранить вопросы')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function addQuestion() {
+    if (!quiz) return
+    saveItems([...quiz.items.map(stripId), blankItem(quiz.items.length + 1)])
+  }
+
+  function removeQuestion(position: number) {
+    if (!quiz) return
+    if (!confirm(`Удалить вопрос ${position}?`)) return
+    saveItems(
+      quiz.items
+        .filter((it) => it.position !== position)
+        .map((it, i) => ({ ...stripId(it), position: i + 1 })),
+    )
   }
 
   async function remove() {
@@ -144,13 +179,38 @@ export function QuizEditor({
             quizId={quiz.id}
             item={it}
             onSaved={reload}
+            onDelete={
+              isPublished ? undefined : () => removeQuestion(it.position)
+            }
           />
         ))}
       </div>
 
+      {isPublished ? (
+        <p className="text-xs text-paper-50/40">
+          Состав вопросов у опубликованного квиза не меняется — иначе уже
+          сданные попытки перестанут соответствовать вопросам. Сними с
+          публикации, чтобы добавить или убрать вопрос.
+        </p>
+      ) : (
+        <button
+          onClick={addQuestion}
+          disabled={busy || quiz.items.length >= 20}
+          className="rounded-lg border border-dashed border-paper-50/20 px-4 py-3 text-sm text-paper-50/60 transition hover:border-paper-50/40 hover:text-paper-50 disabled:opacity-40"
+        >
+          + добавить вопрос
+        </button>
+      )}
+
       {isPublished && <QuizAttempts token={token} quizId={quiz.id} />}
     </div>
   )
+}
+
+/** API ждёт вопросы без id: при замене списка они выдаются заново. */
+function stripId(it: QuizItemDTO): Omit<QuizItemDTO, 'id'> {
+  const { id: _id, ...rest } = it
+  return rest
 }
 
 const backBtn =

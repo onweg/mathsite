@@ -12,6 +12,7 @@ from app.domain.auth.types import User
 from app.domain.quiz.types import Choice, Quiz, QuizItem
 from app.schemas.quiz import (
     AttemptSummaryDTO,
+    CreateQuizRequest,
     GenerateRequest,
     QuizDTO,
     QuizItemDTO,
@@ -78,6 +79,38 @@ async def generate(
     return _quiz_to_dto(quiz)
 
 
+def _items_from_dto(dtos) -> list[QuizItem]:
+    return [
+        QuizItem(
+            id=None,
+            position=i + 1,
+            kind=it.kind,
+            question_md=it.question_md,
+            choices=[Choice(id=c.id, text=c.text) for c in it.choices],
+            correct_answer=it.correct_answer,
+            explanation=it.explanation,
+        )
+        for i, it in enumerate(dtos)
+    ]
+
+
+@router.post("", response_model=QuizDTO)
+async def create(
+    body: CreateQuizRequest,
+    user: Annotated[User, Depends(get_current_admin)],
+    svc: Annotated[QuizService, Depends(get_quiz_service)],
+) -> QuizDTO:
+    """Квиз, собранный учителем вручную, без нейросети."""
+    quiz = await svc.create(
+        title=body.title,
+        topic=body.topic,
+        difficulty=body.difficulty,
+        items=_items_from_dto(body.items),
+        created_by=user.id,
+    )
+    return _quiz_to_dto(quiz)
+
+
 @router.get("", response_model=list[QuizSummaryDTO])
 async def list_all(
     _: Annotated[User, Depends(get_current_admin)],
@@ -136,19 +169,7 @@ async def replace_items(
     _: Annotated[User, Depends(get_current_admin)],
     svc: Annotated[QuizService, Depends(get_quiz_service)],
 ) -> QuizDTO:
-    items = [
-        QuizItem(
-            id=None,
-            position=i + 1,
-            kind=it.kind,
-            question_md=it.question_md,
-            choices=[Choice(id=c.id, text=c.text) for c in it.choices],
-            correct_answer=it.correct_answer,
-            explanation=it.explanation,
-        )
-        for i, it in enumerate(body.items)
-    ]
-    quiz = await svc.replace_items(quiz_id, items)
+    quiz = await svc.replace_items(quiz_id, _items_from_dto(body.items))
     return _quiz_to_dto(quiz)
 
 

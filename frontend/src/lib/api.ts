@@ -261,6 +261,23 @@ export const adminQuizzes = {
       items_count: number
     },
   ) => apiJson<QuizDTO>('/admin/quizzes/generate', { method: 'POST', token, body }),
+  /** Квиз руками, без нейросети. Вопросы можно прислать сразу или добавить потом. */
+  create: (
+    token: string,
+    body: {
+      title: string
+      topic: string
+      difficulty: Difficulty
+      items?: Omit<QuizItemDTO, 'id'>[]
+    },
+  ) => apiJson<QuizDTO>('/admin/quizzes', { method: 'POST', token, body }),
+  /** Замена всего списка вопросов: добавление и удаление. Пересоздаёт id. */
+  replaceItems: (token: string, id: string, items: Omit<QuizItemDTO, 'id'>[]) =>
+    apiJson<QuizDTO>(`/admin/quizzes/${id}/items`, {
+      method: 'PUT',
+      token,
+      body: { items },
+    }),
   updateMeta: (
     token: string,
     id: string,

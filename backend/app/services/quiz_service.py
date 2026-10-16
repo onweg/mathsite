@@ -111,6 +111,32 @@ class QuizService:
         )
         return saved
 
+    # ---------- Ручное создание ----------
+
+    async def create(
+        self,
+        *,
+        title: str,
+        topic: str,
+        difficulty: Difficulty,
+        items: list[QuizItem],
+        created_by: UUID,
+    ) -> Quiz:
+        """Квиз, собранный учителем руками. Создаётся черновиком, как и сгенерированный."""
+        _validate_items(items)
+        draft = Quiz(
+            id=None,
+            title=title.strip(),
+            topic=topic.strip(),
+            source_key=None,
+            difficulty=difficulty,
+            status="draft",
+            items=[replace(it, position=i + 1) for i, it in enumerate(items)],
+        )
+        saved = await self._quizzes.create(draft, created_by)
+        log.info("quiz created by hand · id=%s · items=%d", saved.id, len(items))
+        return saved
+
     # ---------- CRUD ----------
 
     async def list(self, status: QuizStatus | None = None) -> list[Quiz]:
@@ -156,6 +182,7 @@ class QuizService:
         return await self.get(quiz_id)
 
     async def replace_items(self, quiz_id: UUID, items: list[QuizItem]) -> Quiz:
+        _validate_items(items)
         normalized = [replace(it, position=i + 1) for i, it in enumerate(items)]
         await self._quizzes.replace_items(quiz_id, normalized)
         return await self.get(quiz_id)
@@ -220,6 +247,25 @@ class QuizService:
 
     async def list_attempts_by_student(self, student_id: UUID) -> list[StudentAttempt]:
         return await self._quizzes.list_by_student(student_id)
+
+
+def _validate_items(items: list[QuizItem]) -> None:
+    """Проверки, одинаковые для ручного создания и для замены списка вопросов."""
+    for i, it in enumerate(items, start=1):
+        if not it.question_md.strip():
+            raise Conflict(f"вопрос {i}: пустая формулировка")
+        if it.kind == "mcq":
+            if len(it.choices) < 2:
+                raise Conflict(f"вопрос {i}: нужно минимум два варианта ответа")
+            ids = [c.id for c in it.choices]
+            if len(set(ids)) != len(ids):
+                raise Conflict(f"вопрос {i}: у вариантов повторяются id")
+            if any(not c.text.strip() for c in it.choices):
+                raise Conflict(f"вопрос {i}: пустой вариант ответа")
+            if it.correct_answer not in ids:
+                raise Conflict(f"вопрос {i}: не отмечен правильный вариант")
+        elif not it.correct_answer.strip():
+            raise Conflict(f"вопрос {i}: не задан правильный ответ")
 
 
 def _normalize(s: str) -> str:

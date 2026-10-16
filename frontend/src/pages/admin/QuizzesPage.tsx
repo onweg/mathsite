@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { QuizDTO, QuizSummaryDTO, adminQuizzes } from '../../lib/api'
 import { QuizEditor } from './QuizEditor'
 import { QuizGenerateForm } from './QuizGenerateForm'
+import { QuizManualForm } from './QuizManualForm'
 
 type View =
   | { mode: 'list' }
   | { mode: 'generate' }
+  | { mode: 'manual' }
   | { mode: 'edit'; quizId: string }
 
 export function QuizzesPage({ token }: { token: string }) {
@@ -38,6 +40,19 @@ export function QuizzesPage({ token }: { token: string }) {
     )
   }
 
+  if (view.mode === 'manual') {
+    return (
+      <QuizManualForm
+        token={token}
+        onCancel={() => setView({ mode: 'list' })}
+        onCreated={(q: QuizDTO) => {
+          reload()
+          setView({ mode: 'edit', quizId: q.id })
+        }}
+      />
+    )
+  }
+
   if (view.mode === 'edit') {
     return (
       <QuizEditor
@@ -59,12 +74,20 @@ export function QuizzesPage({ token }: { token: string }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="text-lg text-paper-50 font-serif">Квизы</h2>
-        <button
-          onClick={() => setView({ mode: 'generate' })}
-          className="bg-paper-50 text-ink-950 rounded-lg px-4 py-2 text-sm font-medium"
-        >
-          + сгенерировать
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setView({ mode: 'generate' })}
+            className="rounded-lg border border-gold-500/50 bg-gold-500/10 px-4 py-2 text-sm text-paper-50 hover:border-gold-500"
+          >
+            сгенерировать
+          </button>
+          <button
+            onClick={() => setView({ mode: 'manual' })}
+            className="bg-paper-50 text-ink-950 rounded-lg px-4 py-2 text-sm font-medium"
+          >
+            + свой квиз
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -77,7 +100,7 @@ export function QuizzesPage({ token }: { token: string }) {
         <div className="text-paper-50/50 text-sm">загрузка…</div>
       ) : quizzes.length === 0 ? (
         <div className="rounded-xl border border-dashed border-paper-50/15 p-8 text-center text-paper-50/50">
-          пока нет ни одного квиза. нажми «сгенерировать» чтобы создать первый.
+          пока нет ни одного квиза. «сгенерировать» — нейросеть соберёт по учебнику, «свой квиз» — напишешь сам.
         </div>
       ) : (
         <ul className="space-y-2">

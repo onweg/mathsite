@@ -71,6 +71,15 @@ class GenerateRequest(BaseModel):
     items_count: int = Field(default=5, ge=1, le=15)
 
 
+class CreateQuizRequest(BaseModel):
+    """Квиз, собранный учителем вручную. items можно прислать сразу или потом."""
+
+    title: str = Field(min_length=1, max_length=200)
+    topic: str = Field(min_length=1, max_length=200)
+    difficulty: Literal["easy", "medium", "hard"] = "medium"
+    items: list[QuizItemDTO] = Field(default_factory=list, max_length=20)
+
+
 class UpdateMetaRequest(BaseModel):
     title: str | None = Field(default=None, max_length=200)
     topic: str | None = Field(default=None, max_length=200)
@@ -84,7 +93,9 @@ class UpdateItemRequest(BaseModel):
 
 
 class ReplaceItemsRequest(BaseModel):
-    items: list[QuizItemDTO] = Field(min_length=1, max_length=20)
+    # min_length нет: удаление последнего вопроса — законная операция,
+    # публикацию пустого квиза всё равно не пропустит сервис
+    items: list[QuizItemDTO] = Field(default_factory=list, max_length=20)
 
 
 class AttemptRequest(BaseModel):
