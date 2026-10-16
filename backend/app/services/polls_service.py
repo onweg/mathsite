@@ -30,14 +30,18 @@ class PollsService:
     async def list(self) -> list[Poll]:
         return await self._repo.list()
 
-    async def list_published(self, student: Student | None = None) -> list[Poll]:
-        """Открытые опросы. Вошедшему по QR не показываем те, где он уже ответил:
-        главная страница держит только актуальное, история живёт в профиле."""
+    async def list_published(
+        self, student: Student | None = None
+    ) -> tuple[list[Poll], set[UUID]]:
+        """Все открытые опросы + id тех, на которые ученик уже ответил.
+
+        Фильтрует главная: ей нужно отличать «ты уже всё прошёл» от
+        «опросов пока нет».
+        """
         polls = await self._repo.list(published_only=True)
         if not student:
-            return polls
-        answered = await self._repo.answered_ids(student.id)
-        return [p for p in polls if p.id not in answered]
+            return polls, set()
+        return polls, await self._repo.answered_ids(student.id)
 
     async def my_answers(
         self, student: Student

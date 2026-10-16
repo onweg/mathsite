@@ -195,6 +195,8 @@ export type QuizSummaryDTO = {
   status: QuizStatus
   source_key: Source | null
   items_count: number
+  /** Этот ученик уже проходил квиз. У анонимов всегда false. */
+  attempted: boolean
 }
 
 export type QuizItemPublicDTO = {
@@ -466,6 +468,8 @@ export type PollDTO = {
   multiple: boolean
   allow_comment: boolean
   options: PollOptionDTO[]
+  /** Этот ученик уже отвечал. У анонимов всегда false. */
+  answered: boolean
 }
 
 export type PollAdminDTO = PollDTO & {

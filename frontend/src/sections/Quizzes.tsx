@@ -54,9 +54,11 @@ export function Quizzes() {
   if (!quizzes) {
     return null // пока грузится — ничего не показываем
   }
-  if (quizzes.length === 0 && !error) {
-    return null // учитель ещё ничего не опубликовал — секции нет
-  }
+
+  // Пройденные с главной убираем, но саму секцию оставляем: ученик должен
+  // видеть, что раздел есть, просто сейчас в нём пусто.
+  const pending = quizzes.filter((q) => !q.attempted)
+  const allDone = pending.length === 0 && quizzes.length > 0
 
   return (
     <section
@@ -86,7 +88,8 @@ export function Quizzes() {
 
         {screen.kind === 'list' && (
           <QuizList
-            quizzes={quizzes}
+            quizzes={pending}
+            allDone={allDone}
             onOpen={async (q) => {
               // Авторизованный ученик — сразу в прохождение, intro не нужен.
               if (authedName) {
@@ -135,11 +138,39 @@ export function Quizzes() {
 
 function QuizList({
   quizzes,
+  allDone,
   onOpen,
 }: {
   quizzes: QuizSummaryDTO[]
+  /** Квизы есть, но этот ученик прошёл их все. */
+  allDone: boolean
   onOpen: (q: QuizSummaryDTO) => void
 }) {
+  if (quizzes.length === 0) {
+    return (
+      <Reveal>
+        <div className="rounded-2xl border border-dashed border-paper-50/15 px-8 py-12 text-center">
+          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/40">
+            {allDone ? 'всё пройдено' : 'пока пусто'}
+          </div>
+          <p className="mx-auto mt-4 max-w-md text-pretty text-paper-100/70">
+            {allDone
+              ? 'Ты прошёл все открытые квизы. Результаты и разбор ошибок — в твоём профиле, а новые появятся здесь.'
+              : 'Новых квизов пока нет. Как только учитель откроет тест, он появится в этом разделе.'}
+          </p>
+          {allDone && (
+            <a
+              href="/me"
+              className="mt-6 inline-block font-mono text-[10px] uppercase tracking-[0.22em] text-paper-50/60 transition hover:text-gold-500"
+            >
+              смотреть результаты
+            </a>
+          )}
+        </div>
+      </Reveal>
+    )
+  }
+
   return (
     <Reveal>
       <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">

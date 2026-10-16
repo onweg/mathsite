@@ -1,20 +1,21 @@
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { Magnetic } from './Magnetic'
-import { useHasQuizzes } from '../lib/useHasQuizzes'
-import { useHasPolls } from '../lib/useHasPolls'
 import { useVoice } from '../lib/voice'
 import { useStudent } from '../lib/student'
 
-const baseLinks = [
+// Разделы на месте всегда: если проходить нечего, секция объясняет это сама.
+// Пряталась бы ссылка — ученик решил бы, что раздела вовсе нет.
+const links = [
   { label: 'Разделы', href: '#sections' },
   { label: 'ИИ-теоретик', href: '#ai' },
   { label: 'Пропустил урок', href: '#missed' },
   { label: 'Задача недели', href: '#weekly' },
+  { label: 'Квизы', href: '#quizzes' },
+  { label: 'Опрос', href: '#feedback' },
+  { label: 'Классы', href: '#classes' },
 ]
 
-const QUIZZES_LINK = { label: 'Квизы', href: '#quizzes' }
-const POLL_LINK = { label: 'Опрос', href: '#feedback' }
-const CLASSES_LINK = { label: 'Классы', href: '#classes' }
+
 
 export function Nav() {
   const { scrollY } = useScroll()
@@ -23,15 +24,6 @@ export function Nav() {
   const border = useTransform(scrollY, [0, 120], ['rgba(246,242,234,0)', 'rgba(246,242,234,0.08)'])
 
   const student = useStudent()
-
-  const hasQuizzes = useHasQuizzes()
-  const hasPolls = useHasPolls()
-  const links = [
-    ...baseLinks,
-    ...(hasQuizzes ? [QUIZZES_LINK] : []),
-    ...(hasPolls ? [POLL_LINK] : []),
-    CLASSES_LINK,
-  ]
 
   return (
     <motion.header

@@ -21,6 +21,8 @@ class PollDTO(BaseModel):
     multiple: bool
     allow_comment: bool
     options: list[PollOptionDTO] = []
+    # этот ученик уже отвечал; у анонимов всегда False
+    answered: bool = False
 
 
 class PollAdminDTO(PollDTO):

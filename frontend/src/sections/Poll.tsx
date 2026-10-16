@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Markdown } from '../components/Markdown'
 import { RevealText, Reveal } from '../components/RevealText'
 import { PollAnswerDTO, PollDTO, publicPolls } from '../lib/api'
-import { loadOpenPolls } from '../lib/useHasPolls'
+import { loadOpenPolls } from '../lib/polls'
 import { anchorScroll } from '../hooks/useLenis'
 import { useStudent } from '../lib/student'
 
@@ -27,7 +27,11 @@ export function Poll() {
     loadOpenPolls().then(setPolls)
   }, [])
 
-  if (polls !== null && polls.length === 0) return null
+  // Секцию не прячем даже когда отвечать нечего: ученик должен видеть,
+  // что раздел есть. Отвеченные уходят из списка, а пустое состояние
+  // объясняет, почему тут тихо.
+  const pending = polls?.filter((p) => !p.answered) ?? null
+  const allAnswered = pending?.length === 0 && (polls?.length ?? 0) > 0
 
   return (
     <section
@@ -65,12 +69,31 @@ export function Poll() {
         </div>
 
         <div className="space-y-6 md:col-span-7">
-          {polls === null ? (
+          {pending === null ? (
             <div className="font-mono text-xs uppercase tracking-[0.25em] text-paper-50/40">
               загружаем…
             </div>
+          ) : pending.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-paper-50/15 px-8 py-12 text-center">
+              <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/40">
+                {allAnswered ? 'ты уже ответил' : 'пока пусто'}
+              </div>
+              <p className="mx-auto mt-4 max-w-md text-pretty text-paper-100/70">
+                {allAnswered
+                  ? 'Спасибо, твои ответы учитель уже видит. Что ты отвечал — в профиле, а новый вопрос появится здесь.'
+                  : 'Открытых вопросов сейчас нет. Когда учитель спросит мнение класса, вопрос появится в этом разделе.'}
+              </p>
+              {allAnswered && (
+                <a
+                  href="/me"
+                  className="mt-6 inline-block font-mono text-[10px] uppercase tracking-[0.22em] text-paper-50/60 transition hover:text-sage-500"
+                >
+                  мои ответы
+                </a>
+              )}
+            </div>
           ) : (
-            polls.map((p) => <PollCard key={p.id} poll={p} />)
+            pending.map((p) => <PollCard key={p.id} poll={p} />)
           )}
         </div>
       </div>

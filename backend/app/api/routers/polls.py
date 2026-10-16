@@ -29,7 +29,7 @@ from app.services.polls_service import PollsService
 router = APIRouter(prefix="/polls", tags=["polls"])
 
 
-def poll_dto(p: Poll) -> PollDTO:
+def poll_dto(p: Poll, answered: bool = False) -> PollDTO:
     return PollDTO(
         id=str(p.id),
         title=p.title,
@@ -41,6 +41,7 @@ def poll_dto(p: Poll) -> PollDTO:
             PollOptionDTO(id=str(o.id), position=o.position, text=o.text)
             for o in p.options
         ],
+        answered=answered,
     )
 
 
@@ -59,8 +60,9 @@ async def list_open(
     svc: Annotated[PollsService, Depends(get_polls_service)],
     student: Annotated[Student | None, Depends(get_optional_student)] = None,
 ) -> list[PollDTO]:
-    """Только те, на которые ученик ещё не отвечал. Анониму — все открытые."""
-    return [poll_dto(p) for p in await svc.list_published(student)]
+    """Все открытые; отвеченные помечены флагом, прячет их фронт."""
+    polls, answered = await svc.list_published(student)
+    return [poll_dto(p, p.id in answered) for p in polls]
 
 
 @router.post("/{poll_id}/answer", response_model=PollAnswerDTO)

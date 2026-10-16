@@ -1,7 +1,6 @@
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { useRef } from 'react'
 import { Reveal, RevealText } from '../components/RevealText'
-import { useHasQuizzes } from '../lib/useHasQuizzes'
 
 type Item = {
   num: string
@@ -63,11 +62,9 @@ const items: Item[] = [
 ]
 
 export function Sections() {
-  const hasQuizzes = useHasQuizzes()
-  // Квизы живут в секции, которой нет, пока учитель ничего не опубликовал.
-  const cards = items.map((it) =>
-    it.href === '#quizzes' && !hasQuizzes ? { ...it, href: undefined } : it,
-  )
+  // Секции квизов и опроса на странице есть всегда: когда проходить нечего,
+  // они сами объясняют почему. Поэтому карточки больше не гасим.
+  const cards = items
 
   return (
     <section id="sections" className="relative scroll-mt-24 py-32 md:py-44">

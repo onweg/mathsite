@@ -22,7 +22,7 @@ from app.services.quiz_service import QuizService
 router = APIRouter(prefix="/quizzes", tags=["quizzes"])
 
 
-def _summary(quiz: Quiz, items_count: int) -> QuizSummaryDTO:
+def _summary(quiz: Quiz, items_count: int, attempted: bool = False) -> QuizSummaryDTO:
     return QuizSummaryDTO(
         id=str(quiz.id),
         title=quiz.title,
@@ -31,6 +31,7 @@ def _summary(quiz: Quiz, items_count: int) -> QuizSummaryDTO:
         status=quiz.status,
         source_key=quiz.source_key,
         items_count=items_count,
+        attempted=attempted,
     )
 
 
@@ -68,10 +69,10 @@ async def list_published(
     svc: Annotated[QuizService, Depends(get_quiz_service)],
     student: Annotated[Student | None, Depends(get_optional_student)] = None,
 ) -> list[QuizSummaryDTO]:
-    """Только непройденные — для вошедшего по QR. Анониму отдаём все."""
-    quizzes = await svc.list_published_for(student)
+    """Все опубликованные; пройденные помечены флагом, прячет их фронт."""
+    quizzes, done = await svc.list_published_for(student)
     counts = await svc.items_counts()
-    return [_summary(q, counts.get(q.id, 0)) for q in quizzes]
+    return [_summary(q, counts.get(q.id, 0), q.id in done) for q in quizzes]
 
 
 @router.get("/{quiz_id}", response_model=QuizPublicDTO)

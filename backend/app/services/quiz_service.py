@@ -161,17 +161,18 @@ class QuizService:
     async def list(self, status: QuizStatus | None = None) -> list[Quiz]:
         return await self._quizzes.list(status)
 
-    async def list_published_for(self, student: Student | None) -> list[Quiz]:
-        """Опубликованные квизы, кроме уже пройденных этим учеником.
+    async def list_published_for(
+        self, student: Student | None
+    ) -> tuple[list[Quiz], set[UUID]]:
+        """Все опубликованные квизы + id тех, что ученик уже проходил.
 
-        Главная показывает только то, что ещё не сделано; пройденное видно
-        в профиле, оттуда же можно пройти заново по прямой ссылке.
+        Отдаём и то и другое: главная прячет пройденные, но должна отличать
+        «ты всё прошёл» от «учитель ещё ничего не опубликовал».
         """
         quizzes = await self._quizzes.list(status="published")
         if not student:
-            return quizzes
-        done = await self._quizzes.attempted_ids(student.id)
-        return [q for q in quizzes if q.id not in done]
+            return quizzes, set()
+        return quizzes, await self._quizzes.attempted_ids(student.id)
 
     async def items_counts(self) -> dict[UUID, int]:
         """Число вопросов по квизам: в списках сами вопросы не читаем."""

@@ -40,6 +40,8 @@ class QuizSummaryDTO(BaseModel):
     status: Literal["draft", "published"]
     source_key: str | None = None
     items_count: int = 0
+    # этот ученик уже проходил квиз; у анонимов всегда False
+    attempted: bool = False
 
 
 class QuizDTO(BaseModel):
