@@ -57,8 +57,9 @@ export function PrintQuizPage({ token }: { token: string }) {
           .no-print { display: none !important; }
           .page-break { break-before: page; }
         }
-        /* KaTeX на белом листе: цвет наследуется, межстрочный интервал нужен плотнее экранного */
-        .print-sheet .math-rich { line-height: 1.6; }
+        /* KaTeX на белом листе: плотнее экранного, но с запасом под дробь со
+           степенью в знаменателе — иначе числитель садится на строку выше. */
+        .print-sheet .math-rich { line-height: 1.85; }
       `}</style>
       <div className="min-h-screen bg-white text-black">
         <header className="no-print flex flex-wrap items-center justify-between gap-4 border-b border-black/10 px-6 py-4">

@@ -68,19 +68,20 @@ class QuizService:
         )
 
     async def _ask_model(self, user_prompt: str) -> list[QuizItem]:
-        """Спросить модель с повтором.
+        """Спросить модель с повтором, называя ей причину отказа.
 
-        Вторая попытка холоднее: модель ломает JSON на LaTeX'е, переписывает
-        в условие кашу из PDF и ставит «верно» ответом на каждое утверждение.
-        Всё это ловит parse_generation, и переспросить дешевле, чем заставлять
-        учителя жать кнопку заново.
+        Модель ломает JSON на LaTeX'е, переписывает в условие кашу из PDF и
+        ставит «верно» ответом на каждое утверждение. Всё это ловит
+        parse_generation. Просто переспросить мало: без объяснения модель
+        повторяет ту же ошибку, поэтому в следующую попытку кладём текст
+        претензии и просим исправить именно её. Попытки холоднее предыдущей.
         """
         last_error: LLMBadResponse | None = None
-        for attempt, temperature in enumerate((0.3, 0.1), start=1):
+        for attempt, temperature in enumerate((0.3, 0.15, 0.1), start=1):
             reply = await self._llm.chat(
                 messages=[
                     Message(role="system", text=_SYSTEM_PROMPT),
-                    Message(role="user", text=user_prompt),
+                    Message(role="user", text=_with_retry_note(user_prompt, last_error)),
                 ],
                 temperature=temperature,
                 max_tokens=4000,
@@ -341,6 +342,16 @@ class QuizService:
 
     async def list_attempts_by_student(self, student_id: UUID) -> list[StudentAttempt]:
         return await self._quizzes.list_by_student(student_id)
+
+
+def _with_retry_note(prompt: str, error: LLMBadResponse | None) -> str:
+    """Дописать к промпту, чем не понравилась прошлая попытка."""
+    if error is None:
+        return prompt
+    return (
+        f"{prompt}\n\nПрошлый твой ответ отклонён проверкой: {error}.\n"
+        "Собери тест заново по тем же требованиям и обязательно исправь это."
+    )
 
 
 def _validate_items(items: list[QuizItem]) -> None:

@@ -71,17 +71,17 @@ class WeeklyTaskService:
         )
 
     async def _ask_model(self, user_prompt: str) -> GWeeklyTask:
-        """Спросить модель с повтором.
+        """Спросить модель с повтором, называя ей причину отказа.
 
-        Одна задача — один шанс на кривой JSON. Вторая попытка холоднее:
-        дешевле, чем заставлять учителя жать кнопку заново.
+        Одна задача — один шанс на кривой JSON. Следующая попытка холоднее и
+        с текстом претензии: без объяснения модель повторяет ту же ошибку.
         """
         last_error: LLMBadResponse | None = None
-        for attempt, temperature in enumerate((0.5, 0.15), start=1):
+        for attempt, temperature in enumerate((0.5, 0.25, 0.15), start=1):
             reply = await self._llm.chat(
                 messages=[
                     Message(role="system", text=SYSTEM_PROMPT),
-                    Message(role="user", text=user_prompt),
+                    Message(role="user", text=_with_retry_note(user_prompt, last_error)),
                 ],
                 temperature=temperature,
                 max_tokens=2500,
@@ -187,3 +187,13 @@ class WeeklyTaskService:
 
     async def delete(self, task_id: UUID) -> None:
         await self._repo.delete(task_id)
+
+
+def _with_retry_note(prompt: str, error: LLMBadResponse | None) -> str:
+    """Дописать к промпту, чем не понравилась прошлая попытка."""
+    if error is None:
+        return prompt
+    return (
+        f"{prompt}\n\nПрошлый твой ответ отклонён проверкой: {error}.\n"
+        "Напиши задачу заново по тем же требованиям и обязательно исправь это."
+    )

@@ -251,7 +251,8 @@ def _check_tf_balance(items: list[GQuizItem]) -> None:
     truths = [t for t in (_tf_truth(i) for i in items) if t is not None]
     if len(truths) >= 2 and all(truths):
         raise LLMBadResponse(
-            f"во всех вопросах «верно/неверно» ({len(truths)} шт.) правильный ответ «верно»"
+            f"во всех вопросах «верно/неверно» ({len(truths)} шт.) правильный ответ "
+            "«верно» — примерно половина утверждений должна быть ложной"
         )
 
 

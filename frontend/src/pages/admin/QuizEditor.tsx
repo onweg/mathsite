@@ -185,6 +185,8 @@ export function QuizEditor({
         </div>
       )}
 
+      <TrueFalseBalance items={quiz.items} />
+
       <div className="space-y-4">
         {quiz.items.map((it) => (
           <QuizItemCard
@@ -242,6 +244,52 @@ function stripId(it: QuizItemDTO): Omit<QuizItemDTO, 'id'> {
 
 const backBtn =
   'text-xs text-paper-50/50 hover:text-paper-50 border border-paper-50/10 rounded px-2 py-1'
+
+/**
+ * Сколько в тесте вопросов «верно или неверно» и какой у них ключ.
+ *
+ * Модель любит ставить «верно» ответом на каждое утверждение — такой тест
+ * проходится не глядя. Генерация это уже не пропускает, но вопросы можно
+ * править руками, поэтому цифры показываем прямо над списком.
+ */
+function TrueFalseBalance({ items }: { items: QuizItemDTO[] }) {
+  const truths = items
+    .map((it) => trueFalseAnswer(it))
+    .filter((v): v is boolean => v !== null)
+  if (truths.length < 2) return null
+
+  const yes = truths.filter(Boolean).length
+  const no = truths.length - yes
+  const skewed = no === 0 || yes === 0
+  return (
+    <div
+      className={`rounded-lg border px-3 py-2 text-xs ${
+        skewed
+          ? 'border-amber-500/40 bg-amber-500/10 text-amber-200/90'
+          : 'border-paper-50/10 bg-ink-900/40 text-paper-50/60'
+      }`}
+    >
+      Вопросов «верно/неверно»: {truths.length} — ответ «верно» у {yes}, «неверно» у {no}.
+      {skewed && ' Ответ везде одинаковый: исправь ключ или само утверждение.'}
+    </div>
+  )
+}
+
+const TF_TRUE = ['верно', 'да', 'истина', 'правда', 'истинно']
+const TF_FALSE = ['неверно', 'нет', 'ложь', 'ложно', 'не верно']
+
+/** true/false для вопроса «верно или неверно», иначе null. */
+function trueFalseAnswer(item: QuizItemDTO): boolean | null {
+  if (item.choices.length !== 2) return null
+  const norm = (s: string) => s.trim().toLowerCase().replace(/[.!?]+$/, '')
+  const texts = item.choices.map((c) => norm(c.text))
+  const hasTrue = texts.some((t) => TF_TRUE.includes(t))
+  const hasFalse = texts.some((t) => TF_FALSE.includes(t))
+  if (!hasTrue || !hasFalse) return null
+  const picked = item.choices.find((c) => c.id === item.correct_answer)
+  if (!picked) return null
+  return TF_TRUE.includes(norm(picked.text))
+}
 
 function StatusBadge({ status }: { status: 'draft' | 'published' }) {
   if (status === 'published')

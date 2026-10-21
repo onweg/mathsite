@@ -207,7 +207,7 @@ export function QuizGenerateForm({
           onChange={(e) => setHint(e.target.value)}
           rows={2}
           maxLength={500}
-          placeholder="например: без задач на площадь, числа до 20, два вопроса на признаки"
+          placeholder="например: без задач на площадь, числа до 20, все вопросы в формате «верно или неверно»"
           className={input + ' resize-y'}
         />
       </Field>

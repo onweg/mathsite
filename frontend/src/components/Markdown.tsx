@@ -1,5 +1,6 @@
+import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { BlockMath, InlineMath } from 'react-katex'
+import { useMemo } from 'react'
 
 /**
  * Простой парсер под нашу задачу: ищет $$...$$ (блочные формулы)
@@ -14,17 +15,67 @@ export function Markdown({ text }: { text: string }) {
         if (t.type === 'block') {
           return (
             <div key={i} className="my-2 overflow-x-auto">
-              <BlockMath math={t.value} />
+              <Formula tex={t.value} display />
             </div>
           )
         }
         if (t.type === 'inline') {
-          return <InlineMath key={i} math={t.value} />
+          return <Formula key={i} tex={t.value} />
         }
         return <span key={i}>{t.value}</span>
       })}
     </div>
   )
+}
+
+/** Разметку отдаёт KaTeX: вход он экранирует сам, \href и \url выключены (trust по умолчанию false). */
+function Formula({ tex, display = false }: { tex: string; display?: boolean }) {
+  const html = useMemo(
+    () =>
+      katex.renderToString(tex, {
+        displayMode: display,
+        output: mathOutput(),
+        throwOnError: false,
+      }),
+    [tex, display],
+  )
+  return <span dangerouslySetInnerHTML={{ __html: html }} />
+}
+
+/**
+ * Чем рисовать формулу — своей вёрсткой KaTeX или нативным MathML.
+ *
+ * В браузере можно задать минимальный размер шрифта (Chrome: настройки →
+ * внешний вид → настроить шрифты; Safari: «никогда не использовать шрифт
+ * меньше»). Тогда мелкие куски формулы насильно укрупняются, а смещения
+ * внутри дроби KaTeX уже посчитал в em по исходному кеглю — и показатель
+ * степени из знаменателя уезжает через дробную черту в числитель и на строку
+ * выше. MathML от этого не страдает: там раскладывает сам браузер.
+ *
+ * Самая мелкая часть формулы у KaTeX — половина базового кегля, то есть около
+ * 9px при нашем тексте в 15px. Если браузер не даёт опускаться ниже, уходим
+ * на MathML; в обычном случае оставляем привычную вёрстку KaTeX.
+ */
+let cachedOutput: 'htmlAndMathml' | 'mathml' | null = null
+
+function mathOutput(): 'htmlAndMathml' | 'mathml' {
+  if (cachedOutput) return cachedOutput
+  cachedOutput = minimumFontSize() > 9 && 'MathMLElement' in window ? 'mathml' : 'htmlAndMathml'
+  return cachedOutput
+}
+
+function minimumFontSize(): number {
+  try {
+    const probe = document.createElement('span')
+    probe.style.cssText = 'position:absolute;visibility:hidden;font-size:1px'
+    probe.textContent = 'x'
+    document.body.appendChild(probe)
+    const size = parseFloat(getComputedStyle(probe).fontSize)
+    probe.remove()
+    return Number.isFinite(size) ? size : 1
+  } catch {
+    return 1
+  }
 }
 
 type Token =
