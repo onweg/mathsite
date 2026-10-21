@@ -163,10 +163,10 @@ class QuizService:
         quiz = await self.get(quiz_id)
         if quiz.status != "draft":
             raise Conflict(
-                "дорабатывать можно только черновик — снимите квиз с публикации"
+                "дорабатывать можно только черновик — снимите тест с публикации"
             )
         if not quiz.items:
-            raise Conflict("в квизе нет вопросов: нечего дорабатывать")
+            raise Conflict("в тесте нет вопросов: нечего дорабатывать")
 
         hits = await self.find_source(topic=quiz.topic, source_key=quiz.source_key)
         items = await self._ask_model(
@@ -284,7 +284,7 @@ class QuizService:
     async def publish(self, quiz_id: UUID) -> Quiz:
         quiz = await self.get(quiz_id)
         if not quiz.items:
-            raise Conflict("нельзя опубликовать квиз без вопросов")
+            raise Conflict("нельзя опубликовать тест без вопросов")
         await self._quizzes.update_meta(quiz_id, status="published")
         return await self.get(quiz_id)
 
@@ -308,7 +308,7 @@ class QuizService:
         """Если `student` передан (есть cookie) — попытка привязывается к нему, иначе анон."""
         quiz = await self.get(quiz_id)
         if quiz.status != "published":
-            raise Conflict("квиз не опубликован")
+            raise Conflict("тест не опубликован")
 
         per_item: list[dict] = []
         score = 0

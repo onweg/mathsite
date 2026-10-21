@@ -148,7 +148,7 @@ function StudentRow({
   }
 
   async function remove() {
-    if (!confirm(`Удалить ${student.name}? Привязанные попытки квизов станут анонимными.`)) return
+    if (!confirm(`Удалить ${student.name}? Привязанные попытки тестов станут анонимными.`)) return
     setBusy(true)
     try {
       await adminStudents.delete(token, student.id)

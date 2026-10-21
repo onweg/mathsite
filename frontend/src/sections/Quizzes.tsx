@@ -37,7 +37,7 @@ export function Quizzes() {
     publicQuizzes
       .list()
       .then(setQuizzes)
-      .catch((e) => setError(e instanceof Error ? e.message : 'не удалось загрузить квизы'))
+      .catch((e) => setError(e instanceof Error ? e.message : 'не удалось загрузить тесты'))
   }, [])
 
   // Экраны квиза сильно разной высоты: список → прохождение → результат.
@@ -70,7 +70,7 @@ export function Quizzes() {
         <header className="mb-14 md:mb-20">
           <div className="mb-5 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/60">
             <span className="h-px w-10 bg-paper-50/40" />
-            <span>Квизы · Проверь себя</span>
+            <span>Тесты · Проверь себя</span>
           </div>
           <h2 className="font-display text-[clamp(2.3rem,5.2vw,5.6rem)] font-light leading-[1] tracking-tight">
             <RevealText as="span" className="block">Короткие тесты,</RevealText>
@@ -97,7 +97,7 @@ export function Quizzes() {
                   const full = await publicQuizzes.get(q.id)
                   setScreen({ kind: 'run', quiz: full })
                 } catch (e) {
-                  setError(e instanceof Error ? e.message : 'не удалось загрузить квиз')
+                  setError(e instanceof Error ? e.message : 'не удалось загрузить тест')
                 }
               } else {
                 setScreen({ kind: 'intro', quiz: q })
@@ -155,8 +155,8 @@ function QuizList({
           </div>
           <p className="mx-auto mt-4 max-w-md text-pretty text-paper-100/70">
             {allDone
-              ? 'Ты прошёл все открытые квизы. Результаты и разбор ошибок — в твоём профиле, а новые появятся здесь.'
-              : 'Новых квизов пока нет. Как только учитель откроет тест, он появится в этом разделе.'}
+              ? 'Ты прошёл все открытые тесты. Результаты и разбор ошибок — в твоём профиле, а новые появятся здесь.'
+              : 'Новых тестов пока нет. Как только учитель откроет тест, он появится в этом разделе.'}
           </p>
           {allDone && (
             <a
@@ -235,7 +235,7 @@ function QuizIntro({
       const full = await publicQuizzes.get(quiz.id)
       onStart(full)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'не удалось загрузить квиз')
+      setError(e instanceof Error ? e.message : 'не удалось загрузить тест')
     } finally {
       setBusy(false)
     }
@@ -476,7 +476,7 @@ function QuizResult({
           onClick={onBack}
           className="rounded-full border border-paper-50/20 px-6 py-2.5 text-sm text-paper-50 hover:border-gold-500/60"
         >
-          к списку квизов
+          к списку тестов
         </button>
       </div>
     </div>

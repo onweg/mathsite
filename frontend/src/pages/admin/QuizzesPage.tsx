@@ -73,7 +73,7 @@ export function QuizzesPage({ token }: { token: string }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg text-paper-50 font-serif">Квизы</h2>
+        <h2 className="text-lg text-paper-50 font-serif">Тесты</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setView({ mode: 'generate' })}
@@ -85,7 +85,7 @@ export function QuizzesPage({ token }: { token: string }) {
             onClick={() => setView({ mode: 'manual' })}
             className="bg-paper-50 text-ink-950 rounded-lg px-4 py-2 text-sm font-medium"
           >
-            + свой квиз
+            + свой тест
           </button>
         </div>
       </div>
@@ -100,7 +100,7 @@ export function QuizzesPage({ token }: { token: string }) {
         <div className="text-paper-50/50 text-sm">загрузка…</div>
       ) : quizzes.length === 0 ? (
         <div className="rounded-xl border border-dashed border-paper-50/15 p-8 text-center text-paper-50/50">
-          пока нет ни одного квиза. «сгенерировать» — нейросеть соберёт по учебнику, «свой квиз» — напишешь сам.
+          пока нет ни одного теста. «сгенерировать» — нейросеть соберёт по учебнику, «свой тест» — напишешь сам.
         </div>
       ) : (
         <ul className="space-y-2">

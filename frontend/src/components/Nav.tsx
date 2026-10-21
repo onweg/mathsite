@@ -10,7 +10,7 @@ const links = [
   { label: 'ИИ-теоретик', href: '#ai' },
   { label: 'Пропустил урок', href: '#missed' },
   { label: 'Задача недели', href: '#weekly' },
-  { label: 'Квизы', href: '#quizzes' },
+  { label: 'Тесты', href: '#quizzes' },
   { label: 'Опрос', href: '#feedback' },
   { label: 'Классы', href: '#classes' },
 ]

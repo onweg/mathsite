@@ -34,7 +34,7 @@ export function PrintQuizPage({ token }: { token: string }) {
 
   useEffect(() => {
     if (!quizId) {
-      setError('не указан квиз')
+      setError('не указан тест')
       return
     }
     adminQuizzes
@@ -46,7 +46,7 @@ export function PrintQuizPage({ token }: { token: string }) {
   if (error) return <div className="p-10 text-red-500">{error}</div>
   if (!quiz) return <div className="p-10 text-paper-50/50">загрузка…</div>
   if (quiz.items.length === 0)
-    return <div className="p-10">в квизе «{quiz.title}» нет вопросов</div>
+    return <div className="p-10">в тесте «{quiz.title}» нет вопросов</div>
 
   return (
     <>

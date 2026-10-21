@@ -50,9 +50,9 @@ export function QuizManualForm({
         Назад к списку
       </button>
 
-      <h2 className="text-lg text-paper-50 font-serif">свой квиз</h2>
+      <h2 className="text-lg text-paper-50 font-serif">свой тест</h2>
       <p className="text-sm text-paper-50/50 max-w-2xl">
-        Вопросы напишешь сам, нейросеть не участвует. Квиз создастся черновиком
+        Вопросы напишешь сам, нейросеть не участвует. Тест создастся черновиком
         с одним вопросом-заготовкой — дальше добавляй и правь сколько нужно.
       </p>
 

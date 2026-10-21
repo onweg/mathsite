@@ -102,7 +102,7 @@ export function StudentProfile() {
 
         <section className="rounded-2xl border border-paper-50/10 bg-ink-900/40 p-6 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm uppercase tracking-widest text-paper-50/60">Мои квизы</h2>
+            <h2 className="text-sm uppercase tracking-widest text-paper-50/60">Мои тесты</h2>
             {attempts && attempts.length > 0 && (
               <div className="font-mono text-xs text-paper-50/60">
                 {total} попыток · средний {Math.round(avg * 100)}%
@@ -114,7 +114,7 @@ export function StudentProfile() {
             <div className="text-paper-50/50 text-sm">загрузка…</div>
           ) : attempts.length === 0 ? (
             <p className="text-paper-50/60 text-sm">
-              Пока попыток нет. Пройди квиз на главной — результат появится здесь.
+              Пока попыток нет. Пройди тест на главной — результат появится здесь.
             </p>
           ) : (
             <ul className="divide-y divide-paper-50/5">

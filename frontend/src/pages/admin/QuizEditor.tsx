@@ -97,7 +97,7 @@ export function QuizEditor({
 
   async function remove() {
     if (!quiz) return
-    if (!confirm(`Удалить квиз «${quiz.title}»? Отменить нельзя.`)) return
+    if (!confirm(`Удалить тест «${quiz.title}»? Отменить нельзя.`)) return
     setBusy(true)
     try {
       await adminQuizzes.delete(token, quiz.id)
@@ -215,7 +215,7 @@ export function QuizEditor({
 
       {isPublished ? (
         <p className="text-xs text-paper-50/40">
-          Состав вопросов у опубликованного квиза не меняется — иначе уже
+          Состав вопросов у опубликованного теста не меняется — иначе уже
           сданные попытки перестанут соответствовать вопросам. Сними с
           публикации, чтобы добавить или убрать вопрос.
         </p>

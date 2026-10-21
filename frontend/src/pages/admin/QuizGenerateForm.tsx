@@ -113,7 +113,7 @@ export function QuizGenerateForm({
       className="rounded-2xl border border-paper-50/10 p-6 space-y-4 bg-ink-900/40"
     >
       <div className="flex items-center justify-between">
-        <h3 className="text-sm uppercase tracking-widest text-paper-50/50">Новый квиз</h3>
+        <h3 className="text-sm uppercase tracking-widest text-paper-50/50">Новый тест</h3>
         <button
           type="button"
           onClick={onCancel}

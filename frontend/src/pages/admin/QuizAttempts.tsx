@@ -44,7 +44,7 @@ export function QuizAttempts({ token, quizId }: { token: string; quizId: string 
         <div className="text-paper-50/50 text-sm">загрузка…</div>
       ) : attempts.length === 0 ? (
         <div className="text-paper-50/50 text-sm py-4">
-          пока никто не проходил этот квиз.
+          пока никто не проходил этот тест.
         </div>
       ) : (
         <>

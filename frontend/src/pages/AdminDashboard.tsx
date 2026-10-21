@@ -9,7 +9,7 @@ import { WeeklyPage } from './admin/WeeklyPage'
 type Tab = 'quizzes' | 'weekly' | 'polls' | 'materials' | 'students'
 
 const TABS: { id: Tab; label: string; ready: boolean }[] = [
-  { id: 'quizzes', label: 'Квизы', ready: true },
+  { id: 'quizzes', label: 'Тесты', ready: true },
   { id: 'weekly', label: 'Задача недели', ready: true },
   { id: 'polls', label: 'Опросы', ready: true },
   { id: 'materials', label: 'Материалы', ready: true },
