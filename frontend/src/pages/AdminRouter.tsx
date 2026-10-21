@@ -3,6 +3,7 @@ import { useAdminAuth } from '../lib/auth'
 import { AdminDashboard } from './AdminDashboard'
 import { AdminLogin } from './AdminLogin'
 import { PrintClassPage } from './admin/PrintClassPage'
+import { PrintQuizPage } from './admin/PrintQuizPage'
 
 export function AdminRouter() {
   const auth = useAdminAuth()
@@ -28,6 +29,10 @@ export function AdminRouter() {
 
   if (auth.status === 'anon') {
     return <AdminLogin onSuccess={auth.signIn} />
+  }
+
+  if (path.startsWith('/admin/print-quiz')) {
+    return <PrintQuizPage token={auth.token} />
   }
 
   if (path.startsWith('/admin/print')) {

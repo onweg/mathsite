@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import get_current_admin, get_quiz_service
 from app.domain.auth.types import User
+from app.domain.quiz.generation import looks_garbled
 from app.domain.quiz.types import Choice, Quiz, QuizItem
 from app.schemas.quiz import (
     AttemptSummaryDTO,
@@ -17,7 +18,11 @@ from app.schemas.quiz import (
     QuizDTO,
     QuizItemDTO,
     QuizSummaryDTO,
+    RefineRequest,
     ReplaceItemsRequest,
+    SourceHitDTO,
+    SourcePreviewDTO,
+    SourcePreviewRequest,
     UpdateItemRequest,
     UpdateMetaRequest,
 )
@@ -76,8 +81,47 @@ async def generate(
         items_count=body.items_count,
         created_by=user.id,
         allow_without_source=body.allow_without_source,
+        use_materials=body.use_materials,
+        hint=body.hint,
     )
     return _quiz_to_dto(quiz)
+
+
+@router.post("/{quiz_id}/refine", response_model=QuizDTO)
+async def refine(
+    quiz_id: UUID,
+    body: RefineRequest,
+    _: Annotated[User, Depends(get_current_admin)],
+    svc: Annotated[QuizService, Depends(get_quiz_service)],
+) -> QuizDTO:
+    """Доработать черновик по замечанию: модель правит то, о чём просят."""
+    quiz = await svc.refine(quiz_id, instruction=body.instruction)
+    return _quiz_to_dto(quiz)
+
+
+@router.post("/source-preview", response_model=SourcePreviewDTO)
+async def source_preview(
+    body: SourcePreviewRequest,
+    _: Annotated[User, Depends(get_current_admin)],
+    svc: Annotated[QuizService, Depends(get_quiz_service)],
+) -> SourcePreviewDTO:
+    """Что именно нашлось в учебнике по теме — до того, как тратить генерацию.
+
+    Учителю видно, на какой материал обопрётся модель и много ли в нём
+    формул, развалившихся при извлечении из PDF.
+    """
+    hits = await svc.find_source(topic=body.topic, source_key=body.source_key)
+    out = [
+        SourceHitDTO(
+            source_key=h.source,
+            page=h.page,
+            similarity=h.similarity,
+            text=h.text[:600],
+            garbled=looks_garbled(h.text),
+        )
+        for h in hits
+    ]
+    return SourcePreviewDTO(hits=out, garbled_count=sum(1 for h in out if h.garbled))
 
 
 def _items_from_dto(dtos) -> list[QuizItem]:

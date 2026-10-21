@@ -17,6 +17,7 @@ from app.domain.weekly.types import WeeklySubmission, WeeklyTask
 from app.schemas.weekly import (
     CreateWeeklyRequest,
     GenerateWeeklyRequest,
+    RefineWeeklyRequest,
     ReviewSubmissionRequest,
     UpdateWeeklyRequest,
     WeeklySubmissionAdminDTO,
@@ -93,7 +94,22 @@ async def generate(
         source_key=body.source_key,
         level=body.level,
         created_by=user.id,
+        allow_without_source=body.allow_without_source,
+        use_materials=body.use_materials,
+        hint=body.hint,
     )
+    return _dto(task)
+
+
+@router.post("/{task_id}/refine", response_model=WeeklyTaskDTO)
+async def refine(
+    task_id: UUID,
+    body: RefineWeeklyRequest,
+    _: Annotated[User, Depends(get_current_admin)],
+    svc: Annotated[WeeklyTaskService, Depends(get_weekly_service)],
+) -> WeeklyTaskDTO:
+    """Доработать задачу по замечанию: условие и решение переписываются вместе."""
+    task = await svc.refine(task_id, instruction=body.instruction, level=body.level)
     return _dto(task)
 
 

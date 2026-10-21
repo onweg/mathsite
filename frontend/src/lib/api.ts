@@ -163,7 +163,27 @@ export async function me(token: string): Promise<AdminUser> {
 export type Difficulty = 'easy' | 'medium' | 'hard'
 export type QuizStatus = 'draft' | 'published'
 export type ItemKind = 'mcq' | 'short'
-export type Source = 'textbook_8_algebra' | 'textbook_8_geometry' | 'olympiad'
+/** Встроенные учебники плюс любой загруженный материал: его ключ — `material_<hex>`. */
+export type Source =
+  | 'textbook_8_algebra'
+  | 'textbook_8_geometry'
+  | 'olympiad'
+  | `material_${string}`
+
+/** Один фрагмент учебника, найденный по теме. */
+export type SourceHitDTO = {
+  source_key: string
+  page: number | null
+  similarity: number
+  text: string
+  /** текст похож на формулу, развалившуюся при извлечении из PDF */
+  garbled: boolean
+}
+
+export type SourcePreviewDTO = {
+  hits: SourceHitDTO[]
+  garbled_count: number
+}
 
 export type QuizChoice = { id: string; text: string }
 
@@ -277,8 +297,26 @@ export const adminQuizzes = {
       items_count: number
       /** true — писать по программе 8 класса, если в учебнике ничего не нашлось */
       allow_without_source?: boolean
+      /** false — не искать в учебнике вовсе, писать из знаний модели */
+      use_materials?: boolean
+      /** свободное пожелание учителя; в поиск по учебнику не идёт */
+      hint?: string
     },
   ) => apiJson<QuizDTO>('/admin/quizzes/generate', { method: 'POST', token, body }),
+  /** Доработка черновика по замечанию: модель правит то, о чём просят. */
+  refine: (token: string, id: string, instruction: string) =>
+    apiJson<QuizDTO>(`/admin/quizzes/${id}/refine`, {
+      method: 'POST',
+      token,
+      body: { instruction },
+    }),
+  /** Что нашлось в учебнике по теме — до того, как тратить генерацию. */
+  sourcePreview: (token: string, body: { topic: string; source_key: Source | null }) =>
+    apiJson<SourcePreviewDTO>('/admin/quizzes/source-preview', {
+      method: 'POST',
+      token,
+      body,
+    }),
   /** Квиз руками, без нейросети. Вопросы можно прислать сразу или добавить потом. */
   create: (
     token: string,
@@ -381,8 +419,22 @@ export const adminWeekly = {
   ) => apiJson<WeeklyTaskDTO>('/admin/weekly', { method: 'POST', token, body }),
   generate: (
     token: string,
-    body: { topic: string; source_key?: string | null; level?: WeeklyLevel },
+    body: {
+      topic: string
+      source_key?: string | null
+      level?: WeeklyLevel
+      allow_without_source?: boolean
+      use_materials?: boolean
+      hint?: string
+    },
   ) => apiJson<WeeklyTaskDTO>('/admin/weekly/generate', { method: 'POST', token, body }),
+  /** Доработка задачи по замечанию: условие и решение переписываются вместе. */
+  refine: (token: string, id: string, instruction: string, level: WeeklyLevel = 'olympiad') =>
+    apiJson<WeeklyTaskDTO>(`/admin/weekly/${id}/refine`, {
+      method: 'POST',
+      token,
+      body: { instruction, level },
+    }),
   update: (
     token: string,
     id: string,
@@ -417,7 +469,8 @@ export const adminWeekly = {
 }
 
 export const publicWeekly = {
-  current: () => apiJson<WeeklyTaskPublicDTO | null>('/weekly', { method: 'GET' }),
+  /** Все задачи, которые учитель держит на сайте, в порядке добавления. */
+  published: () => apiJson<WeeklyTaskPublicDTO[]>('/weekly', { method: 'GET' }),
 
   /** Отправка решения: текст, фото тетради или и то и другое. */
   async submit(

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { QuizDTO, QuizItemDTO, adminQuizzes } from '../../lib/api'
 import { QuizAttempts } from './QuizAttempts'
+import { RefineBox } from './RefineBox'
 import { QuizItemCard } from './QuizItemCard'
 import { blankItem } from './QuizManualForm'
 
@@ -89,6 +90,11 @@ export function QuizEditor({
     )
   }
 
+  async function refine(instruction: string) {
+    if (!quiz) return
+    setQuiz(await adminQuizzes.refine(token, quiz.id, instruction))
+  }
+
   async function remove() {
     if (!quiz) return
     if (!confirm(`Удалить квиз «${quiz.title}»? Отменить нельзя.`)) return
@@ -156,6 +162,14 @@ export function QuizEditor({
             опубликовать
           </button>
         )}
+        <a
+          href={`/admin/print-quiz?quiz=${quiz.id}`}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-lg border border-paper-50/20 px-4 py-2 text-sm text-paper-50/80 transition hover:bg-paper-50/5"
+        >
+          печать
+        </a>
         <button
           onClick={remove}
           disabled={busy}
@@ -185,6 +199,19 @@ export function QuizEditor({
           />
         ))}
       </div>
+
+      {!isPublished && quiz.items.length > 0 && (
+        <RefineBox
+          examples={[
+            'третий вопрос слишком лёгкий, усложни',
+            'убери вопросы про геометрию',
+            'добавь два вопроса на сокращение дробей',
+          ]}
+          note="Модель видит текущие вопросы и правит только то, о чём просишь. Остальные переносит как есть, но id вопросов меняются — доработка доступна только у черновика."
+          disabled={busy}
+          onSubmit={refine}
+        />
+      )}
 
       {isPublished ? (
         <p className="text-xs text-paper-50/40">

@@ -9,7 +9,11 @@ from uuid import UUID
 
 from app.core.errors import Conflict, LLMBadResponse, NoSourceMaterial, NotFound
 from app.domain.chat.types import Message
-from app.domain.quiz.generation import build_generation_prompt, parse_generation
+from app.domain.quiz.generation import (
+    build_generation_prompt,
+    build_refine_prompt,
+    parse_generation,
+)
 from app.domain.quiz.types import (
     AttemptResult,
     Choice,
@@ -18,7 +22,7 @@ from app.domain.quiz.types import (
     QuizItem,
     QuizStatus,
 )
-from app.domain.rag.chunk import Source
+from app.domain.rag.chunk import SearchHit, Source
 from app.domain.student.types import Student
 from app.infrastructure.llm.base import LLMProvider
 from app.infrastructure.repositories.chunks_repo import ChunksRepository
@@ -51,46 +55,26 @@ class QuizService:
 
     # ---------- Генерация ----------
 
-    async def generate(
-        self,
-        *,
-        title: str,
-        topic: str,
-        source_key: Source | None,
-        difficulty: Difficulty,
-        items_count: int,
-        created_by: UUID,
-        allow_without_source: bool = False,
-    ) -> Quiz:
-        """Черновик квиза: RAG → LLM → валидация → draft в БД.
-
-        Если по теме ничего не нашлось, поднимаем NoSourceMaterial — фронт по
-        этому коду предлагает повторить с allow_without_source, и тогда
-        вопросы пишутся по программе 8 класса без опоры на учебник.
-        """
+    async def find_source(
+        self, *, topic: str, source_key: Source | None
+    ) -> list[SearchHit]:
+        """Фрагменты учебника по теме. Отдельный метод — им же смотрит превью."""
         q_vec = await self._llm.embed(topic, kind="query")
-        hits = await self._chunks.semantic_search(
+        return await self._chunks.semantic_search(
             q_vec,
             source=source_key,
             limit=_RAG_LIMIT,
             min_similarity=_RAG_MIN_SIM,
         )
-        if not hits and not allow_without_source:
-            raise NoSourceMaterial(
-                f"По теме «{topic}» не нашлось материала в выбранном источнике."
-            )
 
-        fragments = [h.text for h in hits]
-        user_prompt = build_generation_prompt(
-            topic=topic,
-            difficulty=difficulty,
-            items_count=items_count,
-            source_fragments=fragments,
-        )
+    async def _ask_model(self, user_prompt: str) -> list[QuizItem]:
+        """Спросить модель с повтором.
 
-        # Вторая попытка холоднее: модель регулярно ломает JSON на LaTeX'е,
-        # и дешевле переспросить, чем заставлять учителя жать кнопку заново.
-        items: list[QuizItem] = []
+        Вторая попытка холоднее: модель ломает JSON на LaTeX'е, переписывает
+        в условие кашу из PDF и ставит «верно» ответом на каждое утверждение.
+        Всё это ловит parse_generation, и переспросить дешевле, чем заставлять
+        учителя жать кнопку заново.
+        """
         last_error: LLMBadResponse | None = None
         for attempt, temperature in enumerate((0.3, 0.1), start=1):
             reply = await self._llm.chat(
@@ -108,11 +92,49 @@ class QuizService:
                 log.warning("quiz generation attempt %d failed: %s", attempt, e)
                 continue
             if items:
-                break
+                return items
             last_error = LLMBadResponse("модель вернула пустой список вопросов")
+        raise last_error or LLMBadResponse("модель не вернула вопросы")
 
-        if not items:
-            raise last_error or LLMBadResponse("модель не вернула вопросы")
+    async def generate(
+        self,
+        *,
+        title: str,
+        topic: str,
+        source_key: Source | None,
+        difficulty: Difficulty,
+        items_count: int,
+        created_by: UUID,
+        allow_without_source: bool = False,
+        use_materials: bool = True,
+        hint: str | None = None,
+    ) -> Quiz:
+        """Черновик квиза: RAG → LLM → валидация → draft в БД.
+
+        use_materials=False — учитель сознательно просит вопросы без учебника,
+        тогда в поиск не ходим вовсе. Если же искали и не нашли, поднимаем
+        NoSourceMaterial: фронт по этому коду предлагает повторить с
+        allow_without_source.
+        """
+        hits = (
+            await self.find_source(topic=topic, source_key=source_key)
+            if use_materials
+            else []
+        )
+        if use_materials and not hits and not allow_without_source:
+            raise NoSourceMaterial(
+                f"По теме «{topic}» не нашлось материала в выбранном источнике."
+            )
+
+        items = await self._ask_model(
+            build_generation_prompt(
+                topic=topic,
+                difficulty=difficulty,
+                items_count=items_count,
+                source_fragments=[h.text for h in hits],
+                hint=hint,
+            )
+        )
 
         draft = Quiz(
             id=None,
@@ -125,10 +147,46 @@ class QuizService:
         )
         saved = await self._quizzes.create(draft, created_by)
         log.info(
-            "quiz generated · id=%s · topic=%s · items=%d · chunks=%d",
-            saved.id, topic, len(items), len(hits),
+            "quiz generated · id=%s · topic=%s · items=%d · chunks=%d · hint=%s",
+            saved.id, topic, len(items), len(hits), bool(hint),
         )
         return saved
+
+    # ---------- Доработка черновика ----------
+
+    async def refine(self, quiz_id: UUID, *, instruction: str) -> Quiz:
+        """Переработать черновик по замечанию учителя.
+
+        Только черновик: замена вопросов пересоздаёт их id, и у опубликованного
+        квиза это разорвало бы связь со сданными попытками.
+        """
+        quiz = await self.get(quiz_id)
+        if quiz.status != "draft":
+            raise Conflict(
+                "дорабатывать можно только черновик — снимите квиз с публикации"
+            )
+        if not quiz.items:
+            raise Conflict("в квизе нет вопросов: нечего дорабатывать")
+
+        hits = await self.find_source(topic=quiz.topic, source_key=quiz.source_key)
+        items = await self._ask_model(
+            build_refine_prompt(
+                topic=quiz.topic,
+                difficulty=quiz.difficulty,
+                items=quiz.items,
+                instruction=instruction,
+                source_fragments=[h.text for h in hits],
+            )
+        )
+        _validate_items(items)
+        await self._quizzes.replace_items(
+            quiz_id, [replace(it, position=i + 1) for i, it in enumerate(items)]
+        )
+        log.info(
+            "quiz refined · id=%s · items=%d→%d · instruction=%s",
+            quiz_id, len(quiz.items), len(items), instruction[:120],
+        )
+        return await self.get(quiz_id)
 
     # ---------- Ручное создание ----------
 

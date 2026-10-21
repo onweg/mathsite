@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { RefineBox } from './RefineBox'
 import { Markdown } from '../../components/Markdown'
 import {
+  ApiError,
   MaterialDTO,
   WeeklyLevel,
   WeeklyTaskDTO,
@@ -37,7 +39,6 @@ export function WeeklyPage({ token }: { token: string }) {
     return (
       <WeeklyEditor
         token={token}
-        publishedOther={tasks?.find((t) => t.is_published) ?? null}
         onCancel={() => {
           reload()
           setView({ mode: 'list' })
@@ -80,12 +81,10 @@ export function WeeklyPage({ token }: { token: string }) {
   if (view.mode === 'edit') {
     // Задача, опубликованная прямо сейчас, — не считая открытую в редакторе.
     // Нужна, чтобы предупредить: публикация новой снимет её с сайта.
-    const published = tasks?.find((t) => t.is_published && t.id !== view.task.id)
     return (
       <WeeklyEditor
         token={token}
         task={view.task}
-        publishedOther={published ?? null}
         onCancel={() => {
           // Без перезагрузки список показывал бы устаревший статус:
           // учитель публикует, выходит «назад» и видит «черновик».
@@ -100,10 +99,22 @@ export function WeeklyPage({ token }: { token: string }) {
     )
   }
 
+  const publishedCount = tasks?.filter((t) => t.is_published).length ?? 0
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg text-paper-50 font-serif">Задача недели</h2>
+        <div>
+          <h2 className="text-lg text-paper-50 font-serif">Задачи недели</h2>
+          <p className="mt-0.5 text-xs text-paper-50/40">
+            {publishedCount === 0
+              ? 'на сайте сейчас пусто'
+              : publishedCount === 1
+                ? 'на сайте одна задача'
+                : `на сайте ${publishedCount} задач${publishedCount < 5 ? 'и' : ''}`}
+            {' · снимается каждая отдельно'}
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setView({ mode: 'generate' })}
@@ -194,14 +205,11 @@ function StatusBadge({ published }: { published: boolean }) {
 function WeeklyEditor({
   token,
   task,
-  publishedOther,
   onCancel,
   onDone,
 }: {
   token: string
   task?: WeeklyTaskDTO
-  /** Задача, которая сейчас висит на сайте, если это не редактируемая. */
-  publishedOther?: WeeklyTaskDTO | null
   onCancel: () => void
   onDone: () => void
 }) {
@@ -212,6 +220,15 @@ function WeeklyEditor({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [current, setCurrent] = useState<WeeklyTaskDTO | undefined>(task)
+
+  async function refine(instruction: string) {
+    if (!current) return
+    const t = await adminWeekly.refine(token, current.id, instruction)
+    setCurrent(t)
+    setTitle(t.title)
+    setBody(t.body_md)
+    setAnswer(t.answer_md)
+  }
 
   async function save() {
     setBusy(true)
@@ -242,17 +259,6 @@ function WeeklyEditor({
   async function publish() {
     if (!current) {
       setError('сначала сохрани')
-      return
-    }
-    // На сайте всегда одна задача недели: публикация новой снимает прежнюю.
-    if (
-      publishedOther &&
-      !confirm(
-        `Сейчас на сайте висит «${publishedOther.title}».\n\n` +
-          `Опубликовать «${current.title}» вместо неё? ` +
-          `Прежняя задача уйдёт с сайта, решения по ней сохранятся.`,
-      )
-    ) {
       return
     }
     setBusy(true)
@@ -308,6 +314,23 @@ function WeeklyEditor({
           {preview ? 'редактировать' : 'предпросмотр'}
         </button>
       </div>
+
+      {current && !preview && (
+        <RefineBox
+          examples={[
+            'сделай условие короче и убери лишние числа',
+            'замени сюжет на геометрический',
+            'слишком сложно для восьмого класса, упрости',
+          ]}
+          note={
+            current.is_published
+              ? 'Задача опубликована: новый текст увидят ученики сразу после доработки. Решения, которые уже прислали, останутся на месте.'
+              : 'Модель видит текущее условие и решение и правит то, о чём просишь. Решение пересобирается под исправленное условие.'
+          }
+          disabled={busy}
+          onSubmit={refine}
+        />
+      )}
 
       {!preview ? (
         <>
@@ -400,11 +423,9 @@ function WeeklyEditor({
               >
                 опубликовать
               </button>
-              {publishedOther && (
-                <span className="text-[11px] text-amber-300/70">
-                  заменит «{publishedOther.title}» на сайте
-                </span>
-              )}
+              <span className="text-[11px] text-paper-50/40">
+                встанет на сайт рядом с уже опубликованными
+              </span>
             </div>
           ))}
 
@@ -446,6 +467,9 @@ const LEVELS: { value: WeeklyLevel; label: string }[] = [
   { value: 'hard', label: 'сложная' },
 ]
 
+/** Отдельное значение селекта: в учебник не ходим вовсе. */
+const NO_MATERIALS = '__none__'
+
 function WeeklyGenerateForm({
   token,
   onCancel,
@@ -458,9 +482,12 @@ function WeeklyGenerateForm({
   const [topic, setTopic] = useState('')
   const [sourceKey, setSourceKey] = useState<string>('textbook_8_algebra')
   const [level, setLevel] = useState<WeeklyLevel>('olympiad')
+  const [hint, setHint] = useState('')
   const [materials, setMaterials] = useState<MaterialDTO[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Тема не нашлась в учебнике — предлагаем написать по программе 8 класса
+  const [noSource, setNoSource] = useState(false)
 
   useEffect(() => {
     adminMaterials
@@ -469,18 +496,28 @@ function WeeklyGenerateForm({
       .catch(() => setMaterials([]))
   }, [token])
 
-  async function run() {
+  const useMaterials = sourceKey !== NO_MATERIALS
+
+  async function run(allowWithoutSource = false) {
     setBusy(true)
     setError(null)
+    setNoSource(false)
     try {
       const task = await adminWeekly.generate(token, {
         topic: topic.trim(),
-        source_key: sourceKey || null,
+        source_key: useMaterials && sourceKey ? sourceKey : null,
         level,
+        use_materials: useMaterials,
+        allow_without_source: allowWithoutSource,
+        hint: hint.trim() || undefined,
       })
       onGenerated(task)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'не удалось сгенерировать')
+      if (e instanceof ApiError && e.code === 'no_source_material') {
+        setNoSource(true)
+      } else {
+        setError(e instanceof Error ? e.message : 'не удалось сгенерировать')
+      }
       setBusy(false)
     }
   }
@@ -523,7 +560,29 @@ function WeeklyGenerateForm({
             </option>
           ))}
           <option value="">искать по всем материалам</option>
+          <option value={NO_MATERIALS}>без учебника — только нейросеть</option>
         </select>
+      </Field>
+
+      {!useMaterials && (
+        <p className="-mt-2 text-xs text-amber-200/70">
+          Задача будет написана из общих знаний модели, без опоры на учебник, —
+          проверь условие и решение внимательнее обычного.
+        </p>
+      )}
+
+      <Field label="пожелания — необязательно">
+        <textarea
+          value={hint}
+          onChange={(e) => setHint(e.target.value)}
+          rows={2}
+          maxLength={500}
+          placeholder="например: без громоздких вычислений, сюжет про класс, ответ целым числом"
+          className={textarea}
+        />
+        <p className="pt-1 text-[11px] text-paper-50/40">
+          Пожелания идут прямо модели и в поиск по учебнику не попадают.
+        </p>
       </Field>
 
       <Field label="уровень">
@@ -550,8 +609,25 @@ function WeeklyGenerateForm({
         </div>
       )}
 
+      {noSource && (
+        <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-3">
+          <p className="text-sm text-amber-200/90">
+            По теме «{topic.trim()}» в выбранном источнике ничего не нашлось.
+            Можно сменить источник или формулировку — либо написать задачу без
+            учебника, по программе 8 класса.
+          </p>
+          <button
+            onClick={() => run(true)}
+            disabled={busy}
+            className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-2 text-sm text-paper-50 transition hover:border-amber-400 disabled:opacity-50"
+          >
+            {busy ? 'генерируем…' : 'сгенерировать без учебника'}
+          </button>
+        </div>
+      )}
+
       <button
-        onClick={run}
+        onClick={() => run()}
         disabled={busy || topic.trim().length < 2}
         className="bg-paper-50 text-ink-950 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
       >

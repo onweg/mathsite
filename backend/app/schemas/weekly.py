@@ -41,6 +41,19 @@ class GenerateWeeklyRequest(BaseModel):
     topic: str = Field(min_length=2, max_length=200)
     source_key: str | None = Field(default=None, max_length=64)
     level: Literal["school", "olympiad", "hard"] = "olympiad"
+    # true — писать по программе 8 класса, если в учебнике ничего не нашлось
+    allow_without_source: bool = False
+    # false — не ходить в учебник вообще
+    use_materials: bool = True
+    # свободное пожелание учителя, в поиск по учебнику не идёт
+    hint: str | None = Field(default=None, max_length=500)
+
+
+class RefineWeeklyRequest(BaseModel):
+    """Доработка задачи по замечанию учителя."""
+
+    instruction: str = Field(min_length=3, max_length=1000)
+    level: Literal["school", "olympiad", "hard"] = "olympiad"
 
 
 # ---------- решения учеников ----------

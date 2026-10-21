@@ -65,14 +65,51 @@ class QuizPublicDTO(BaseModel):
 # ---------- Запросы ----------
 
 
+#: Встроенные источники плюс любой загруженный материал («material_<hex>»).
+#: Literal держать нельзя: учитель грузит свои PDF, и их source_key заранее неизвестен.
+SOURCE_KEY_RE = r"^(textbook_8_algebra|textbook_8_geometry|olympiad|material_[0-9a-f]{6,32})$"
+
+
 class GenerateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     topic: str = Field(min_length=2, max_length=200)
-    source_key: Literal["textbook_8_algebra", "textbook_8_geometry", "olympiad"] | None = None
+    source_key: str | None = Field(default=None, pattern=SOURCE_KEY_RE)
     difficulty: Literal["easy", "medium", "hard"] = "medium"
     items_count: int = Field(default=5, ge=1, le=15)
     # true — генерировать по программе 8 класса, если в учебнике ничего не нашлось
     allow_without_source: bool = False
+    # false — не ходить в учебник вообще, писать вопросы из знаний модели
+    use_materials: bool = True
+    # свободное пожелание учителя: «без задач на площадь», «числа до 20».
+    # В поиск по учебнику не попадает — только в промпт.
+    hint: str | None = Field(default=None, max_length=500)
+
+
+class RefineRequest(BaseModel):
+    """Доработка черновика по замечанию учителя."""
+
+    instruction: str = Field(min_length=3, max_length=1000)
+
+
+class SourcePreviewRequest(BaseModel):
+    """Что именно нашлось в учебнике по теме — до генерации."""
+
+    topic: str = Field(min_length=2, max_length=200)
+    source_key: str | None = Field(default=None, pattern=SOURCE_KEY_RE)
+
+
+class SourceHitDTO(BaseModel):
+    source_key: str
+    page: int | None
+    similarity: float
+    text: str
+    # текст похож на развалившуюся при извлечении формулу
+    garbled: bool = False
+
+
+class SourcePreviewDTO(BaseModel):
+    hits: list[SourceHitDTO]
+    garbled_count: int = 0
 
 
 class CreateQuizRequest(BaseModel):

@@ -1,4 +1,4 @@
-"""Публичные эндпоинты задачи недели: текущая задача + приём решений."""
+"""Публичные эндпоинты задач недели: открытые задачи + приём решений."""
 
 from __future__ import annotations
 
@@ -49,14 +49,15 @@ def submission_dto(s: WeeklySubmission) -> WeeklySubmissionDTO:
     )
 
 
-@router.get("", response_model=WeeklyTaskPublicDTO | None)
-async def current(
+@router.get("", response_model=list[WeeklyTaskPublicDTO])
+async def published(
     svc: Annotated[WeeklyTaskService, Depends(get_weekly_service)],
-) -> WeeklyTaskPublicDTO | None:
-    task = await svc.current()
-    if not task:
-        return None
-    return WeeklyTaskPublicDTO(id=str(task.id), title=task.title, body_md=task.body_md)
+) -> list[WeeklyTaskPublicDTO]:
+    """Все задачи, которые учитель держит на сайте, в порядке добавления."""
+    return [
+        WeeklyTaskPublicDTO(id=str(t.id), title=t.title, body_md=t.body_md)
+        for t in await svc.published()
+    ]
 
 
 # Регистрируется раньше «/{task_id}/...», чтобы «images» не ушло в разбор UUID.

@@ -15,7 +15,7 @@ class WeeklyTasksRepository(Protocol):
 
     async def get(self, task_id: UUID) -> WeeklyTask | None: ...
 
-    async def get_latest_published(self) -> WeeklyTask | None: ...
+    async def list_published(self) -> list[WeeklyTask]: ...
 
     async def create(
         self, title: str, body_md: str, answer_md: str, created_by: UUID
@@ -32,10 +32,6 @@ class WeeklyTasksRepository(Protocol):
     ) -> None: ...
 
     async def delete(self, task_id: UUID) -> None: ...
-
-    async def publish_only(self, task_id: UUID) -> None:
-        """Опубликовать одну задачу, сняв публикацию со всех остальных."""
-        ...
 
 
 def _row_to_task(row) -> WeeklyTask:
@@ -72,13 +68,19 @@ class PgWeeklyTasksRepository:
             row = await cur.fetchone()
         return _row_to_task(row) if row else None
 
-    async def get_latest_published(self) -> WeeklyTask | None:
+    async def list_published(self) -> list[WeeklyTask]:
+        """Все задачи, висящие на сайте, в порядке добавления.
+
+        Сортировка по возрастанию, а не как в админском списке: на главной
+        задачи идут «первая, вторая, третья», и новая должна вставать в конец,
+        а не сдвигать нумерацию уже решаемых.
+        """
         async with self._pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
-                f"{_SELECT} WHERE is_published = TRUE ORDER BY created_at DESC LIMIT 1"
+                f"{_SELECT} WHERE is_published = TRUE ORDER BY created_at ASC"
             )
-            row = await cur.fetchone()
-        return _row_to_task(row) if row else None
+            rows = await cur.fetchall()
+        return [_row_to_task(r) for r in rows]
 
     async def create(
         self, title: str, body_md: str, answer_md: str, created_by: UUID
@@ -127,22 +129,6 @@ class PgWeeklyTasksRepository:
             await cur.execute(
                 f"UPDATE weekly_tasks SET {', '.join(sets)} WHERE id = %s",  # noqa: S608
                 params,
-            )
-            await conn.commit()
-
-    async def publish_only(self, task_id: UUID) -> None:
-        # Обе команды в одной транзакции: между ними не должно быть момента,
-        # когда опубликованы две задачи или ни одной.
-        async with self._pool.connection() as conn, conn.cursor() as cur:
-            await cur.execute(
-                "UPDATE weekly_tasks SET is_published = FALSE, updated_at = NOW() "
-                "WHERE is_published = TRUE AND id <> %s",
-                (task_id,),
-            )
-            await cur.execute(
-                "UPDATE weekly_tasks SET is_published = TRUE, updated_at = NOW() "
-                "WHERE id = %s",
-                (task_id,),
             )
             await conn.commit()
 
