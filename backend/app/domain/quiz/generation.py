@@ -189,17 +189,18 @@ _GLYPH_RE = re.compile(r"/(?:mat|uni|glyph|cmr|cmmi|cmsy)\d", re.IGNORECASE)
 #: «ab324» — склейка числителя со знаменателем. Настоящая переменная с тремя
 #: цифрами подряд в школьной математике не встречается, а LaTeX-дробь сюда не
 #: попадает: там между буквами и цифрами стоят `^`, `{` и `}`.
+#: Обратный порядок («21bc») не проверяем: это обычный коэффициент перед
+#: переменными, и от мусора вида «62ba» его не отличить.
 _GLUED_TAIL_RE = re.compile(r"[A-Za-zА-Яа-яё]{1,4}\d{3,}")
-#: «62ba» — то же самое, но числитель числовой.
-_GLUED_HEAD_RE = re.compile(r"\d{2,}[A-Za-zА-Яа-яё]{2,}")
 #: «a b 3 24» — дробь, рассыпавшаяся на отдельно стоящие символы.
 _LONE_LETTERS_RE = re.compile(r"(?:(?<![\w\\$])[A-Za-zА-Яа-яё0-9](?![\w$])\s+){3,}")
 #: «$a^2b^2128$» — степень, слипшаяся со знаменателем.
 _GLUED_SUP_RE = re.compile(r"\^\d{3,}")
 #: «xxxx» — один и тот же символ, размноженный извлечением.
 _REPEATED_RE = re.compile(r"([A-Za-zА-Яа-яё])\1{2,}")
-#: «121 + +», «– : + –+» — операторы, оставшиеся без операндов.
-_DANGLING_OPS_RE = re.compile(r"[+*/−–—]\s*[+*/−–—-]|[-]\s+[+*/−–—-]")
+#: «121 + +», «– : + –+» — операторы, оставшиеся без операндов. Первым идёт
+#: только настоящий знак операции: тире в начале — это «Ответ — −5», а не мусор.
+_DANGLING_OPS_RE = re.compile(r"[+*/]\s*[+*/−–—-]|[-]\s+[+*/−–—-]")
 
 
 def looks_garbled(text: str) -> bool:
@@ -207,7 +208,6 @@ def looks_garbled(text: str) -> bool:
     return bool(
         _GLYPH_RE.search(text)
         or _GLUED_TAIL_RE.search(text)
-        or _GLUED_HEAD_RE.search(text)
         or _GLUED_SUP_RE.search(text)
         or _LONE_LETTERS_RE.search(text)
         or _REPEATED_RE.search(text)
