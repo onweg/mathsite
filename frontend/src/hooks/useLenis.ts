@@ -42,6 +42,44 @@ export function scrollToId(id: string): void {
 }
 
 /**
+ * Наверх после перехода на другую страницу.
+ *
+ * Через Lenis, а не `window.scrollTo`: он каждый кадр выставляет позицию сам
+ * и обычную прокрутку просто перетирает. `immediate` — без анимации: при
+ * смене страницы пролёт через весь документ выглядит мусором.
+ */
+export function scrollWindowTo(y: number): void {
+  if (instance) {
+    instance.scrollTo(y, { immediate: true, force: true })
+    return
+  }
+  window.scrollTo(0, y)
+}
+
+export function scrollToTop(): void {
+  scrollWindowTo(0)
+}
+
+/**
+ * Прокрутка к якорю, которого может ещё не быть в DOM.
+ *
+ * При переходе «библиотека → /#weekly» главная монтируется в том же кадре,
+ * и секции появляются не сразу. Поэтому несколько попыток в течение
+ * полусекунды, а не одна.
+ */
+export function scrollToIdWhenReady(id: string, attempts = 12): void {
+  const tick = (left: number) => {
+    const el = document.getElementById(id)
+    if (el) {
+      scrollToElement(el)
+      return
+    }
+    if (left > 0) requestAnimationFrame(() => tick(left - 1))
+  }
+  requestAnimationFrame(() => tick(attempts))
+}
+
+/**
  * Якорь прокрутки вокруг перестройки DOM.
  *
  * Запоминает, где элемент стоял на экране, и возвращает функцию, которая

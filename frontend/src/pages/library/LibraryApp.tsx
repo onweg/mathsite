@@ -6,6 +6,7 @@ import { Reveal, RevealText } from '../../components/RevealText'
 import { Footer } from '../../sections/Footer'
 import { useLenis } from '../../hooks/useLenis'
 import { LibraryCollectionDTO, publicLibrary } from '../../lib/api'
+import { useRoute } from '../../lib/router'
 import { VoiceProvider } from '../../lib/voice'
 import { ArticleView } from './ArticleView'
 import { BackLink } from './BackLink'
@@ -24,10 +25,8 @@ import { accentOf, plural } from './meta'
 export function LibraryApp() {
   useLenis()
 
-  const parts =
-    typeof window === 'undefined'
-      ? []
-      : window.location.pathname.split('/').filter(Boolean)
+  const { path } = useRoute()
+  const parts = path.split('/').filter(Boolean)
   const collection = parts[1] ?? null
   const itemSlug = parts[2] ? decodeURIComponent(parts[2]) : null
 
