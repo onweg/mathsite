@@ -7,7 +7,14 @@ import {
   fileUrl,
   publicLibrary,
 } from '../../lib/api'
-import { KIND_LABEL, accentOf, fileSize, hostOf } from './meta'
+import { BackLink } from './BackLink'
+import {
+  COLLECTION_FALLBACK,
+  KIND_LABEL,
+  accentOf,
+  fileSize,
+  hostOf,
+} from './meta'
 
 /** Страница одного материала: своя статья или заметка учителя к ссылке/файлу. */
 export function ArticleView({
@@ -24,6 +31,8 @@ export function ArticleView({
 
   const meta = collections?.find((c) => c.slug === collection)
   const accent = accentOf(collection)
+  const collectionTitle =
+    meta?.title ?? COLLECTION_FALLBACK[collection as keyof typeof COLLECTION_FALLBACK]
 
   useEffect(() => {
     let alive = true
@@ -51,13 +60,9 @@ export function ArticleView({
         <p className="mt-5 text-sm text-paper-50/60">
           Возможно, учитель снял его с публикации или поменял название.
         </p>
-        <a
-          href={`/library/${collection}`}
-          data-cursor
-          className="mt-8 inline-block font-mono text-[11px] uppercase tracking-[0.22em] text-gold-500 hover:text-gold-400"
-        >
-          ← вернуться в раздел
-        </a>
+        <div className="mt-8 flex justify-center">
+          <BackLink href={`/library/${collection}`}>Вернуться в раздел</BackLink>
+        </div>
       </div>
     )
   }
@@ -72,19 +77,11 @@ export function ArticleView({
 
   return (
     <article className="mx-auto max-w-3xl px-6 pb-32 pt-36 md:px-10 md:pt-44">
-      <nav className="mb-8 flex flex-wrap items-center gap-3 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/50">
-        <a href="/library" data-cursor className="transition-colors hover:text-paper-50">
-          Библиотека
-        </a>
-        <span className="text-paper-50/25">/</span>
-        <a
-          href={`/library/${collection}`}
-          data-cursor
-          className="transition-colors hover:text-paper-50"
-        >
-          {meta?.title ?? KIND_LABEL[item.kind]}
-        </a>
-      </nav>
+      <div className="mb-10">
+        <BackLink href={`/library/${collection}`}>
+          {collectionTitle ?? 'Назад в раздел'}
+        </BackLink>
+      </div>
 
       <div className={`mb-6 font-mono text-[10px] uppercase tracking-[0.28em] ${accent.text}`}>
         {KIND_LABEL[item.kind]}
@@ -122,7 +119,7 @@ export function ArticleView({
           data-cursor
           className="font-mono text-[11px] uppercase tracking-[0.22em] text-paper-50/60 transition-colors hover:text-paper-50"
         >
-          ← весь раздел «{meta?.title ?? 'библиотека'}»
+          ← весь раздел «{collectionTitle ?? 'библиотека'}»
         </a>
       </div>
     </article>

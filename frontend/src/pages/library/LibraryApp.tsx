@@ -8,6 +8,7 @@ import { useLenis } from '../../hooks/useLenis'
 import { LibraryCollectionDTO, publicLibrary } from '../../lib/api'
 import { VoiceProvider } from '../../lib/voice'
 import { ArticleView } from './ArticleView'
+import { BackLink } from './BackLink'
 import { CollectionView } from './CollectionView'
 import { accentOf, plural } from './meta'
 
@@ -67,11 +68,17 @@ function Hub({ collections }: { collections: LibraryCollectionDTO[] | null }) {
   return (
     <>
       <header className="mx-auto max-w-[1700px] px-6 pb-20 pt-36 md:px-10 md:pt-44">
+        <div className="mb-8">
+          <BackLink href="/">На главную</BackLink>
+        </div>
+
         <div className="mb-7 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/60">
           <span className="h-px w-10 bg-paper-50/40" />
           <span>
             Библиотека
-            {collections ? ` · ${plural(collections.length, 'полка', 'полки', 'полок')}` : ''}
+            {collections?.length
+              ? ` · ${plural(collections.length, 'полка', 'полки', 'полок')}`
+              : ''}
           </span>
         </div>
 

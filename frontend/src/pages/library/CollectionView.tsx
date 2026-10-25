@@ -6,8 +6,9 @@ import {
   LibraryKind,
   publicLibrary,
 } from '../../lib/api'
+import { BackLink } from './BackLink'
 import { ItemCard } from './ItemCard'
-import { KIND_LABEL, accentOf, plural } from './meta'
+import { COLLECTION_FALLBACK, KIND_LABEL, accentOf, plural } from './meta'
 
 type Filter = 'all' | LibraryKind
 
@@ -32,6 +33,9 @@ export function CollectionView({
 
   const meta = collections?.find((c) => c.slug === slug)
   const accent = accentOf(slug)
+  // Названия полок зашиты и на фронте: заголовок виден сразу, а не после
+  // ответа сервера — и остаётся на месте, если ответа вовсе не будет.
+  const title = meta?.title ?? COLLECTION_FALLBACK[slug as keyof typeof COLLECTION_FALLBACK]
 
   useEffect(() => {
     let alive = true
@@ -65,17 +69,13 @@ export function CollectionView({
   return (
     <>
       <header className="mx-auto max-w-[1700px] px-6 pb-16 pt-36 md:px-10 md:pt-44">
-        <nav className="mb-7 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/50">
-          <a href="/library" data-cursor className="transition-colors hover:text-paper-50">
-            Библиотека
-          </a>
-          <span className="text-paper-50/25">/</span>
-          <span className={accent.text}>{meta?.title ?? '…'}</span>
-        </nav>
+        <div className="mb-8">
+          <BackLink href="/library">Все разделы</BackLink>
+        </div>
 
         <h1 className="max-w-5xl font-display text-[clamp(2.4rem,6vw,5.8rem)] font-light leading-[1.02] tracking-tight">
           <RevealText as="span" className="block">
-            {meta?.title ?? ' '}
+            {title ?? 'Раздел не найден'}
           </RevealText>
         </h1>
 
