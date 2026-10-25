@@ -14,7 +14,7 @@ const links = [
   { label: 'Пропустил урок', href: '#missed' },
   { label: 'Задача недели', href: '#weekly' },
   { label: 'Тесты', href: '#quizzes' },
-  { label: 'Библиотека', href: '/library' },
+  { label: 'Библиотека', href: '#library' },
   { label: 'Опрос', href: '#feedback' },
   { label: 'Классы', href: '#classes' },
 ]

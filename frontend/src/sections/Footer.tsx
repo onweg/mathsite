@@ -6,7 +6,7 @@ const LINKS = [
   { title: 'Пропустил урок', href: '#missed' },
   { title: 'Задача недели', href: '#weekly' },
   { title: 'Вклад в оценку', href: '#quizzes' },
-  { title: 'Библиотека', href: '/library' },
+  { title: 'Библиотека', href: '#library' },
 ]
 
 export function Footer() {

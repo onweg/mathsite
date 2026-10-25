@@ -68,16 +68,16 @@ export function CollectionView({
 
   return (
     <>
-      <header className="mx-auto max-w-[1700px] px-6 pb-16 pt-36 md:px-10 md:pt-44">
+      <header className="pb-14 md:pb-16">
         <div className="mb-8">
-          <BackLink href="/library">Все разделы</BackLink>
+          <BackLink href="/library">Все полки</BackLink>
         </div>
 
-        <h1 className="max-w-5xl font-display text-[clamp(2.4rem,6vw,5.8rem)] font-light leading-[1.02] tracking-tight">
+        <h2 className="max-w-5xl font-display text-[clamp(2.3rem,5.2vw,5.6rem)] font-light leading-[1.02] tracking-tight">
           <RevealText as="span" className="block">
             {title ?? 'Раздел не найден'}
           </RevealText>
-        </h1>
+        </h2>
 
         {meta?.subtitle && (
           <Reveal delay={0.2} className="mt-8">
@@ -111,7 +111,7 @@ export function CollectionView({
         )}
       </header>
 
-      <section className="mx-auto max-w-[1700px] px-6 pb-32 md:px-10 md:pb-44">
+      <div>
         {items === null ? (
           <div className="font-mono text-xs uppercase tracking-[0.25em] text-paper-50/40">
             загружаем…
@@ -129,7 +129,7 @@ export function CollectionView({
             ))}
           </div>
         )}
-      </section>
+      </div>
     </>
   )
 }

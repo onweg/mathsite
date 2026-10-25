@@ -1,10 +1,13 @@
 /**
  * Якорь секции главной страницы.
  *
- * С самой главной это обычный «#weekly», а с отдельной страницы
- * (библиотека, профиль) такой href никуда не ведёт — нужен «/#weekly».
+ * Адреса библиотеки — это та же главная, просто прокрученная к полке, так
+ * что с них «#weekly» работает как обычно. А вот с профиля или админки такой
+ * href никуда не ведёт — там нужен «/#weekly».
  */
 export function sectionHref(hash: string): string {
-  const onHome = typeof window === 'undefined' || window.location.pathname === '/'
+  if (typeof window === 'undefined') return hash
+  const p = window.location.pathname
+  const onHome = p === '/' || p === '/library' || p.startsWith('/library/')
   return onHome ? hash : `/${hash}`
 }

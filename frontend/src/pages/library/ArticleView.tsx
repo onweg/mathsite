@@ -53,7 +53,7 @@ export function ArticleView({
 
   if (missing) {
     return (
-      <div className="mx-auto max-w-3xl px-6 pb-40 pt-44 text-center md:px-10">
+      <div className="mx-auto max-w-3xl text-center">
         <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/50">
           материал не найден
         </div>
@@ -69,14 +69,14 @@ export function ArticleView({
 
   if (!item) {
     return (
-      <div className="mx-auto max-w-3xl px-6 pb-40 pt-44 font-mono text-xs uppercase tracking-[0.25em] text-paper-50/40 md:px-10">
+      <div className="mx-auto max-w-3xl font-mono text-xs uppercase tracking-[0.25em] text-paper-50/40">
         загружаем…
       </div>
     )
   }
 
   return (
-    <article className="mx-auto max-w-3xl px-6 pb-32 pt-36 md:px-10 md:pt-44">
+    <article className="mx-auto max-w-3xl">
       <div className="mb-10">
         <BackLink href={`/library/${collection}`}>
           {collectionTitle ?? 'Назад в раздел'}
@@ -87,11 +87,11 @@ export function ArticleView({
         {KIND_LABEL[item.kind]}
       </div>
 
-      <h1 className="text-balance font-display text-[clamp(2rem,4.6vw,3.6rem)] font-light leading-[1.05] tracking-tight">
+      <h2 className="text-balance font-display text-[clamp(2rem,4.6vw,3.6rem)] font-light leading-[1.05] tracking-tight">
         <RevealText as="span" className="block">
           {item.title}
         </RevealText>
-      </h1>
+      </h2>
 
       {item.summary && (
         <Reveal delay={0.15} className="mt-8">

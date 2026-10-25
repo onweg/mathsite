@@ -7,6 +7,7 @@ import { CTA } from './sections/CTA'
 import { Classes } from './sections/Classes'
 import { Footer } from './sections/Footer'
 import { Hero } from './sections/Hero'
+import { Library } from './sections/Library'
 import { Marquee } from './sections/Marquee'
 import { MissedClass } from './sections/MissedClass'
 import { Poll } from './sections/Poll'
@@ -14,31 +15,22 @@ import { Quizzes } from './sections/Quizzes'
 import { Sections } from './sections/Sections'
 import { Weekly } from './sections/Weekly'
 import { useLenis } from './hooks/useLenis'
-import { hasNavigated, useLinkRouting, useRoute } from './lib/router'
+import { hasNavigated, useLinkRouting, usePage } from './lib/router'
 import { VoiceProvider } from './lib/voice'
 import { AdminRouter } from './pages/AdminRouter'
-import { LibraryApp } from './pages/library/LibraryApp'
 import { StudentActivate } from './pages/student/StudentActivate'
 import { StudentProfile } from './pages/student/StudentProfile'
 
 export default function App() {
   // Прокруткой после перехода заведует сам роутер: якорь на своей же странице
-  // не должен даже доходить до React.
-  const path = useRoute()
+  // не должен даже доходить до React. И адрес тут не весь, а только группа:
+  // полки библиотеки живут на главной, перерисовывать её ради них незачем.
+  const page = usePage()
   useLinkRouting()
 
-  if (path.startsWith('/admin')) return <AdminRouter />
-  if (path === '/library' || path.startsWith('/library/')) {
-    // Переход с главной — проявлением, а не подменой кадра. При обычной
-    // загрузке страницы проявлять нечего, она и так появляется с нуля.
-    return (
-      <div className={hasNavigated() ? 'page-in' : undefined}>
-        <LibraryApp />
-      </div>
-    )
-  }
-  if (path.startsWith('/s/')) return <StudentActivate />
-  if (path === '/me' || path.startsWith('/me/')) return <StudentProfile />
+  if (page === 'admin') return <AdminRouter />
+  if (page === 'activate') return <StudentActivate />
+  if (page === 'me') return <StudentProfile />
   return <PublicSite />
 }
 
@@ -52,7 +44,7 @@ function PublicSite() {
 
   return (
     <VoiceProvider>
-      <div className={`noise vignette relative min-h-screen${skipIntro ? ' page-in' : ''}`}>
+      <div className="noise vignette relative min-h-screen">
         {!skipIntro && <Preloader onDone={() => setReady(true)} />}
         <Cursor />
         <Nav />
@@ -67,6 +59,7 @@ function PublicSite() {
           <MissedClass />
           <Weekly />
           <Quizzes />
+          <Library />
           <Poll />
           <Classes />
           <CTA />

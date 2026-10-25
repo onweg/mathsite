@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { scrollToIdWhenReady, scrollToTop, scrollWindowTo } from '../hooks/useLenis'
 
 /**
@@ -31,7 +31,35 @@ function key(): string {
 
 /** Публичные адреса: главная и библиотека. Остальное — обычной загрузкой. */
 export function isPublicPath(p: string): boolean {
-  return p === '/' || p === '/library' || p.startsWith('/library/')
+  return p === '/' || isLibraryPath(p)
+}
+
+/**
+ * Адрес библиотеки.
+ *
+ * Отдельной страницы у библиотеки больше нет — она секция главной. Но свои
+ * адреса у полок остались: по ним ссылку на нужную полку можно дать ученику,
+ * а кнопка «назад» возвращает из материала в полку, а не уводит с сайта.
+ */
+export function isLibraryPath(p: string): boolean {
+  return p === '/library' || p.startsWith('/library/')
+}
+
+/** Якорь, к которому ведёт адрес без решётки. */
+function anchorOf(p: string): string | null {
+  return isLibraryPath(p) ? 'library' : null
+}
+
+/**
+ * Что именно рендерит App. Главная и все адреса библиотеки — одна и та же
+ * страница, поэтому переход между ними не должен перерисовывать её целиком:
+ * меняется только то, что показывает секция библиотеки.
+ */
+function pageOf(p: string): string {
+  if (p.startsWith('/admin')) return 'admin'
+  if (p.startsWith('/s/')) return 'activate'
+  if (p === '/me' || p.startsWith('/me/')) return 'me'
+  return 'site'
 }
 
 /**
@@ -75,60 +103,78 @@ export function navigate(href: string): void {
   // React вообще, иначе каждый пункт меню стоит полной перерисовки главной.
   if (!samePage) window.dispatchEvent(new Event(NAVIGATE_EVENT))
 
-  applyScroll(url.hash, samePage)
+  applyScroll(url.hash)
 }
 
 /**
  * Куда встать после перехода.
  *
- * Внутри страницы едем плавно через весь сайт: с разгоном и торможением,
- * чтобы по дороге было видно, мимо чего проезжаешь. А вот переход с другой
- * страницы — мгновенный: ехать неоткуда, страница только что открылась, и
- * «поездка» по ней выглядит как сбой.
+ * Едем плавно, с разгоном и торможением: всё публичное — одна страница, так
+ * что любому переходу есть откуда ехать, и по дороге видно, мимо чего
+ * проезжаешь. Якоря ждём: секция может ещё не смонтироваться, если её
+ * содержимое едет с сервера.
  */
-function applyScroll(hash: string, samePage: boolean): void {
-  if (!hash) {
+function applyScroll(hash: string): void {
+  const id = hash ? hash.slice(1) : anchorOf(window.location.pathname)
+  if (!id) {
     scrollToTop()
     return
   }
-  const id = hash.slice(1)
-  // Ждём появления якоря в обоих случаях: даже на своей странице секция может
-  // ещё не смонтироваться, если её содержимое едет с сервера.
-  scrollToIdWhenReady(id, { immediate: !samePage })
+  scrollToIdWhenReady(id)
+}
+
+/**
+ * Подписка на смену адреса — и на наши переходы, и на кнопку «назад».
+ * Сам обработчик ничего не прокручивает: этим занят один общий слушатель
+ * в `useLinkRouting`, иначе каждая подписка восстанавливала бы скролл заново.
+ */
+function useRouteSync(sync: () => void): void {
+  useEffect(() => {
+    window.addEventListener(NAVIGATE_EVENT, sync)
+    window.addEventListener('popstate', sync)
+    return () => {
+      window.removeEventListener(NAVIGATE_EVENT, sync)
+      window.removeEventListener('popstate', sync)
+    }
+  }, [sync])
+}
+
+/**
+ * Какую страницу показывать. Отдельно от `useRoute`, чтобы переход
+ * «главная → полка библиотеки» не перерисовывал всю главную: строка группы
+ * не меняется, и React останавливает обновление на самом App.
+ */
+export function usePage(): string {
+  const [page, setPage] = useState(() => pageOf(path()))
+  useRouteSync(useCallback(() => setPage(pageOf(path())), []))
+  return page
 }
 
 /** Текущий путь. Обновляется и на кнопку «назад» в браузере, и на наши переходы. */
 export function useRoute(): string {
   const [current, setCurrent] = useState<string>(path)
+  // Строка, а не объект: при том же пути React не станет перерисовывать.
+  useRouteSync(useCallback(() => setCurrent(path()), []))
+  return current
+}
 
+/**
+ * Перехват кликов по ссылкам и восстановление прокрутки на «назад».
+ * Ставится один раз на всё приложение.
+ */
+export function useLinkRouting(): void {
   useEffect(() => {
-    // Строка, а не объект: при том же пути React не станет перерисовывать.
-    const sync = () => setCurrent(path())
-
+    // Кнопка «назад»: вернуть ровно туда, где человек был, а если такой
+    // отметки нет (пришёл по чужой ссылке) — встать по адресу.
     const onPop = () => {
       remember()
       navigated = true
       const restore = scrollPositions.get(key())
       currentKey = key()
-      sync()
       if (restore !== undefined) scrollWindowTo(restore)
-      else applyScroll(window.location.hash, false)
+      else applyScroll(window.location.hash)
     }
 
-    window.addEventListener('popstate', onPop)
-    window.addEventListener(NAVIGATE_EVENT, sync)
-    return () => {
-      window.removeEventListener('popstate', onPop)
-      window.removeEventListener(NAVIGATE_EVENT, sync)
-    }
-  }, [])
-
-  return current
-}
-
-/** Перехват кликов по ссылкам. Ставится один раз на всё приложение. */
-export function useLinkRouting(): void {
-  useEffect(() => {
     const onClick = (e: MouseEvent) => {
       // Ctrl/Cmd/Shift и средняя кнопка — это «открыть в новой вкладке»,
       // такой клик всегда остаётся за браузером.
@@ -153,6 +199,10 @@ export function useLinkRouting(): void {
     }
 
     document.addEventListener('click', onClick)
-    return () => document.removeEventListener('click', onClick)
+    window.addEventListener('popstate', onPop)
+    return () => {
+      document.removeEventListener('click', onClick)
+      window.removeEventListener('popstate', onPop)
+    }
   }, [])
 }
