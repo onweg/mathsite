@@ -28,7 +28,15 @@ export default function App() {
   useLinkRouting()
 
   if (path.startsWith('/admin')) return <AdminRouter />
-  if (path === '/library' || path.startsWith('/library/')) return <LibraryApp />
+  if (path === '/library' || path.startsWith('/library/')) {
+    // Переход с главной — проявлением, а не подменой кадра. При обычной
+    // загрузке страницы проявлять нечего, она и так появляется с нуля.
+    return (
+      <div className={hasNavigated() ? 'page-in' : undefined}>
+        <LibraryApp />
+      </div>
+    )
+  }
   if (path.startsWith('/s/')) return <StudentActivate />
   if (path === '/me' || path.startsWith('/me/')) return <StudentProfile />
   return <PublicSite />
@@ -44,7 +52,7 @@ function PublicSite() {
 
   return (
     <VoiceProvider>
-      <div className="noise vignette relative min-h-screen">
+      <div className={`noise vignette relative min-h-screen${skipIntro ? ' page-in' : ''}`}>
         {!skipIntro && <Preloader onDone={() => setReady(true)} />}
         <Cursor />
         <Nav />

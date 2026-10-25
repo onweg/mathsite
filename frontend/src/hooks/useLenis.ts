@@ -15,16 +15,26 @@ const NAV_OFFSET = -96
 type Align = 'top' | 'bottom'
 
 /**
- * Дальше скольких экранов не летим.
- *
- * Пункт меню может стоять в конце очень длинной страницы. Пролететь её всю за
- * секунду — значит отрисовать подряд все секции, каждая со своими анимациями
- * появления; получается смазанный рывок, а не переход. Поэтому сначала
- * прыгаем к точке в полутора экранах от цели, а оттуда уже доезжаем плавно:
- * на глаз это обычная короткая прокрутка, одинаково ровная и к ближней
- * секции, и к дальней.
+ * Разгон и торможение проезда к секции: медленно трогаемся, быстро идём
+ * серединой, мягко подъезжаем. Четвёртая степень, а не третья — так начало
+ * и конец заметно спокойнее середины, и длинный проезд читается как поездка,
+ * а не как рывок.
  */
-const MAX_TRAVEL = 1.2
+const EASE_IN_OUT = (t: number) =>
+  t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2
+
+/**
+ * Сколько ехать до цели.
+ *
+ * Время растёт с расстоянием, но медленнее него: иначе проезд до футера
+ * занимал бы полминуты. Нижняя граница — чтобы соседняя секция не дёргалась,
+ * верхняя — чтобы с первого экрана до последнего всё же доезжать за пару
+ * секунд.
+ */
+function travelDuration(distance: number): number {
+  const screens = distance / Math.max(1, window.innerHeight)
+  return Math.min(2.4, Math.max(0.85, 0.6 + screens * 0.26))
+}
 
 /**
  * `align: 'bottom'` подводит элемент к нижней части экрана, а не к верхней.
@@ -50,16 +60,11 @@ export function scrollToElement(
     }
 
     const target = window.scrollY + box.top + offset
-    const limit = window.innerHeight * MAX_TRAVEL
-    if (Math.abs(target - window.scrollY) > limit) {
-      const from = target + (window.scrollY > target ? limit : -limit)
-      lenis.scrollTo(from, { immediate: true, force: true })
-      // Кадр на то, чтобы прыжок применился: иначе плавная часть стартует
-      // от старой позиции и мы снова летим через весь документ.
-      requestAnimationFrame(() => lenis.scrollTo(target, { duration: 0.8, force: true }))
-      return
-    }
-    lenis.scrollTo(target, { duration: 0.9, force: true })
+    lenis.scrollTo(target, {
+      duration: travelDuration(Math.abs(target - window.scrollY)),
+      easing: EASE_IN_OUT,
+      force: true,
+    })
     return
   }
   el.scrollIntoView({
