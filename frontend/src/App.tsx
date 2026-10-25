@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Cursor } from './components/Cursor'
 import { Nav } from './components/Nav'
 import { Preloader } from './components/Preloader'
@@ -13,18 +13,8 @@ import { Poll } from './sections/Poll'
 import { Quizzes } from './sections/Quizzes'
 import { Sections } from './sections/Sections'
 import { Weekly } from './sections/Weekly'
-import {
-  scrollToIdWhenReady,
-  scrollToTop,
-  scrollWindowTo,
-  useLenis,
-} from './hooks/useLenis'
-import {
-  consumeSavedScroll,
-  hasNavigated,
-  useLinkRouting,
-  useRoute,
-} from './lib/router'
+import { useLenis } from './hooks/useLenis'
+import { hasNavigated, useLinkRouting, useRoute } from './lib/router'
 import { VoiceProvider } from './lib/voice'
 import { AdminRouter } from './pages/AdminRouter'
 import { LibraryApp } from './pages/library/LibraryApp'
@@ -32,27 +22,11 @@ import { StudentActivate } from './pages/student/StudentActivate'
 import { StudentProfile } from './pages/student/StudentProfile'
 
 export default function App() {
-  const route = useRoute()
+  // Прокруткой после перехода заведует сам роутер: якорь на своей же странице
+  // не должен даже доходить до React.
+  const path = useRoute()
   useLinkRouting()
 
-  // Переход внутри сайта должен вести себя как обычная навигация: «назад» —
-  // вернуть на прежнее место, якорь — подвести к секции, остальное — начало
-  // новой страницы. Первый рендер пропускаем: там прокруткой распоряжается
-  // браузер, и после обновления страницы он честно возвращает читателя туда,
-  // где тот был.
-  const firstRender = useRef(true)
-  useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false
-      return
-    }
-    const saved = consumeSavedScroll()
-    if (saved !== null) scrollWindowTo(saved)
-    else if (route.hash) scrollToIdWhenReady(route.hash.slice(1))
-    else scrollToTop()
-  }, [route.path, route.hash])
-
-  const path = route.path
   if (path.startsWith('/admin')) return <AdminRouter />
   if (path === '/library' || path.startsWith('/library/')) return <LibraryApp />
   if (path.startsWith('/s/')) return <StudentActivate />

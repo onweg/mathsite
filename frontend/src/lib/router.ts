@@ -1,32 +1,37 @@
 import { useEffect, useState } from 'react'
+import { scrollToIdWhenReady, scrollToTop, scrollWindowTo } from '../hooks/useLenis'
 
 /**
  * Переходы без перезагрузки страницы — для публичной части сайта.
  *
  * Роутера в проекте нет, страницы выбираются по `location.pathname` в App.
  * Пока каждая ссылка была обычной, переход «библиотека → разделы» грузил
- * весь документ заново: белая вспышка, повторный прелоадер, заново
- * скачанный бандл. Поэтому клики по внутренним ссылкам перехватываем и
- * меняем адрес через history API, а React просто перерисовывает нужную
- * страницу.
+ * весь документ заново. Поэтому клики по внутренним ссылкам перехватываем и
+ * меняем адрес через history API, а React перерисовывает нужную страницу.
  *
  * Перехватываем только публичную часть: админка и личный кабинет живут
  * своей жизнью (свой курсор, печать, отдельные экраны), и трогать их
  * поведение ради этой задачи незачем.
+ *
+ * Важно: в состоянии React лежит ТОЛЬКО путь, без якоря. Клик по «#тесты» —
+ * это прокрутка внутри уже открытой страницы, и перерисовывать ради него всю
+ * главную с трёхмерной сценой и десятком анимированных секций нельзя: именно
+ * на этом она и подвисала.
  */
-
-export type Route = { path: string; hash: string }
 
 const NAVIGATE_EVENT = 'spa:navigate'
 
-function read(): Route {
-  if (typeof window === 'undefined') return { path: '/', hash: '' }
-  return { path: window.location.pathname, hash: window.location.hash }
+function path(): string {
+  return typeof window === 'undefined' ? '/' : window.location.pathname
+}
+
+function key(): string {
+  return window.location.pathname + window.location.hash
 }
 
 /** Публичные адреса: главная и библиотека. Остальное — обычной загрузкой. */
-export function isPublicPath(path: string): boolean {
-  return path === '/' || path === '/library' || path.startsWith('/library/')
+export function isPublicPath(p: string): boolean {
+  return p === '/' || p === '/library' || p.startsWith('/library/')
 }
 
 /**
@@ -37,7 +42,9 @@ export function isPublicPath(path: string): boolean {
  * сам, но только при настоящей перезагрузке; наши переходы он не видит.
  */
 const scrollPositions = new Map<string, number>()
-let cameFromHistory = false
+//: адрес, на котором мы сейчас стоим; нужен, чтобы при уходе записать
+//: позицию под СТАРЫМ ключом — в popstate адрес уже успел смениться
+let currentKey = typeof window === 'undefined' ? '/' : key()
 let navigated = false
 
 /**
@@ -51,42 +58,63 @@ export function hasNavigated(): boolean {
   return navigated
 }
 
-function key(): string {
-  return window.location.pathname + window.location.hash
+function remember(): void {
+  scrollPositions.set(currentKey, window.scrollY)
 }
 
 export function navigate(href: string): void {
-  scrollPositions.set(key(), window.scrollY)
-  cameFromHistory = false
-  navigated = true
   const url = new URL(href, window.location.href)
+  const samePage = url.pathname === window.location.pathname
+
+  remember()
+  navigated = true
   window.history.pushState(null, '', url.pathname + url.search + url.hash)
-  window.dispatchEvent(new Event(NAVIGATE_EVENT))
+  currentKey = key()
+
+  // Страница меняется — перерисовываем. Меняется только якорь — не трогаем
+  // React вообще, иначе каждый пункт меню стоит полной перерисовки главной.
+  if (!samePage) window.dispatchEvent(new Event(NAVIGATE_EVENT))
+
+  applyScroll(url.hash, samePage)
 }
 
 /**
- * Сохранённая позиция, если сюда пришли кнопкой «назад» или «вперёд».
- * Значение одноразовое: следующий переход должен начинаться сверху.
+ * Куда встать после перехода.
+ *
+ * Внутри страницы едем плавно: `scrollToElement` сам не даёт улететь дальше
+ * полутора экранов, так что прокрутка короткая независимо от того, где стоит
+ * секция. А вот переход с другой страницы — мгновенный: плавно ехать некуда,
+ * страница только что открылась, и «поездка» по ней выглядит как сбой.
  */
-export function consumeSavedScroll(): number | null {
-  if (!cameFromHistory) return null
-  cameFromHistory = false
-  return scrollPositions.get(key()) ?? null
+function applyScroll(hash: string, samePage: boolean): void {
+  if (!hash) {
+    scrollToTop()
+    return
+  }
+  const id = hash.slice(1)
+  // Ждём появления якоря в обоих случаях: даже на своей странице секция может
+  // ещё не смонтироваться, если её содержимое едет с сервера.
+  scrollToIdWhenReady(id, { immediate: !samePage })
 }
 
-/** Текущий адрес. Обновляется и на кнопку «назад» в браузере, и на наши переходы. */
-export function useRoute(): Route {
-  const [route, setRoute] = useState<Route>(read)
+/** Текущий путь. Обновляется и на кнопку «назад» в браузере, и на наши переходы. */
+export function useRoute(): string {
+  const [current, setCurrent] = useState<string>(path)
 
   useEffect(() => {
-    const sync = () => setRoute(read())
+    // Строка, а не объект: при том же пути React не станет перерисовывать.
+    const sync = () => setCurrent(path())
+
     const onPop = () => {
-      // Позицию уходящей страницы тоже сохраняем: с неё могут вернуться «вперёд».
-      scrollPositions.set(key(), window.scrollY)
-      cameFromHistory = true
+      remember()
       navigated = true
+      const restore = scrollPositions.get(key())
+      currentKey = key()
       sync()
+      if (restore !== undefined) scrollWindowTo(restore)
+      else applyScroll(window.location.hash, false)
     }
+
     window.addEventListener('popstate', onPop)
     window.addEventListener(NAVIGATE_EVENT, sync)
     return () => {
@@ -95,7 +123,7 @@ export function useRoute(): Route {
     }
   }, [])
 
-  return route
+  return current
 }
 
 /** Перехват кликов по ссылкам. Ставится один раз на всё приложение. */

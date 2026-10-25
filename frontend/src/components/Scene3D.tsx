@@ -5,17 +5,27 @@ import {
   MeshTransmissionMaterial,
 } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Suspense, useRef } from 'react'
+import { Suspense, useEffect, useRef, useState, type RefObject } from 'react'
 import * as THREE from 'three'
 
 /**
  * Математическая 3D-сцена — Платоновы тела + тор-кнот.
  * Используется как фон Hero. pointer-events-none, не ловит клики.
+ *
+ * Сцена рисуется только пока видна. Браузер сам кадры WebGL не экономит: ушёл
+ * ты к «Задаче недели» или нет, канвас продолжает каждый кадр считать стекло
+ * (MeshTransmissionMaterial — это отдельные проходы рендера в текстуру),
+ * искажение вершин и HDR-окружение. Из-за этого подтормаживала прокрутка по
+ * всему сайту, а не только на первом экране.
  */
 export function Scene3D() {
+  const host = useRef<HTMLDivElement>(null)
+  const visible = useOnScreen(host)
+
   return (
-    <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
+    <div ref={host} className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
       <Canvas
+        frameloop={visible ? 'always' : 'never'}
         dpr={[1, 2]}
         gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
         camera={{ position: [0, 0, 7], fov: 42 }}
@@ -124,4 +134,28 @@ function SceneContent() {
       </Float>
     </group>
   )
+}
+
+/**
+ * Виден ли элемент на экране.
+ *
+ * Запас в полэкрана — чтобы сцена успела ожить до того, как доедет до глаз,
+ * и не моргала пустотой на границе. Без IntersectionObserver (очень старый
+ * браузер) считаем, что видна всегда: лучше лишние кадры, чем чёрный фон.
+ */
+function useOnScreen(ref: RefObject<Element>): boolean {
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+
+    const io = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), {
+      rootMargin: '50% 0px',
+    })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [ref])
+
+  return visible
 }

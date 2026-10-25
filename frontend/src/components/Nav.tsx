@@ -1,4 +1,5 @@
-import { motion, useScroll, useTransform } from 'framer-motion'
+import { useMotionValueEvent, useScroll } from 'framer-motion'
+import { useState } from 'react'
 import { Magnetic } from './Magnetic'
 import { useVoice } from '../lib/voice'
 import { useStudent } from '../lib/student'
@@ -21,17 +22,23 @@ const links = [
 
 
 export function Nav() {
+  // Шапка «проявляется» переключением класса, а не стилем на каждый кадр.
+  // Плавное изменение радиуса backdrop-filter прокруткой заставляло браузер
+  // заново размывать фон под шапкой каждый кадр — на этом и спотыкалась
+  // прокрутка. Теперь два состояния и обычный CSS-переход между ними.
   const { scrollY } = useScroll()
-  const bg = useTransform(scrollY, [0, 120], ['rgba(7,7,12,0)', 'rgba(7,7,12,0.72)'])
-  const blur = useTransform(scrollY, [0, 120], ['blur(0px)', 'blur(14px)'])
-  const border = useTransform(scrollY, [0, 120], ['rgba(246,242,234,0)', 'rgba(246,242,234,0.08)'])
+  const [scrolled, setScrolled] = useState(false)
+  useMotionValueEvent(scrollY, 'change', (v) => setScrolled(v > 80))
 
   const student = useStudent()
 
   return (
-    <motion.header
-      style={{ background: bg, backdropFilter: blur, borderBottomColor: border }}
-      className="fixed inset-x-0 top-0 z-50 select-none border-b"
+    <header
+      className={`fixed inset-x-0 top-0 z-50 select-none border-b transition-[background-color,backdrop-filter,border-color] duration-500 ease-out-quint ${
+        scrolled
+          ? 'border-paper-50/10 bg-ink-950/70 backdrop-blur-[14px]'
+          : 'border-transparent bg-transparent'
+      }`}
     >
       <div className="mx-auto flex max-w-[1700px] items-center justify-between px-6 py-5 md:px-10">
         <a href={sectionHref('#top')} data-cursor data-cursor-label="В начало" className="group flex items-center gap-3">
@@ -87,7 +94,7 @@ export function Nav() {
           )}
         </div>
       </div>
-    </motion.header>
+    </header>
   )
 }
 

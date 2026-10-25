@@ -51,14 +51,10 @@ export function Quizzes() {
     scrollToElement(sectionRef.current)
   }, [screen.kind])
 
-  if (!quizzes) {
-    return null // пока грузится — ничего не показываем
-  }
-
   // Пройденные с главной убираем, но саму секцию оставляем: ученик должен
   // видеть, что раздел есть, просто сейчас в нём пусто.
-  const pending = quizzes.filter((q) => !q.attempted)
-  const allDone = pending.length === 0 && quizzes.length > 0
+  const pending = (quizzes ?? []).filter((q) => !q.attempted)
+  const allDone = pending.length === 0 && (quizzes?.length ?? 0) > 0
 
   return (
     <section
@@ -86,7 +82,16 @@ export function Quizzes() {
           </div>
         )}
 
-        {screen.kind === 'list' && (
+        {/* Пока список едет с сервера, секция уже стоит на месте со своим
+            id: иначе пункт меню «Тесты», нажатый сразу после загрузки, ведёт
+            в пустоту — якоря на странице просто нет. */}
+        {!quizzes && !error && (
+          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-paper-50/40">
+            загружаем тесты…
+          </p>
+        )}
+
+        {quizzes && screen.kind === 'list' && (
           <QuizList
             quizzes={pending}
             allDone={allDone}

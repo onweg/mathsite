@@ -25,7 +25,7 @@ import { accentOf, plural } from './meta'
 export function LibraryApp() {
   useLenis()
 
-  const { path } = useRoute()
+  const path = useRoute()
   const parts = path.split('/').filter(Boolean)
   const collection = parts[1] ?? null
   const itemSlug = parts[2] ? decodeURIComponent(parts[2]) : null

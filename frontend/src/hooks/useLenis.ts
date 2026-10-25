@@ -15,30 +15,61 @@ const NAV_OFFSET = -96
 type Align = 'top' | 'bottom'
 
 /**
+ * Дальше скольких экранов не летим.
+ *
+ * Пункт меню может стоять в конце очень длинной страницы. Пролететь её всю за
+ * секунду — значит отрисовать подряд все секции, каждая со своими анимациями
+ * появления; получается смазанный рывок, а не переход. Поэтому сначала
+ * прыгаем к точке в полутора экранах от цели, а оттуда уже доезжаем плавно:
+ * на глаз это обычная короткая прокрутка, одинаково ровная и к ближней
+ * секции, и к дальней.
+ */
+const MAX_TRAVEL = 1.2
+
+/**
  * `align: 'bottom'` подводит элемент к нижней части экрана, а не к верхней.
  * Нужно для поля ввода в чате: секция высокая, и выравнивание по её верху
  * оставляет само поле далеко внизу за краем экрана.
  */
 export function scrollToElement(
   el: Element | null,
-  opts: { align?: Align; margin?: number } = {},
+  opts: { align?: Align; margin?: number; immediate?: boolean } = {},
 ): void {
   if (!el) return
-  const { align = 'top', margin = 120 } = opts
+  const { align = 'top', margin = 120, immediate = false } = opts
 
-  if (instance) {
+  const lenis = instance
+  if (lenis) {
+    const box = el.getBoundingClientRect()
     const offset =
-      align === 'bottom'
-        ? -(window.innerHeight - el.getBoundingClientRect().height - margin)
-        : NAV_OFFSET
-    instance.scrollTo(el as HTMLElement, { offset, duration: 1.1 })
+      align === 'bottom' ? -(window.innerHeight - box.height - margin) : NAV_OFFSET
+
+    if (immediate) {
+      lenis.scrollTo(el as HTMLElement, { offset, immediate: true, force: true })
+      return
+    }
+
+    const target = window.scrollY + box.top + offset
+    const limit = window.innerHeight * MAX_TRAVEL
+    if (Math.abs(target - window.scrollY) > limit) {
+      const from = target + (window.scrollY > target ? limit : -limit)
+      lenis.scrollTo(from, { immediate: true, force: true })
+      // Кадр на то, чтобы прыжок применился: иначе плавная часть стартует
+      // от старой позиции и мы снова летим через весь документ.
+      requestAnimationFrame(() => lenis.scrollTo(target, { duration: 0.8, force: true }))
+      return
+    }
+    lenis.scrollTo(target, { duration: 0.9, force: true })
     return
   }
-  el.scrollIntoView({ behavior: 'smooth', block: align === 'bottom' ? 'end' : 'start' })
+  el.scrollIntoView({
+    behavior: immediate ? 'auto' : 'smooth',
+    block: align === 'bottom' ? 'end' : 'start',
+  })
 }
 
-export function scrollToId(id: string): void {
-  scrollToElement(document.getElementById(id))
+export function scrollToId(id: string, opts: { immediate?: boolean } = {}): void {
+  scrollToElement(document.getElementById(id), opts)
 }
 
 /**
@@ -67,11 +98,15 @@ export function scrollToTop(): void {
  * и секции появляются не сразу. Поэтому несколько попыток в течение
  * полусекунды, а не одна.
  */
-export function scrollToIdWhenReady(id: string, attempts = 12): void {
+export function scrollToIdWhenReady(
+  id: string,
+  opts: { immediate?: boolean; attempts?: number } = {},
+): void {
+  const { immediate = false, attempts = 12 } = opts
   const tick = (left: number) => {
     const el = document.getElementById(id)
     if (el) {
-      scrollToElement(el)
+      scrollToElement(el, { immediate })
       return
     }
     if (left > 0) requestAnimationFrame(() => tick(left - 1))
