@@ -2,15 +2,18 @@ import { motion, useScroll, useTransform } from 'framer-motion'
 import { Magnetic } from './Magnetic'
 import { useVoice } from '../lib/voice'
 import { useStudent } from '../lib/student'
+import { sectionHref } from '../lib/nav'
 
 // Разделы на месте всегда: если проходить нечего, секция объясняет это сама.
 // Пряталась бы ссылка — ученик решил бы, что раздела вовсе нет.
+// Якоря прогоняем через sectionHref: с /library «#weekly» вёл бы в никуда.
 const links = [
   { label: 'Разделы', href: '#sections' },
   { label: 'ИИ-теоретик', href: '#ai' },
   { label: 'Пропустил урок', href: '#missed' },
   { label: 'Задача недели', href: '#weekly' },
   { label: 'Тесты', href: '#quizzes' },
+  { label: 'Библиотека', href: '/library' },
   { label: 'Опрос', href: '#feedback' },
   { label: 'Классы', href: '#classes' },
 ]
@@ -31,7 +34,7 @@ export function Nav() {
       className="fixed inset-x-0 top-0 z-50 select-none border-b"
     >
       <div className="mx-auto flex max-w-[1700px] items-center justify-between px-6 py-5 md:px-10">
-        <a href="#top" data-cursor data-cursor-label="В начало" className="group flex items-center gap-3">
+        <a href={sectionHref('#top')} data-cursor data-cursor-label="В начало" className="group flex items-center gap-3">
           <span className="relative inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-paper-50/20">
             <span className="font-display text-base italic text-paper-50">∫</span>
           </span>
@@ -40,11 +43,11 @@ export function Nav() {
           </span>
         </a>
 
-        <nav className="hidden items-center gap-8 md:flex">
+        <nav className="hidden items-center gap-5 md:flex lg:gap-8">
           {links.map((l) => (
             <a
               key={l.href}
-              href={l.href}
+              href={l.href.startsWith('#') ? sectionHref(l.href) : l.href}
               data-cursor
               className="group relative font-mono text-[11px] uppercase tracking-[0.22em] text-paper-50/70 transition-colors hover:text-paper-50"
             >

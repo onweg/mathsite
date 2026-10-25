@@ -1,9 +1,12 @@
+import { sectionHref } from '../lib/nav'
+
 // Якоря те же, что у карточек в Sections.tsx — ссылки вели на «#» и прыгали наверх.
 const LINKS = [
   { title: 'ИИ-теоретик', href: '#ai' },
   { title: 'Пропустил урок', href: '#missed' },
   { title: 'Задача недели', href: '#weekly' },
   { title: 'Вклад в оценку', href: '#quizzes' },
+  { title: 'Библиотека', href: '/library' },
 ]
 
 export function Footer() {
@@ -24,7 +27,11 @@ export function Footer() {
             <ul className="space-y-2 font-serif text-base italic text-paper-100/90">
               {LINKS.map((l) => (
                 <li key={l.href}>
-                  <a href={l.href} data-cursor className="transition-colors hover:text-gold-500">
+                  <a
+                    href={l.href.startsWith('#') ? sectionHref(l.href) : l.href}
+                    data-cursor
+                    className="transition-colors hover:text-gold-500"
+                  >
                     {l.title}
                   </a>
                 </li>

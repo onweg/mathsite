@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { MaterialDTO, MaterialStatus, adminMaterials } from '../../lib/api'
 
 const POLL_MS = 3000
+//: столько принимает бэкенд (admin_materials.py); nginx на сервере пропускает 64m
+const MAX_MB = 60
 
 export function MaterialsPage({ token }: { token: string }) {
   const [materials, setMaterials] = useState<MaterialDTO[] | null>(null)
@@ -10,6 +12,25 @@ export function MaterialsPage({ token }: { token: string }) {
   const [title, setTitle] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const tooBig = !!file && file.size > MAX_MB * 1024 * 1024
+  // почему кнопка не нажимается: раньше она просто была серой и молчала
+  const blocker = !file
+    ? 'выбери PDF'
+    : !title.trim()
+      ? 'впиши название — по нему материал будет виден в списке источников'
+      : tooBig
+        ? `файл ${mb(file.size)} — сервер принимает до ${MAX_MB} МБ`
+        : null
+
+  /** Выбрали файл: подставляем название из имени, если учитель его не вписал. */
+  function pickFile(picked: File | null) {
+    setFile(picked)
+    setError(null)
+    if (picked && !title.trim()) {
+      setTitle(picked.name.replace(/\.pdf$/i, '').replace(/_+/g, ' ').trim())
+    }
+  }
 
   async function reload() {
     try {
@@ -96,10 +117,17 @@ export function MaterialsPage({ token }: { token: string }) {
             ref={fileRef}
             type="file"
             accept="application/pdf,.pdf"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
             className="w-full text-sm text-paper-50/80 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-paper-50/10 file:text-paper-50 file:cursor-pointer"
           />
         </label>
+
+        {file && (
+          <p className={`text-xs ${tooBig ? 'text-amber-300/90' : 'text-paper-50/40'}`}>
+            {file.name} · {mb(file.size)}
+            {tooBig && ` — больше ${MAX_MB} МБ, сервер такой файл не примет`}
+          </p>
+        )}
 
         {error && (
           <div className="text-sm text-red-400/90 border border-red-500/30 bg-red-500/10 rounded-lg px-3 py-2">
@@ -109,13 +137,17 @@ export function MaterialsPage({ token }: { token: string }) {
 
         <button
           type="submit"
-          disabled={uploading || !file || !title.trim()}
+          disabled={uploading || !!blocker}
           className="bg-paper-50 text-ink-950 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           {uploading ? 'грузим…' : 'загрузить и индексировать'}
         </button>
+        {blocker && !uploading && (
+          <p className="text-xs text-paper-50/50">Кнопка ждёт: {blocker}.</p>
+        )}
         <p className="text-xs text-paper-50/40">
-          После загрузки индексация идёт в фоне (1-5 минут в зависимости от объёма). Статус обновляется автоматически.
+          После загрузки индексация идёт в фоне: учебник на пару сотен страниц —
+          несколько минут, толстый сборник — заметно дольше. Статус обновляется автоматически.
         </p>
       </form>
 
@@ -183,4 +215,10 @@ function StatusBadge({ status }: { status: MaterialStatus }) {
   return (
     <span className={`text-[11px] px-2 py-1 rounded border font-mono ${s.color}`}>{s.label}</span>
   )
+}
+
+/** Размер файла по-человечески. */
+function mb(bytes: number): string {
+  const value = bytes / 1024 / 1024
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} МБ`
 }

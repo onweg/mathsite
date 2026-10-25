@@ -19,6 +19,7 @@ from fastapi import Cookie
 from app.core.config import settings
 from app.domain.student.types import Student
 from app.infrastructure.repositories.chunks_repo import ChunksRepository
+from app.infrastructure.repositories.library_repo import LibraryRepository
 from app.infrastructure.repositories.materials_repo import MaterialsRepository
 from app.infrastructure.repositories.polls_repo import PollsRepository
 from app.infrastructure.repositories.quizzes_repo import QuizzesRepository
@@ -32,6 +33,7 @@ from app.services.auth_service import AuthService
 from app.services.chat_service import ChatService
 from app.services.classifier_service import ClassifierService
 from app.services.indexing_service import IndexingService
+from app.services.library_service import LibraryService
 from app.services.materials_service import MaterialsService
 from app.services.polls_service import PollsService
 from app.services.quiz_service import QuizService
@@ -182,6 +184,19 @@ def get_materials_service(
     return MaterialsService(
         repo, chunks, indexer, upload_dir=Path(settings.upload_dir)
     )
+
+
+def get_library_repo(request: Request) -> LibraryRepository:
+    return _state(request).library_repo
+
+
+def get_library_service(
+    repo: Annotated[LibraryRepository, Depends(get_library_repo)],
+    materials: Annotated[MaterialsService, Depends(get_materials_service)],
+) -> LibraryService:
+    # Файлы библиотеки лежат там же, где материалы: PDF со статьёй — это
+    # и есть материал, просто заведённый с полки.
+    return LibraryService(repo, materials, upload_dir=Path(settings.upload_dir))
 
 
 def get_students_repo(request: Request) -> StudentsRepository:

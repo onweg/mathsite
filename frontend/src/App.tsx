@@ -16,12 +16,14 @@ import { Weekly } from './sections/Weekly'
 import { useLenis } from './hooks/useLenis'
 import { VoiceProvider } from './lib/voice'
 import { AdminRouter } from './pages/AdminRouter'
+import { LibraryApp } from './pages/library/LibraryApp'
 import { StudentActivate } from './pages/student/StudentActivate'
 import { StudentProfile } from './pages/student/StudentProfile'
 
 export default function App() {
   const path = typeof window !== 'undefined' ? window.location.pathname : ''
   if (path.startsWith('/admin')) return <AdminRouter />
+  if (path === '/library' || path.startsWith('/library/')) return <LibraryApp />
   if (path.startsWith('/s/')) return <StudentActivate />
   if (path === '/me' || path.startsWith('/me/')) return <StudentProfile />
   return <PublicSite />

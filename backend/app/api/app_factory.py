@@ -14,6 +14,7 @@ from app.infrastructure.llm.yandex import YandexProvider
 from app.infrastructure.ratelimit.base import Limit
 from app.infrastructure.ratelimit.memory import InMemoryRateLimiter
 from app.infrastructure.repositories.chunks_repo import PgChunksRepository
+from app.infrastructure.repositories.library_repo import PgLibraryRepository
 from app.infrastructure.repositories.materials_repo import PgMaterialsRepository
 from app.infrastructure.repositories.polls_repo import PgPollsRepository
 from app.infrastructure.repositories.quizzes_repo import PgQuizzesRepository
@@ -25,6 +26,7 @@ from app.infrastructure.repositories.weekly_submissions_repo import (
 )
 
 from .middleware import RequestIdMiddleware, register_error_handlers
+from .routers import admin_library as admin_library_router
 from .routers import admin_materials as admin_materials_router
 from .routers import admin_polls as admin_polls_router
 from .routers import admin_quizzes as admin_quizzes_router
@@ -34,6 +36,7 @@ from .routers import auth as auth_router
 from .routers import chat as chat_router
 from .routers import embed as embed_router
 from .routers import health as health_router
+from .routers import library as library_router
 from .routers import materials as materials_router
 from .routers import polls as polls_router
 from .routers import quizzes as quizzes_router
@@ -73,6 +76,7 @@ async def _lifespan(app: FastAPI):
     app.state.weekly_repo = PgWeeklyTasksRepository(pool)
     app.state.weekly_submissions_repo = PgWeeklySubmissionsRepository(pool)
     app.state.materials_repo = PgMaterialsRepository(pool)
+    app.state.library_repo = PgLibraryRepository(pool)
     app.state.students_repo = PgStudentsRepository(pool)
     app.state.rate_limiter = InMemoryRateLimiter((
         Limit(max_requests=settings.rate_limit_per_minute, window_seconds=60),
@@ -123,6 +127,8 @@ def create_app() -> FastAPI:
     app.include_router(weekly_router.router)
     app.include_router(admin_materials_router.router)
     app.include_router(materials_router.router)
+    app.include_router(admin_library_router.router)
+    app.include_router(library_router.router)
     app.include_router(admin_polls_router.router)
     app.include_router(polls_router.router)
     app.include_router(admin_students_router.router)

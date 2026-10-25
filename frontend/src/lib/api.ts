@@ -789,3 +789,180 @@ export const publicQuizzes = {
   attempt: (id: string, body: { student_name: string; answers: Record<string, string> }) =>
     apiJson<AttemptResultDTO>(`/quizzes/${id}/attempt`, { method: 'POST', body }),
 }
+
+// ====== Библиотека: «Математика вокруг нас», олимпиады, ОГЭ, ЕГЭ ======
+
+/** Набор полок фиксирован на бэкенде (domain/library/types.py). */
+export type LibraryCollection = 'around' | 'olympiad' | 'oge' | 'ege'
+export type LibraryKind = 'article' | 'link' | 'file'
+/** section — открыли полку, остальное — конкретный материал. */
+export type LibraryAction = 'section' | 'open' | 'link' | 'file'
+
+export type LibraryCollectionDTO = {
+  slug: LibraryCollection
+  title: string
+  subtitle: string
+  count: number
+}
+
+export type LibraryItemPublicDTO = {
+  id: string
+  collection: LibraryCollection
+  kind: LibraryKind
+  slug: string
+  title: string
+  summary: string
+  url: string
+  /** Путь относительно API — прогонять через `fileUrl`. */
+  file_url: string | null
+  file_name: string
+  file_size: number
+  media_type: string
+  has_body: boolean
+}
+
+export type LibraryItemDetailDTO = LibraryItemPublicDTO & { body_md: string }
+
+export type LibraryItemDTO = LibraryItemDetailDTO & {
+  is_published: boolean
+  position: number
+  material_id: string | null
+  /** Статус индексации PDF. null — файла в материалах нет. */
+  material_status: MaterialStatus | null
+  chunks_count: number
+  views: number
+  created_at: string
+}
+
+export type LibraryItemStatDTO = {
+  item_id: string
+  title: string
+  collection: LibraryCollection
+  kind: LibraryKind
+  is_published: boolean
+  views: number
+  students: number
+  last_view: string | null
+}
+
+export type LibraryStudentStatDTO = {
+  student_id: string
+  student_name: string
+  class_label: string
+  views: number
+  last_view: string | null
+}
+
+export type LibraryEventDTO = {
+  id: string
+  item_id: string | null
+  item_title: string
+  collection: LibraryCollection
+  action: LibraryAction
+  student_id: string | null
+  student_name: string
+  class_label: string
+  created_at: string
+}
+
+export type LibraryStatsDTO = {
+  views: number
+  students: number
+  views_week: number
+  anonymous: number
+  items: LibraryItemStatDTO[]
+  top_students: LibraryStudentStatDTO[]
+  recent: LibraryEventDTO[]
+}
+
+export const publicLibrary = {
+  collections: () =>
+    apiJson<LibraryCollectionDTO[]>('/library/collections', { method: 'GET' }),
+  items: (collection: string) =>
+    apiJson<LibraryItemPublicDTO[]>(`/library/collections/${collection}/items`, {
+      method: 'GET',
+    }),
+  item: (collection: string, slug: string) =>
+    apiJson<LibraryItemDetailDTO>(
+      `/library/collections/${collection}/items/${encodeURIComponent(slug)}`,
+      { method: 'GET' },
+    ),
+  /**
+   * Отметка просмотра. Молча глотаем ошибку: счётчик — не то, ради чего
+   * стоит показывать ученику красную плашку.
+   */
+  track: (body: { collection: string; action: LibraryAction; item_id?: string | null }) =>
+    apiJson<void>('/library/events', { method: 'POST', body }).catch(() => {}),
+}
+
+export const adminLibrary = {
+  list: (token: string, collection?: string) => {
+    const qs = collection ? `?collection=${encodeURIComponent(collection)}` : ''
+    return apiJson<LibraryItemDTO[]>(`/admin/library${qs}`, { method: 'GET', token })
+  },
+  create: (
+    token: string,
+    body: {
+      collection: string
+      kind: 'article' | 'link'
+      title: string
+      summary?: string
+      body_md?: string
+      url?: string
+    },
+  ) => apiJson<LibraryItemDTO>('/admin/library', { method: 'POST', token, body }),
+  /** Файл на полку. PDF заодно уходит в индексацию и в источники генерации. */
+  async upload(
+    token: string,
+    body: { collection: string; title: string; summary: string; file: File },
+  ): Promise<LibraryItemDTO> {
+    const fd = new FormData()
+    fd.append('file', body.file)
+    fd.append('collection', body.collection)
+    fd.append('title', body.title)
+    fd.append('summary', body.summary)
+    const r = await fetch(`${BASE}/admin/library/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+      body: fd,
+    })
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}))
+      // 413 отдаёт nginx, а не приложение — объясняем по-человечески
+      if (r.status === 413) {
+        throw new Error('Сервер не принял файл такого размера. Нужен лимит в nginx.')
+      }
+      throw new Error((data as { detail?: string }).detail || `upload ${r.status}`)
+    }
+    return (await r.json()) as LibraryItemDTO
+  },
+  update: (
+    token: string,
+    id: string,
+    body: {
+      title?: string
+      summary?: string
+      body_md?: string
+      url?: string
+      collection?: string
+    },
+  ) => apiJson<LibraryItemDTO>(`/admin/library/${id}`, { method: 'PATCH', token, body }),
+  publish: (token: string, id: string) =>
+    apiJson<LibraryItemDTO>(`/admin/library/${id}/publish`, { method: 'POST', token }),
+  unpublish: (token: string, id: string) =>
+    apiJson<LibraryItemDTO>(`/admin/library/${id}/unpublish`, { method: 'POST', token }),
+  /** Новый порядок полки целиком: стрелки в списке двигают локально и шлют всё. */
+  reorder: (token: string, collection: string, ids: string[]) =>
+    apiJson<LibraryItemDTO[]>('/admin/library/reorder', {
+      method: 'POST',
+      token,
+      body: { collection, ids },
+    }),
+  delete: (token: string, id: string) =>
+    apiJson<void>(`/admin/library/${id}`, { method: 'DELETE', token }),
+  stats: (token: string, collection?: string) => {
+    const qs = collection ? `?collection=${encodeURIComponent(collection)}` : ''
+    return apiJson<LibraryStatsDTO>(`/admin/library/stats${qs}`, { method: 'GET', token })
+  },
+}

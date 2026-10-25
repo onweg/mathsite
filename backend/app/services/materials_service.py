@@ -70,11 +70,15 @@ class MaterialsService:
         if not content:
             raise Conflict("пустой файл")
 
-        slug = _slugify(title)
-        if not slug:
+        base = _slugify(title)
+        if not base:
             raise Conflict("не удалось сформировать slug из названия")
 
-        source_key = f"material_{uuid.uuid4().hex[:12]}"
+        # Суффикс обязателен: slug в БД уникален, а два учебника легко
+        # назвать одинаково — без него второй такой же падал на вставке.
+        suffix = uuid.uuid4().hex[:12]
+        slug = f"{base}-{suffix[:6]}"
+        source_key = f"material_{suffix}"
         safe_name = f"{source_key}_{_safe_filename(filename)}"
         path = self._upload_dir / safe_name
         path.write_bytes(content)

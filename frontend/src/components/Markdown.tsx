@@ -22,6 +22,19 @@ export function Markdown({ text }: { text: string }) {
         if (t.type === 'inline') {
           return <Formula key={i} tex={t.value} />
         }
+        if (t.type === 'link') {
+          return (
+            <a
+              key={i}
+              href={t.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gold-500 underline decoration-gold-500/40 underline-offset-4 transition-colors hover:decoration-gold-500"
+            >
+              {t.value}
+            </a>
+          )
+        }
         return <span key={i}>{t.value}</span>
       })}
     </div>
@@ -82,6 +95,7 @@ type Token =
   | { type: 'text'; value: string }
   | { type: 'inline'; value: string }
   | { type: 'block'; value: string }
+  | { type: 'link'; value: string; href: string }
 
 function tokenize(text: string): Token[] {
   const tokens: Token[] = []
@@ -110,13 +124,37 @@ function tokenizeInline(text: string): Token[] {
   let m: RegExpExecArray | null
   while ((m = inlineRe.exec(text)) !== null) {
     if (m.index > last) {
-      tokens.push({ type: 'text', value: text.slice(last, m.index) })
+      pushText(tokens, text.slice(last, m.index))
     }
     tokens.push({ type: 'inline', value: m[1].trim() })
     last = inlineRe.lastIndex
   }
   if (last < text.length) {
-    tokens.push({ type: 'text', value: text.slice(last) })
+    pushText(tokens, text.slice(last))
   }
   return tokens
+}
+
+/** `[текст](адрес)` и голые ссылки. Протокол только http(s): `javascript:` в href не пройдёт. */
+const LINK_RE = /\[([^\]\n]{1,200})\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"'\]]+)/g
+
+function pushText(tokens: Token[], text: string): void {
+  let last = 0
+  let m: RegExpExecArray | null
+  LINK_RE.lastIndex = 0
+  while ((m = LINK_RE.exec(text)) !== null) {
+    if (m.index > last) tokens.push({ type: 'text', value: text.slice(last, m.index) })
+    if (m[2]) {
+      tokens.push({ type: 'link', value: m[1], href: m[2] })
+    } else {
+      // Точка или скобка сразу за адресом — это знак препинания фразы,
+      // а не часть ссылки: «подробнее на example.ru/page.» ведёт на /page
+      const href = m[3].replace(/[.,;:!?)]+$/, '')
+      tokens.push({ type: 'link', value: href.replace(/^https?:\/\//, '').replace(/\/$/, ''), href })
+      const tail = m[3].slice(href.length)
+      if (tail) tokens.push({ type: 'text', value: tail })
+    }
+    last = LINK_RE.lastIndex
+  }
+  if (last < text.length) tokens.push({ type: 'text', value: text.slice(last) })
 }

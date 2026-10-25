@@ -48,18 +48,56 @@ const items: Item[] = [
   {
     num: '05',
     title: 'Математика вокруг',
+    href: '/library/around',
     tag: 'Истории',
     desc: 'Почему мост стоит, музыка звучит, а Google находит нужное. Короткие истории, где за всем — одна формула.',
     accent: 'gold',
   },
   {
     num: '06',
+    title: 'Подготовка к олимпиадам',
+    href: '/library/olympiad',
+    tag: 'Разборы · Сборники',
+    desc: 'Где брать задачи посильнее школьных и как к ним подступаться. Подборка учителя, а не первая выдача поиска.',
+    accent: 'sage',
+  },
+  {
+    num: '07',
+    title: 'Подготовка к ОГЭ',
+    href: '/library/oge',
+    tag: '9 класс',
+    desc: 'Демоверсии, банк заданий, разборы сложных номеров. Всё, что понадобится в девятом, уже сложено сюда.',
+    accent: 'gold',
+  },
+  {
+    num: '08',
+    title: 'Подготовка к ЕГЭ',
+    href: '/library/ege',
+    tag: '11 класс',
+    desc: 'База и профиль: что читать, что смотреть, где тренироваться. Полка растёт вместе с вами.',
+    accent: 'sage',
+  },
+  {
+    num: '09',
     title: 'Наше творчество',
     tag: 'Галерея',
     desc: 'Работы учеников, фото с олимпиад, кусочки уроков. Доска почёта, которая живёт.',
-    accent: 'sage',
+    accent: 'gold',
   },
 ]
+
+//: Заголовок секции называет число разделов словом — держим его рядом со списком,
+//: чтобы «шесть сценариев» не разъехалось с девятью карточками.
+const NUMERALS = [
+  'ноль', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь',
+  'девять', 'десять', 'одиннадцать', 'двенадцать',
+]
+
+function scenarios(n: number): string {
+  const word = NUMERALS[n] ?? String(n)
+  const tail = n % 10 === 1 && n % 100 !== 11 ? 'сценарий' : 'сценариев'
+  return `${word} ${tail}`
+}
 
 export function Sections() {
   // Секции квизов и опроса на странице есть всегда: когда проходить нечего,
@@ -73,12 +111,12 @@ export function Sections() {
           <div>
             <div className="mb-6 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/60">
               <span className="h-px w-10 bg-paper-50/40" />
-              <span>Что внутри · 06 разделов</span>
+              <span>Что внутри · {String(cards.length).padStart(2, '0')} разделов</span>
             </div>
             <h2 className="max-w-4xl font-display text-[clamp(2.5rem,6.1vw,6.6rem)] font-light leading-[1] tracking-tight">
               <RevealText as="span" className="block">Один сайт —</RevealText>
               <RevealText as="span" className="block italic text-gold-500" delay={0.1}>
-                шесть сценариев
+                {scenarios(cards.length)}
               </RevealText>
             </h2>
           </div>
