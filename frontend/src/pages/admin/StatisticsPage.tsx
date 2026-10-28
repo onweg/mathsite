@@ -3,12 +3,14 @@ import { Markdown } from '../../components/Markdown'
 import { fileUrl } from '../../lib/api'
 import { AnalyticsReport, getAnalytics, PAGE_LABELS } from '../../lib/analytics'
 import { Overview } from './analytics/Overview'
+import { AIInsights } from './analytics/AIInsights'
 import { dateTime, duration, percent, ReportTable } from './analytics/ReportTable'
 
-type Screen = 'overview' | 'students' | 'quizzes' | 'weekly' | 'content' | 'polls'
+type Screen = 'overview' | 'students' | 'quizzes' | 'weekly' | 'content' | 'polls' | 'insights'
 const SCREENS: [Screen, string][] = [
   ['overview', 'Обзор'], ['students', 'Ученики'], ['quizzes', 'Тесты'],
   ['weekly', 'Задачи недели'], ['content', 'Разделы и материалы'], ['polls', 'Опросы'],
+  ['insights', 'Анализ ИИ'],
 ]
 const STATUS = { new: 'Ждёт проверки', correct: 'Верно', partial: 'Частично', wrong: 'Неверно' }
 const ACTION: Record<string, string> = { section: 'Вход в раздел', open: 'Чтение статьи', file: 'Открытие файла', link: 'Переход по ссылке' }
@@ -96,16 +98,17 @@ export default function StatisticsPage({ token }: { token: string }) {
         {student && <button onClick={() => setStudent(null)} className="rounded-full border border-gold-500/30 px-3 py-2 text-sm text-gold-500" title="Сбросить фильтр по ученику">{student.name} ×</button>}
       </div>
       {!!invalid && <p role="alert" className="text-sm text-red-300">Укажи корректный период до сегодняшнего дня.</p>}
-      <p className="text-xs text-paper-50/35">Все вкладки ниже используют этот период и фильтры. Нажми на имя ученика, чтобы посмотреть только его данные.</p>
+      <p className="text-xs text-paper-50/35">Таблицы используют этот период и фильтры. Нажми на имя ученика, чтобы посмотреть только его данные. Анализ ИИ использует выбранный период по всему сайту.</p>
     </div>
 
     <div className="flex gap-2 overflow-x-auto border-b border-paper-50/10" role="tablist" aria-label="Виды статистики">
       {SCREENS.map(([id, label]) => <button key={id} role="tab" aria-selected={screen === id} onClick={() => { setScreen(id); setSearch('') }} className={`whitespace-nowrap border-b-2 px-3 py-3 text-sm ${screen === id ? 'border-gold-500 text-gold-500' : 'border-transparent text-paper-50/45 hover:text-paper-50'}`}>{label}</button>)}
     </div>
+    {!invalid && <div hidden={screen !== 'insights'}><AIInsights key={`${token}:${start}:${end}`} token={token} start={start} end={end} /></div>}
     {error && <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">{error} <button className="ml-3 underline" onClick={() => setRevision((v) => v + 1)}>Повторить</button></div>}
     {loading && <div className="py-16 text-center text-sm text-paper-50/45" role="status">Собираем статистику…</div>}
     {data && !loading && <>
-      {screen !== 'overview' && <div className="flex flex-wrap gap-3">
+      {screen !== 'overview' && screen !== 'insights' && <div className="flex flex-wrap gap-3">
         <input value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Поиск в статистике" placeholder="Поиск по имени или названию…" className={`${CONTROL} min-w-64 flex-1`} />
         {screen === 'students' && <select aria-label="Сортировка учеников" value={sort} onChange={(e) => setSort(e.target.value)} className={CONTROL}>
           <option value="activity">По последней активности</option><option value="visits">По числу визитов</option><option value="time">По времени на сайте</option><option value="quizzes">По попыткам тестов</option><option value="name">По имени</option>

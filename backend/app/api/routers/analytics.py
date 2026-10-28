@@ -8,14 +8,19 @@ from app.api.deps import client_ip, get_current_admin, get_optional_student
 from app.core.errors import RateLimited
 from app.domain.auth.types import User
 from app.domain.student.types import Student
-from app.schemas.analytics import ActivityPulse
+from app.schemas.analytics import ActivityPulse, AnalyticsInsightsRequest
 from app.services.analytics_service import AnalyticsService
+from app.services.analytics_insights_service import AnalyticsInsightsService
 
 router = APIRouter(tags=['analytics'])
 
 
 def get_analytics_service(request: Request) -> AnalyticsService:
     return AnalyticsService(request.app.state.analytics_repo)
+
+
+def get_insights_service(request: Request) -> AnalyticsInsightsService:
+    return AnalyticsInsightsService(request.app.state.analytics_insights_repo, request.app.state.llm)
 
 
 @router.post('/analytics/pulse', status_code=204, response_model=None)
@@ -43,3 +48,16 @@ async def report(
     student_id: UUID | None = None,
 ) -> dict:
     return await svc.report(start=start, end=end, class_label=class_label, student_id=student_id)
+
+
+@router.post('/admin/analytics/insights')
+async def insights(
+    body: AnalyticsInsightsRequest,
+    request: Request,
+    teacher: Annotated[User, Depends(get_current_admin)],
+    svc: Annotated[AnalyticsInsightsService, Depends(get_insights_service)],
+) -> dict:
+    ok, reason = request.app.state.analytics_insights_limiter.check(str(teacher.id))
+    if not ok:
+        raise RateLimited(reason)
+    return await svc.analyze(body.start, body.end)

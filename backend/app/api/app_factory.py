@@ -15,6 +15,7 @@ from app.infrastructure.ratelimit.base import Limit
 from app.infrastructure.ratelimit.memory import InMemoryRateLimiter
 from app.infrastructure.repositories.chunks_repo import PgChunksRepository
 from app.infrastructure.repositories.analytics_repo import PgAnalyticsRepository
+from app.infrastructure.repositories.analytics_insights_repo import PgAnalyticsInsightsRepository
 from app.infrastructure.repositories.library_repo import PgLibraryRepository
 from app.infrastructure.repositories.materials_repo import PgMaterialsRepository
 from app.infrastructure.repositories.polls_repo import PgPollsRepository
@@ -73,6 +74,11 @@ async def _lifespan(app: FastAPI):
     )
     app.state.chunks_repo = PgChunksRepository(pool)
     app.state.analytics_repo = PgAnalyticsRepository(pool)
+    app.state.analytics_insights_repo = PgAnalyticsInsightsRepository(pool)
+    app.state.analytics_insights_limiter = InMemoryRateLimiter((
+        Limit(max_requests=3, window_seconds=60),
+        Limit(max_requests=12, window_seconds=3600),
+    ))
     app.state.analytics_limiter = InMemoryRateLimiter((
         Limit(max_requests=180, window_seconds=60),
         Limit(max_requests=7200, window_seconds=3600),

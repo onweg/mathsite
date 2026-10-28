@@ -94,6 +94,30 @@ class AnalyticsApiTests(unittest.IsolatedAsyncioTestCase):
         response = await self.client.post('/analytics/pulse', json=body | {'page': '/s/private-token'})
         self.assertEqual(response.status_code, 422)
 
+    async def test_insights_require_teacher_and_reject_personal_filters(self):
+        from types import SimpleNamespace
+        from app.api.deps import get_current_admin
+        from app.api.routers.analytics import get_insights_service
+        from app.infrastructure.ratelimit.memory import InMemoryRateLimiter
+        from app.infrastructure.ratelimit.base import Limit
+        service = AsyncMock()
+        service.analyze.return_value = {'summary': 'test'}
+        self.app.dependency_overrides[get_insights_service] = lambda: service
+        self.app.state.analytics_insights_limiter = InMemoryRateLimiter((Limit(1, 60),))
+        response = await self.client.post('/admin/analytics/insights', json={})
+        self.assertEqual(response.status_code, 401)
+        service.analyze.assert_not_awaited()
+        self.app.dependency_overrides[get_current_admin] = lambda: SimpleNamespace(id=uuid4())
+        response = await self.client.post('/admin/analytics/insights', json={'student_id': str(uuid4())})
+        self.assertEqual(response.status_code, 422)
+        teacher = SimpleNamespace(id=uuid4())
+        self.app.dependency_overrides[get_current_admin] = lambda: teacher
+        response = await self.client.post('/admin/analytics/insights', json={})
+        self.assertEqual(response.status_code, 200)
+        response = await self.client.post('/admin/analytics/insights', json={})
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(service.analyze.await_count, 1)
+
 
 @unittest.skipUnless(os.environ.get('ANALYTICS_TEST_DSN'), 'Set ANALYTICS_TEST_DSN for PostgreSQL tests')
 class AnalyticsPostgresTests(unittest.IsolatedAsyncioTestCase):
@@ -185,6 +209,25 @@ class AnalyticsPostgresTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result['totals']['poll_answers'], 0)
         self.assertEqual(result['quizzes'][0]['attempts'], 1)
         self.assertEqual(result['weekly'][0]['status'], 'correct')
+
+    async def test_insights_include_unused_items_and_distinguish_lifetime_first_attempts(self):
+        from app.infrastructure.repositories.analytics_insights_repo import PgAnalyticsInsightsRepository
+        await self.conn.execute("INSERT INTO quizzes (title,topic,status) VALUES ('Unused quiz','topic','published')")
+        await self.conn.execute("INSERT INTO library_items (collection,kind,slug,title,is_published) VALUES ('around','article','unused','Unused material',true)")
+        await self.conn.commit()
+        result = await PgAnalyticsInsightsRepository(TempPool(self.conn)).snapshot(
+            self.now - timedelta(days=7), self.now + timedelta(days=1))
+        quiz = next(q for q in result['quizzes'] if q['id'] == self.quiz)
+        # Student 1's first attempt was 40 days ago: both recent attempts are repeats.
+        self.assertEqual(quiz['attempts'], 4)
+        self.assertEqual(quiz['first_attempts'], 1)
+        self.assertEqual(quiz['first_average_score'], 20)
+        self.assertEqual(quiz['repeat_attempts'], 2)
+        self.assertEqual(quiz['anonymous_attempts'], 1)
+        unused = next(q for q in result['quizzes'] if q['title'] == 'Unused quiz')
+        self.assertEqual(unused['attempts'], 0)
+        self.assertIsNone(unused['first_average_score'])
+        self.assertEqual(result['materials'][0]['views'], 0)
 
     async def test_heartbeat_retries_are_idempotent_and_ownership_is_fixed(self):
         id, visit = uuid4(), uuid4()

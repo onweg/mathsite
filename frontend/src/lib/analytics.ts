@@ -51,3 +51,23 @@ export const PAGE_LABELS: Record<string, string> = {
   quizzes: 'Тесты', library: 'Библиотека', around: 'Математика вокруг нас',
   olympiad: 'Олимпиады', oge: 'ОГЭ', ege: 'ЕГЭ', feedback: 'Опросы', profile: 'Личный кабинет',
 }
+
+export type AnalyticsInsights = {
+  summary: string
+  findings: {
+    ref: string; title: string; kind: string; observation: string; recommendation: string
+    confidence: 'low' | 'medium' | 'high'; metrics: Record<string, number | null>
+  }[]
+  next_steps: { ref: string; title: string; action: string; check: string }[]
+  limitations: string[]
+  coverage: Record<string, { total: number; included: number }>
+  generated_at: string
+  period: { start: string | null; end: string }
+  provider: string
+}
+
+export function analyzeAnalytics(token: string, start: string, end: string): Promise<AnalyticsInsights> {
+  return apiJson('/admin/analytics/insights', {
+    method: 'POST', token, body: { start: start || null, end },
+  })
+}
