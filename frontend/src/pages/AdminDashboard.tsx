@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { AdminUser } from '../lib/api'
 import { LibraryPage } from './admin/LibraryPage'
 import { MaterialsPage } from './admin/MaterialsPage'
@@ -7,7 +7,9 @@ import { QuizzesPage } from './admin/QuizzesPage'
 import { StudentsPage } from './admin/StudentsPage'
 import { WeeklyPage } from './admin/WeeklyPage'
 
-type Tab = 'quizzes' | 'weekly' | 'library' | 'polls' | 'materials' | 'students'
+const StatisticsPage = lazy(() => import('./admin/StatisticsPage'))
+
+type Tab = 'quizzes' | 'weekly' | 'library' | 'polls' | 'materials' | 'students' | 'statistics'
 
 const TABS: { id: Tab; label: string; ready: boolean }[] = [
   { id: 'quizzes', label: 'Тесты', ready: true },
@@ -16,6 +18,7 @@ const TABS: { id: Tab; label: string; ready: boolean }[] = [
   { id: 'polls', label: 'Опросы', ready: true },
   { id: 'materials', label: 'Материалы', ready: true },
   { id: 'students', label: 'Класс', ready: true },
+  { id: 'statistics', label: 'Статистика', ready: true },
 ]
 
 export function AdminDashboard({
@@ -52,8 +55,8 @@ export function AdminDashboard({
         </div>
       </header>
 
-      <nav className="border-b border-paper-50/10 px-6">
-        <ul className="flex gap-6">
+      <nav className="border-b border-paper-50/10 px-6 overflow-x-auto">
+        <ul className="flex gap-6 whitespace-nowrap">
           {TABS.map((t) => (
             <li key={t.id}>
               <button
@@ -73,13 +76,14 @@ export function AdminDashboard({
         </ul>
       </nav>
 
-      <main className="max-w-4xl mx-auto px-6 py-10">
+      <main className={`${tab === 'statistics' ? 'max-w-7xl' : 'max-w-4xl'} mx-auto px-6 py-10`}>
         {tab === 'quizzes' && <QuizzesPage token={token} />}
         {tab === 'weekly' && <WeeklyPage token={token} />}
         {tab === 'library' && <LibraryPage token={token} />}
         {tab === 'polls' && <PollsPage token={token} />}
         {tab === 'materials' && <MaterialsPage token={token} />}
         {tab === 'students' && <StudentsPage token={token} />}
+        {tab === 'statistics' && <Suspense fallback={<div className="text-sm text-paper-50/50">Загрузка статистики…</div>}><StatisticsPage token={token} /></Suspense>}
       </main>
     </div>
   )

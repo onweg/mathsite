@@ -14,6 +14,7 @@ from app.infrastructure.llm.yandex import YandexProvider
 from app.infrastructure.ratelimit.base import Limit
 from app.infrastructure.ratelimit.memory import InMemoryRateLimiter
 from app.infrastructure.repositories.chunks_repo import PgChunksRepository
+from app.infrastructure.repositories.analytics_repo import PgAnalyticsRepository
 from app.infrastructure.repositories.library_repo import PgLibraryRepository
 from app.infrastructure.repositories.materials_repo import PgMaterialsRepository
 from app.infrastructure.repositories.polls_repo import PgPollsRepository
@@ -33,6 +34,7 @@ from .routers import admin_quizzes as admin_quizzes_router
 from .routers import admin_students as admin_students_router
 from .routers import admin_weekly as admin_weekly_router
 from .routers import auth as auth_router
+from .routers import analytics as analytics_router
 from .routers import chat as chat_router
 from .routers import embed as embed_router
 from .routers import health as health_router
@@ -70,6 +72,11 @@ async def _lifespan(app: FastAPI):
         client=http_client,
     )
     app.state.chunks_repo = PgChunksRepository(pool)
+    app.state.analytics_repo = PgAnalyticsRepository(pool)
+    app.state.analytics_limiter = InMemoryRateLimiter((
+        Limit(max_requests=180, window_seconds=60),
+        Limit(max_requests=7200, window_seconds=3600),
+    ))
     app.state.users_repo = PgUsersRepository(pool)
     app.state.quizzes_repo = PgQuizzesRepository(pool)
     app.state.polls_repo = PgPollsRepository(pool)
@@ -121,6 +128,7 @@ def create_app() -> FastAPI:
     app.include_router(rag_router.router)
     app.include_router(embed_router.router)
     app.include_router(auth_router.router)
+    app.include_router(analytics_router.router)
     app.include_router(admin_quizzes_router.router)
     app.include_router(quizzes_router.router)
     app.include_router(admin_weekly_router.router)

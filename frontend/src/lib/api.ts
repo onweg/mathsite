@@ -1,4 +1,6 @@
-const BASE =
+import { resetAnalyticsIdentity } from './analyticsSession'
+
+export const BASE =
   (import.meta.env.VITE_API_URL as string | undefined) || 'http://localhost:8000'
 
 /**
@@ -265,7 +267,7 @@ export type QuizAttemptsSummaryDTO = {
   }[]
 }
 
-async function apiJson<T>(
+export async function apiJson<T>(
   path: string,
   { method, token, body }: { method: string; token?: string | null; body?: unknown } = {
     method: 'GET',
@@ -739,12 +741,12 @@ export const studentAuth = {
     apiJson<StudentPublicDTO>('/students/activate', {
       method: 'POST',
       body: { token },
-    }),
+    }).then((student) => { resetAnalyticsIdentity(); return student }),
   me: () =>
     apiJson<StudentPublicDTO | null>('/students/me', { method: 'GET' }).catch(
       () => null,
     ),
-  logout: () => apiJson<void>('/students/logout', { method: 'POST' }),
+  logout: () => apiJson<void>('/students/logout', { method: 'POST' }).then(resetAnalyticsIdentity),
   myAttempts: () =>
     apiJson<StudentAttemptDTO[]>('/students/me/attempts', { method: 'GET' }),
   myWeekly: () =>

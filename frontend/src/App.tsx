@@ -15,6 +15,7 @@ import { Quizzes } from './sections/Quizzes'
 import { Sections } from './sections/Sections'
 import { Weekly } from './sections/Weekly'
 import { useLenis } from './hooks/useLenis'
+import { useAnalytics } from './hooks/useAnalytics'
 import { hasNavigated, useLinkRouting, usePage } from './lib/router'
 import { VoiceProvider } from './lib/voice'
 import { AdminRouter } from './pages/AdminRouter'
@@ -27,6 +28,7 @@ export default function App() {
   // полки библиотеки живут на главной, перерисовывать её ради них незачем.
   const page = usePage()
   useLinkRouting()
+  useAnalytics()
 
   if (page === 'admin') return <AdminRouter />
   if (page === 'activate') return <StudentActivate />
