@@ -251,6 +251,20 @@ export type AttemptSummaryDTO = {
   created_at: string
 }
 
+export type QuizAttemptsSummaryDTO = {
+  total_attempts: number
+  anonymous_attempts: number
+  students: {
+    student_id: string
+    student_name: string
+    class_label: string
+    attempts_count: number
+    last_score: number
+    last_total: number
+    last_attempt_at: string
+  }[]
+}
+
 async function apiJson<T>(
   path: string,
   { method, token, body }: { method: string; token?: string | null; body?: unknown } = {
@@ -363,6 +377,8 @@ export const adminQuizzes = {
     apiJson<void>(`/admin/quizzes/${id}`, { method: 'DELETE', token }),
   listAttempts: (token: string, id: string) =>
     apiJson<AttemptSummaryDTO[]>(`/admin/quizzes/${id}/attempts`, { method: 'GET', token }),
+  attemptsSummary: (token: string, id: string) =>
+    apiJson<QuizAttemptsSummaryDTO>(`/admin/quizzes/${id}/attempts/summary`, { method: 'GET', token }),
 }
 
 // ====== Задача недели ======

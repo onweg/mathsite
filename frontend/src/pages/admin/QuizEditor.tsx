@@ -231,7 +231,7 @@ export function QuizEditor({
         </button>
       )}
 
-      {isPublished && <QuizAttempts token={token} quizId={quiz.id} />}
+      <QuizAttempts key={quiz.id} token={token} quizId={quiz.id} />
     </div>
   )
 }

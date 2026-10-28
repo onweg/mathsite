@@ -159,3 +159,19 @@ class AttemptSummaryDTO(BaseModel):
     score: int
     total: int
     created_at: str
+
+
+class StudentAttemptSummaryDTO(BaseModel):
+    student_id: str
+    student_name: str
+    class_label: str
+    attempts_count: int
+    last_score: int
+    last_total: int
+    last_attempt_at: str
+
+
+class QuizAttemptsSummaryDTO(BaseModel):
+    total_attempts: int
+    anonymous_attempts: int
+    students: list[StudentAttemptSummaryDTO]

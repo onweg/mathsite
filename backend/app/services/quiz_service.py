@@ -30,6 +30,7 @@ from app.infrastructure.repositories.quizzes_repo import (
     AttemptSummary,
     QuizzesRepository,
     StudentAttempt,
+    StudentAttemptSummary,
 )
 
 log = logging.getLogger("mathsite.quiz")
@@ -339,6 +340,10 @@ class QuizService:
 
     async def list_attempts(self, quiz_id: UUID) -> list[AttemptSummary]:
         return await self._quizzes.list_attempts(quiz_id)
+
+    async def attempts_summary(self, quiz_id: UUID) -> list[StudentAttemptSummary]:
+        await self.get(quiz_id)
+        return await self._quizzes.attempts_summary(quiz_id)
 
     async def list_attempts_by_student(self, student_id: UUID) -> list[StudentAttempt]:
         return await self._quizzes.list_by_student(student_id)

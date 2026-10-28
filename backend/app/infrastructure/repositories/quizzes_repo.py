@@ -26,6 +26,17 @@ class AttemptSummary:
 
 
 @dataclass(frozen=True)
+class StudentAttemptSummary:
+    student_id: UUID | None
+    student_name: str
+    class_label: str
+    attempts_count: int
+    last_score: int
+    last_total: int
+    last_attempt_at: datetime
+
+
+@dataclass(frozen=True)
 class StudentAttempt:
     """Для профиля ученика: привязана к конкретному студенту, с названием квиза."""
 
@@ -86,6 +97,8 @@ class QuizzesRepository(Protocol):
     ) -> UUID: ...
 
     async def list_attempts(self, quiz_id: UUID) -> list[AttemptSummary]: ...
+
+    async def attempts_summary(self, quiz_id: UUID) -> list[StudentAttemptSummary]: ...
 
     async def list_by_student(self, student_id: UUID) -> list[StudentAttempt]: ...
 
@@ -392,6 +405,45 @@ class PgQuizzesRepository:
                 score=r[3],
                 total=r[4],
                 created_at=r[5],
+            )
+            for r in rows
+        ]
+
+    async def attempts_summary(self, quiz_id: UUID) -> list[StudentAttemptSummary]:
+        # Считаем по всей истории, независимо от LIMIT в журнале прохождений.
+        # NULL student_id — общий счётчик анонимных попыток, не один ученик.
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                WITH ranked AS (
+                    SELECT student_id, student_name, score, total, created_at,
+                           COUNT(*) OVER (PARTITION BY student_id) AS attempts_count,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY student_id ORDER BY created_at DESC, id DESC
+                           ) AS position
+                    FROM quiz_attempts
+                    WHERE quiz_id = %s
+                )
+                SELECT r.student_id, COALESCE(s.name, r.student_name),
+                       COALESCE(s.class_label, ''), r.attempts_count,
+                       r.score, r.total, r.created_at
+                FROM ranked r
+                LEFT JOIN students s ON s.id = r.student_id
+                WHERE r.position = 1
+                ORDER BY r.created_at DESC, r.student_id
+                """,
+                (quiz_id,),
+            )
+            rows = await cur.fetchall()
+        return [
+            StudentAttemptSummary(
+                student_id=r[0],
+                student_name=r[1],
+                class_label=r[2],
+                attempts_count=r[3],
+                last_score=r[4],
+                last_total=r[5],
+                last_attempt_at=r[6],
             )
             for r in rows
         ]

@@ -16,6 +16,7 @@ from app.schemas.quiz import (
     CreateQuizRequest,
     GenerateRequest,
     QuizDTO,
+    QuizAttemptsSummaryDTO,
     QuizItemDTO,
     QuizSummaryDTO,
     RefineRequest,
@@ -23,6 +24,7 @@ from app.schemas.quiz import (
     SourceHitDTO,
     SourcePreviewDTO,
     SourcePreviewRequest,
+    StudentAttemptSummaryDTO,
     UpdateItemRequest,
     UpdateMetaRequest,
 )
@@ -264,3 +266,28 @@ async def list_attempts(
         )
         for a in attempts
     ]
+
+
+@router.get("/{quiz_id}/attempts/summary", response_model=QuizAttemptsSummaryDTO)
+async def attempts_summary(
+    quiz_id: UUID,
+    _: Annotated[User, Depends(get_current_admin)],
+    svc: Annotated[QuizService, Depends(get_quiz_service)],
+) -> QuizAttemptsSummaryDTO:
+    rows = await svc.attempts_summary(quiz_id)
+    return QuizAttemptsSummaryDTO(
+        total_attempts=sum(r.attempts_count for r in rows),
+        anonymous_attempts=sum(r.attempts_count for r in rows if r.student_id is None),
+        students=[
+            StudentAttemptSummaryDTO(
+                student_id=str(r.student_id),
+                student_name=r.student_name,
+                class_label=r.class_label,
+                attempts_count=r.attempts_count,
+                last_score=r.last_score,
+                last_total=r.last_total,
+                last_attempt_at=r.last_attempt_at.isoformat(),
+            )
+            for r in rows if r.student_id is not None
+        ],
+    )
