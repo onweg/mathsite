@@ -1,0 +1,17 @@
+# Dedicated disposable database. Never mounts application data or production volumes.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: mathsite_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "127.0.0.1:5544:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mathsite_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

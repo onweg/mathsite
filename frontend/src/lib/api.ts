@@ -391,6 +391,7 @@ export type WeeklyTaskDTO = {
   body_md: string
   answer_md: string
   is_published: boolean
+  is_answer_published: boolean
   submissions_count: number
   new_submissions_count: number
 }
@@ -423,6 +424,8 @@ export type WeeklyTaskPublicDTO = {
   id: string
   title: string
   body_md: string
+  is_answer_published: boolean
+  answer_md: string | null
 }
 
 export type WeeklyLevel = 'school' | 'olympiad' | 'hard'
@@ -462,6 +465,12 @@ export const adminWeekly = {
     apiJson<WeeklyTaskDTO>(`/admin/weekly/${id}/publish`, { method: 'POST', token }),
   unpublish: (token: string, id: string) =>
     apiJson<WeeklyTaskDTO>(`/admin/weekly/${id}/unpublish`, { method: 'POST', token }),
+  publishAnswer: (token: string, id: string, answer_md: string) =>
+    apiJson<WeeklyTaskDTO>(`/admin/weekly/${id}/answer/publish`, {
+      method: 'POST', token, body: { answer_md },
+    }),
+  hideAnswer: (token: string, id: string) =>
+    apiJson<WeeklyTaskDTO>(`/admin/weekly/${id}/answer/hide`, { method: 'POST', token }),
   delete: (token: string, id: string) =>
     apiJson<void>(`/admin/weekly/${id}`, { method: 'DELETE', token }),
   submissions: (token: string, taskId: string) =>

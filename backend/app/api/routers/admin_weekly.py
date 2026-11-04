@@ -17,6 +17,7 @@ from app.domain.weekly.types import WeeklySubmission, WeeklyTask
 from app.schemas.weekly import (
     CreateWeeklyRequest,
     GenerateWeeklyRequest,
+    PublishWeeklyAnswerRequest,
     RefineWeeklyRequest,
     ReviewSubmissionRequest,
     UpdateWeeklyRequest,
@@ -36,6 +37,7 @@ def _dto(t: WeeklyTask, counts: tuple[int, int] = (0, 0)) -> WeeklyTaskDTO:
         body_md=t.body_md,
         answer_md=t.answer_md,
         is_published=t.is_published,
+        is_answer_published=t.is_answer_published,
         submissions_count=counts[0],
         new_submissions_count=counts[1],
     )
@@ -198,3 +200,22 @@ async def delete(
     svc: Annotated[WeeklyTaskService, Depends(get_weekly_service)],
 ) -> None:
     await svc.delete(task_id)
+
+
+@router.post("/{task_id}/answer/publish", response_model=WeeklyTaskDTO)
+async def publish_answer(
+    task_id: UUID,
+    body: PublishWeeklyAnswerRequest,
+    _: Annotated[User, Depends(get_current_admin)],
+    svc: Annotated[WeeklyTaskService, Depends(get_weekly_service)],
+) -> WeeklyTaskDTO:
+    return _dto(await svc.publish_answer(task_id, answer_md=body.answer_md))
+
+
+@router.post("/{task_id}/answer/hide", response_model=WeeklyTaskDTO)
+async def hide_answer(
+    task_id: UUID,
+    _: Annotated[User, Depends(get_current_admin)],
+    svc: Annotated[WeeklyTaskService, Depends(get_weekly_service)],
+) -> WeeklyTaskDTO:
+    return _dto(await svc.hide_answer(task_id))

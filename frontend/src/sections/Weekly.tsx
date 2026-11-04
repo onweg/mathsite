@@ -19,10 +19,30 @@ export function Weekly() {
   const [tasks, setTasks] = useState<WeeklyTaskPublicDTO[] | null>(null)
 
   useEffect(() => {
-    publicWeekly
-      .published()
-      .then(setTasks)
-      .catch(() => setTasks([]))
+    let alive = true
+    let loading = false
+    async function refresh() {
+      if (loading || document.hidden) return
+      loading = true
+      try {
+        const latest = await publicWeekly.published()
+        if (alive) setTasks(latest)
+      } catch {
+        if (alive) setTasks((previous) => previous ?? [])
+      } finally {
+        loading = false
+      }
+    }
+    void refresh()
+    const timer = window.setInterval(refresh, 30_000)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      alive = false
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
   }, [])
 
   const many = (tasks?.length ?? 0) > 1
@@ -109,11 +129,21 @@ function TaskCard({
           <div className="text-balance font-serif text-xl leading-relaxed text-paper-50 md:text-[1.6rem]">
             <Markdown text={task.body_md} />
           </div>
+          {task.is_answer_published && task.answer_md && (
+            <div className="mt-8 border-t border-gold-500/30 pt-6">
+              <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-gold-500">
+                Решение учителя
+              </h3>
+              <div className="text-base leading-relaxed text-paper-50/85">
+                <Markdown text={task.answer_md} />
+              </div>
+            </div>
+          )}
         </article>
       </Reveal>
 
       <Reveal delay={0.15}>
-        <WeeklySubmit taskId={task.id} />
+        <WeeklySubmit taskId={task.id} closed={task.is_answer_published} />
       </Reveal>
     </div>
   )

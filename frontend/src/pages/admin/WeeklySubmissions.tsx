@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Markdown } from '../../components/Markdown'
 import {
   SubmissionStatus,
@@ -102,19 +102,20 @@ function SubmissionRow({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [zoom, setZoom] = useState(false)
+  const saveVersion = useRef(0)
 
   // Вердикт сохраняем сразу вместе с текущим текстом комментария: учитель
   // жмёт одну кнопку, а не «сохранить» отдельно.
   async function setVerdict(status: SubmissionStatus) {
+    const version = ++saveVersion.current
     setBusy(true)
     setError(null)
     try {
-      onChanged(
-        await adminWeekly.review(token, submission.id, {
-          status,
-          teacher_comment: comment.trim() || null,
-        }),
-      )
+      const updated = await adminWeekly.review(token, submission.id, {
+        status,
+        teacher_comment: comment.trim() || null,
+      })
+      if (version === saveVersion.current) onChanged(updated)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'не сохранилось')
     } finally {
@@ -123,18 +124,19 @@ function SubmissionRow({
   }
 
   async function saveComment() {
-    setBusy(true)
+    const version = ++saveVersion.current
+    // Blur happens before the verdict button's click. Do not disable that
+    // button here; its request saves the current comment together with status.
     setError(null)
     try {
-      onChanged(
-        await adminWeekly.review(token, submission.id, {
-          teacher_comment: comment.trim() || null,
-        }),
-      )
+      const updated = await adminWeekly.review(token, submission.id, {
+        teacher_comment: comment.trim() || null,
+      })
+      if (version === saveVersion.current) onChanged(updated)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'не сохранилось')
-    } finally {
-      setBusy(false)
+      if (version === saveVersion.current) {
+        setError(e instanceof Error ? e.message : 'не сохранилось')
+      }
     }
   }
 

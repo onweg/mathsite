@@ -1,16 +1,140 @@
-name: Deploy
+name: CI
 on:
-  push: { branches: [main] }
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: deploy-production
-  cancel-in-progress: false
+permissions:
+  contents: read
 
 jobs:
-  deploy:
+  unit:
+    name: Unit tests and TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: pip install -r backend/requirements-test.txt
+      - name: Unit and isolated API tests (no database or model access)
+        working-directory: backend
+        run: python -m pytest -m 'not integration' --junitxml=test-results/unit.xml --cov=app --cov-report=xml:test-results/unit-coverage.xml
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run typecheck && npm run typecheck:e2e
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-results
+          path: backend/test-results/
+          retention-days: 7
+
+  integration:
+    name: API and PostgreSQL integration
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: mathsite_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mathsite_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/mathsite_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r backend/requirements-test.txt
+      - name: Apply real migrations to an empty database
+        working-directory: backend
+        run: python -m tests.prepare
+      - name: API, transactions, identity and database regressions
+        working-directory: backend
+        run: python -m pytest -m integration --junitxml=test-results/integration.xml --cov=app --cov-report=xml:test-results/integration-coverage.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-results
+          path: backend/test-results/
+          retention-days: 7
+
+  ui:
+    name: Browser workflows (desktop and mobile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: mathsite_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mathsite_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/mathsite_test
+      TEST_PYTHON: python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: pip install -r backend/requirements-test.txt
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Build site and run real browser → API → database scenarios
+        working-directory: frontend
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-results
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
+
+  deploy:
+    name: Deploy tested commit
+    needs: [unit, integration, ui]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     steps:
       - uses: appleboy/ssh-action@v1.0.3
         with:
@@ -20,7 +144,13 @@ jobs:
           script: |
             set -e
             cd /opt/mathsite
-            git pull --ff-only
+            git fetch origin main
+            # A newer push can arrive during checks. Never deploy untested HEAD.
+            if [ "$(git rev-parse origin/main)" != "${{ github.sha }}" ]; then
+              echo "A newer commit exists; its own CI run will deploy it."
+              exit 0
+            fi
+            git checkout --detach "${{ github.sha }}"
             cd deploy
             docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
             docker image prune -f

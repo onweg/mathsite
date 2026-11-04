@@ -38,3 +38,11 @@ uploads/
 # учебники/материалы заказчика — не публикуем, держим локально
 *.pdf
 .env.prod
+
+# test artifacts
+.coverage
+coverage.xml
+htmlcov/
+test-results/
+playwright-report/
+blob-report/

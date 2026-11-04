@@ -5,8 +5,8 @@
 авторизации (capability-URL) — иначе `<img src>` в админке пришлось бы
 подписывать Bearer-токеном, чего браузер не умеет.
 
-Решение принимается только к опубликованной задаче: снял публикацию —
-закрыл приём.
+Решение принимается только к опубликованной задаче со скрытым разбором.
+Публикация разбора закрывает приём, скрытие снова открывает.
 """
 
 from __future__ import annotations
@@ -75,6 +75,8 @@ class WeeklySubmissionsService:
             raise NotFound("задача не найдена")
         if not task.is_published:
             raise Conflict("приём решений по этой задаче закрыт")
+        if task.is_answer_published:
+            raise Conflict("решение учителя опубликовано — приём ответов по этой задаче закрыт")
 
         solution_md = solution_md.strip()
         if len(solution_md) > MAX_SOLUTION_CHARS:
@@ -87,14 +89,19 @@ class WeeklySubmissionsService:
             raise Conflict("нужно написать решение или приложить фото")
 
         name = student.name if student else (student_name.strip() or "аноним")
-        submission, stale = await self._repo.upsert(
-            task_id=task_id,
-            student_id=student.id if student else None,
-            student_name=name[:120],
-            class_label=student.class_label if student else "",
-            solution_md=solution_md,
-            image_filename=saved_name,
-        )
+        try:
+            submission, stale = await self._repo.upsert(
+                task_id=task_id,
+                student_id=student.id if student else None,
+                student_name=name[:120],
+                class_label=student.class_label if student else "",
+                solution_md=solution_md,
+                image_filename=saved_name,
+            )
+        except Exception:
+            if saved_name:
+                self._remove_image(saved_name)
+            raise
         if stale:
             self._remove_image(stale)
 

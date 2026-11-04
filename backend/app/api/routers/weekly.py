@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 from fastapi.responses import FileResponse
 
 from app.api.deps import (
@@ -51,11 +51,17 @@ def submission_dto(s: WeeklySubmission) -> WeeklySubmissionDTO:
 
 @router.get("", response_model=list[WeeklyTaskPublicDTO])
 async def published(
+    response: Response,
     svc: Annotated[WeeklyTaskService, Depends(get_weekly_service)],
 ) -> list[WeeklyTaskPublicDTO]:
     """Все задачи, которые учитель держит на сайте, в порядке добавления."""
+    response.headers["Cache-Control"] = "no-store"
     return [
-        WeeklyTaskPublicDTO(id=str(t.id), title=t.title, body_md=t.body_md)
+        WeeklyTaskPublicDTO(
+            id=str(t.id), title=t.title, body_md=t.body_md,
+            is_answer_published=t.is_answer_published,
+            answer_md=t.answer_md if t.is_answer_published else None,
+        )
         for t in await svc.published()
     ]
 

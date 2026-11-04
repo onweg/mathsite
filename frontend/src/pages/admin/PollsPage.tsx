@@ -34,7 +34,10 @@ export function PollsPage({ token }: { token: string }) {
       <PollEditor
         token={token}
         poll={view.poll}
-        onCancel={() => setView({ mode: 'list' })}
+        onCancel={() => {
+          reload()
+          setView({ mode: 'list' })
+        }}
         onDone={() => {
           reload()
           setView({ mode: 'list' })

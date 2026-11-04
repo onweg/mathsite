@@ -11,16 +11,23 @@ class WeeklyTaskDTO(BaseModel):
     body_md: str
     answer_md: str
     is_published: bool
+    is_answer_published: bool = False
     submissions_count: int = 0
     new_submissions_count: int = 0
 
 
 class WeeklyTaskPublicDTO(BaseModel):
-    """Для публики — без ответа."""
+    """Ответ передаётся только после явной публикации учителем."""
 
     id: str
     title: str
     body_md: str
+    is_answer_published: bool = False
+    answer_md: str | None = None
+
+
+class PublishWeeklyAnswerRequest(BaseModel):
+    answer_md: str = Field(min_length=1, max_length=4000)
 
 
 class CreateWeeklyRequest(BaseModel):

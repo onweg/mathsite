@@ -29,6 +29,7 @@ class WeeklyTasksRepository(Protocol):
         body_md: str | None = None,
         answer_md: str | None = None,
         is_published: bool | None = None,
+        is_answer_published: bool | None = None,
     ) -> None: ...
 
     async def delete(self, task_id: UUID) -> None: ...
@@ -43,11 +44,12 @@ def _row_to_task(row) -> WeeklyTask:
         is_published=row[4],
         created_at=row[5],
         updated_at=row[6],
+        is_answer_published=row[7],
     )
 
 
 _SELECT = (
-    "SELECT id, title, body_md, answer_md, is_published, created_at, updated_at "
+    "SELECT id, title, body_md, answer_md, is_published, created_at, updated_at, is_answer_published "
     "FROM weekly_tasks"
 )
 
@@ -90,7 +92,7 @@ class PgWeeklyTasksRepository:
                 """
                 INSERT INTO weekly_tasks (title, body_md, answer_md, created_by)
                 VALUES (%s, %s, %s, %s)
-                RETURNING id, title, body_md, answer_md, is_published, created_at, updated_at
+                RETURNING id, title, body_md, answer_md, is_published, created_at, updated_at, is_answer_published
                 """,
                 (title, body_md, answer_md, created_by),
             )
@@ -106,6 +108,7 @@ class PgWeeklyTasksRepository:
         body_md: str | None = None,
         answer_md: str | None = None,
         is_published: bool | None = None,
+        is_answer_published: bool | None = None,
     ) -> None:
         sets: list[str] = []
         params: list[object] = []
@@ -121,6 +124,9 @@ class PgWeeklyTasksRepository:
         if is_published is not None:
             sets.append("is_published = %s")
             params.append(is_published)
+        if is_answer_published is not None:
+            sets.append("is_answer_published = %s")
+            params.append(is_answer_published)
         if not sets:
             return
         sets.append("updated_at = NOW()")

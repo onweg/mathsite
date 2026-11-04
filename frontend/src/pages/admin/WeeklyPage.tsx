@@ -79,8 +79,6 @@ export function WeeklyPage({ token }: { token: string }) {
   }
 
   if (view.mode === 'edit') {
-    // Задача, опубликованная прямо сейчас, — не считая открытую в редакторе.
-    // Нужна, чтобы предупредить: публикация новой снимет её с сайта.
     return (
       <WeeklyEditor
         token={token}
@@ -103,7 +101,7 @@ export function WeeklyPage({ token }: { token: string }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg text-paper-50 font-serif">Задачи недели</h2>
           <p className="mt-0.5 text-xs text-paper-50/40">
@@ -148,7 +146,7 @@ export function WeeklyPage({ token }: { token: string }) {
           {tasks.map((t) => (
             <li
               key={t.id}
-              className="rounded-xl border border-paper-50/10 bg-ink-900/30 p-4 flex items-center justify-between gap-4"
+              className="rounded-xl border border-paper-50/10 bg-ink-900/30 p-4 flex flex-wrap items-center justify-between gap-4"
             >
               <button
                 onClick={() => setView({ mode: 'edit', task: t })}
@@ -158,13 +156,18 @@ export function WeeklyPage({ token }: { token: string }) {
                 <div className="text-xs text-paper-50/40 mt-0.5 truncate">
                   {t.body_md.slice(0, 80).replace(/\n/g, ' ')}
                 </div>
+                <div className="mt-2 text-xs text-gold-500/80">
+                  {t.is_answer_published
+                    ? 'Решение опубликовано · приём ответов закрыт'
+                    : t.is_published ? 'Решение скрыто · приём ответов открыт' : 'Решение скрыто'}
+                </div>
               </button>
               <div className="flex shrink-0 items-center gap-3">
                 <button
                   onClick={() => setView({ mode: 'submissions', task: t })}
                   className="rounded-lg border border-paper-50/10 px-3 py-1.5 text-xs text-paper-50/60 transition hover:border-paper-50/30 hover:text-paper-50"
                 >
-                  решения
+                  ответы учеников
                   {t.submissions_count > 0 && (
                     <span className="ml-2 text-paper-50/40">{t.submissions_count}</span>
                   )}
@@ -297,6 +300,22 @@ function WeeklyEditor({
     }
   }
 
+  async function toggleAnswer() {
+    if (!current || busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const updated = current.is_answer_published
+        ? await adminWeekly.hideAnswer(token, current.id)
+        : await adminWeekly.publishAnswer(token, current.id, answer)
+      setCurrent(updated)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'не удалось изменить публикацию решения')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
       <button onClick={onCancel} className={backBtn}>
@@ -359,7 +378,7 @@ function WeeklyEditor({
             </p>
           </Field>
 
-          <Field label="решение и ответ — только для тебя">
+          <Field label="решение и ответ учителя">
             <textarea
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
@@ -367,7 +386,9 @@ function WeeklyEditor({
               className={textarea}
             />
             <p className="text-[11px] text-paper-50/40 pt-1">
-              Решение не уходит на сайт — публичный ответ отдаёт только условие.
+              {current?.is_answer_published
+                ? 'Решение видно ученикам. Сохранённые изменения сразу появятся на сайте.'
+                : 'Пока решение скрыто, его видишь только ты. Опубликовать его можно отдельной кнопкой ниже.'}
             </p>
           </Field>
         </>
@@ -381,12 +402,33 @@ function WeeklyEditor({
           </div>
           <div className="border-t border-paper-50/10 pt-6">
             <div className="text-xs uppercase tracking-widest text-amber-300/80">
-              Решение (только для учителя)
+              Решение {current?.is_answer_published ? '(опубликовано)' : '(скрыто от учеников)'}
             </div>
             <div className="mt-3 text-paper-50/80">
               <Markdown text={answer || '…'} />
             </div>
           </div>
+        </div>
+      )}
+
+      {current && (
+        <div className="space-y-3 rounded-xl border border-gold-500/30 bg-gold-500/5 p-4">
+          <div className="text-sm text-paper-50">
+            {current.is_answer_published ? 'Решение опубликовано' : 'Решение скрыто от учеников'}
+          </div>
+          <p className="text-xs leading-relaxed text-paper-50/60">
+            {current.is_answer_published
+              ? 'Ответы на эту задачу больше не принимаются. Скрой решение, чтобы снова открыть приём ответов на опубликованную задачу.'
+              : 'Кнопка сохранит текст решения из редактора и покажет его ученикам только у этой задачи. Приём ответов на неё закроется. Остальные задачи продолжат работать как раньше.'}
+            {!current.is_published && ' Сама задача сейчас снята с публикации и ученикам не видна.'}
+          </p>
+          <button
+            onClick={toggleAnswer}
+            disabled={busy || (!current.is_answer_published && !answer.trim())}
+            className="rounded-lg border border-gold-500/50 bg-gold-500/10 px-4 py-2 text-sm text-paper-50 hover:border-gold-500 disabled:opacity-50"
+          >
+            {current.is_answer_published ? 'Скрыть решение' : 'Опубликовать решение'}
+          </button>
         </div>
       )}
 

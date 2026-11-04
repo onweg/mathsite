@@ -14,7 +14,7 @@ const MAX_PHOTO_MB = 8
  * решение потом уже не увидит: опознать его между заходами нечем, поэтому
  * ему прямо об этом говорим.
  */
-export function WeeklySubmit({ taskId }: { taskId: string }) {
+export function WeeklySubmit({ taskId, closed = false }: { taskId: string; closed?: boolean }) {
   const auth = useStudent()
   const authed = auth.status === 'authed'
 
@@ -41,6 +41,10 @@ export function WeeklySubmit({ taskId }: { taskId: string }) {
     publicWeekly.mine(taskId).then(setMine)
   }, [taskId, authed])
 
+  useEffect(() => {
+    if (closed) setOpen(false)
+  }, [closed])
+
   function afterSend(s: WeeklySubmissionDTO) {
     restore.current = anchorScroll(boxRef.current)
     setOpen(false)
@@ -52,10 +56,16 @@ export function WeeklySubmit({ taskId }: { taskId: string }) {
 
   return (
     <div ref={boxRef} className="mt-6 space-y-5">
-      {current && !open && (
+      {closed && (
+        <p className="rounded-2xl border border-gold-500/20 bg-gold-500/5 px-5 py-4 text-sm text-paper-50/70">
+          Решение учителя опубликовано. Приём ответов на эту задачу закрыт.
+        </p>
+      )}
+      {current && (!open || closed) && (
         <SubmittedLine
           submission={current}
           anonymous={!authed}
+          closed={closed}
           onRedo={() => {
             restore.current = anchorScroll(boxRef.current)
             setOpen(true)
@@ -63,7 +73,7 @@ export function WeeklySubmit({ taskId }: { taskId: string }) {
         />
       )}
 
-      {!current && !open && (
+      {!closed && !current && !open && (
         <button
           onClick={() => setOpen(true)}
           data-cursor="lg"
@@ -75,7 +85,7 @@ export function WeeklySubmit({ taskId }: { taskId: string }) {
         </button>
       )}
 
-      {open && (
+      {!closed && open && (
         <SubmitForm
           taskId={taskId}
           studentName={authed ? auth.student.name : null}
@@ -282,10 +292,12 @@ const STATUS: Record<
 function SubmittedLine({
   submission,
   anonymous,
+  closed,
   onRedo,
 }: {
   submission: WeeklySubmissionDTO
   anonymous: boolean
+  closed: boolean
   onRedo: () => void
 }) {
   const s = STATUS[submission.status]
@@ -309,12 +321,14 @@ function SubmittedLine({
           >
             смотреть в профиле
           </a>
-          <button
-            onClick={onRedo}
-            className="font-mono text-[10px] uppercase tracking-[0.2em] text-paper-50/50 transition hover:text-gold-500"
-          >
-            отправить заново
-          </button>
+          {!closed && (
+            <button
+              onClick={onRedo}
+              className="font-mono text-[10px] uppercase tracking-[0.2em] text-paper-50/50 transition hover:text-gold-500"
+            >
+              отправить заново
+            </button>
+          )}
         </>
       )}
     </div>

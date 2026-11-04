@@ -7,6 +7,7 @@ from uuid import UUID
 
 from psycopg_pool import AsyncConnectionPool
 
+from app.core.errors import Conflict, NotFound
 from app.domain.weekly.types import SubmissionStatus, WeeklySubmission
 
 
@@ -83,6 +84,22 @@ class PgWeeklySubmissionsRepository:
     def __init__(self, pool: AsyncConnectionPool):
         self._pool = pool
 
+    @staticmethod
+    async def _ensure_accepting(cur, task_id: UUID) -> None:
+        # Блокировка до записи ответа: публикация решения учителем не может
+        # вклиниться между проверкой и INSERT/UPDATE, в том числе для анонима.
+        await cur.execute(
+            "SELECT is_published, is_answer_published FROM weekly_tasks WHERE id = %s FOR UPDATE",
+            (task_id,),
+        )
+        task = await cur.fetchone()
+        if not task:
+            raise NotFound("задача не найдена")
+        if not task[0]:
+            raise Conflict("приём решений по этой задаче закрыт")
+        if task[1]:
+            raise Conflict("решение учителя опубликовано — приём ответов по этой задаче закрыт")
+
     async def upsert(
         self,
         *,
@@ -96,6 +113,7 @@ class PgWeeklySubmissionsRepository:
         # Аноним не опознаётся между запросами — у него каждая отправка своя строка.
         if student_id is None:
             async with self._pool.connection() as conn, conn.cursor() as cur:
+                await self._ensure_accepting(cur, task_id)
                 await cur.execute(
                     f"""
                     INSERT INTO weekly_submissions
@@ -114,6 +132,7 @@ class PgWeeklySubmissionsRepository:
         # возвращаем старое имя файла, чтобы сервис подчистил диск.
         # Проверка снова уходит в 'new': учитель смотрит свежий вариант.
         async with self._pool.connection() as conn, conn.cursor() as cur:
+            await self._ensure_accepting(cur, task_id)
             await cur.execute(
                 "SELECT image_filename FROM weekly_submissions "
                 "WHERE task_id = %s AND student_id = %s",

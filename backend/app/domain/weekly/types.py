@@ -1,4 +1,4 @@
-"""Задача недели: условие + ответ, одна активная публикуется ученикам."""
+"""Задачи недели: независимая публикация условий и решений учителя."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -15,6 +15,7 @@ class WeeklyTask:
     is_published: bool
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    is_answer_published: bool = False
 
 
 SubmissionStatus = Literal["new", "correct", "partial", "wrong"]

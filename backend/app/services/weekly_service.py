@@ -188,6 +188,20 @@ class WeeklyTaskService:
     async def delete(self, task_id: UUID) -> None:
         await self._repo.delete(task_id)
 
+    async def publish_answer(self, task_id: UUID, *, answer_md: str) -> WeeklyTask:
+        await self.get(task_id)
+        answer = answer_md.strip()
+        if not answer:
+            raise Conflict("сначала напишите решение задачи")
+        # Текст из редактора и видимость меняются одной операцией.
+        await self._repo.update(task_id, answer_md=answer, is_answer_published=True)
+        return await self.get(task_id)
+
+    async def hide_answer(self, task_id: UUID) -> WeeklyTask:
+        await self.get(task_id)
+        await self._repo.update(task_id, is_answer_published=False)
+        return await self.get(task_id)
+
 
 def _with_retry_note(prompt: str, error: LLMBadResponse | None) -> str:
     """Дописать к промпту, чем не понравилась прошлая попытка."""
