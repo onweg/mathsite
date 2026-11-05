@@ -163,6 +163,7 @@ export async function me(token: string): Promise<AdminUser> {
 // ====== Квизы ======
 
 export type Difficulty = 'easy' | 'medium' | 'hard'
+export type QuizTrack = 'general' | 'oge' | 'ege'
 export type QuizStatus = 'draft' | 'published'
 export type ItemKind = 'mcq' | 'short'
 /** Встроенные учебники плюс любой загруженный материал: его ключ — `material_<hex>`. */
@@ -200,6 +201,7 @@ export type QuizItemDTO = {
 }
 
 export type QuizDTO = {
+  track: QuizTrack
   id: string
   title: string
   topic: string
@@ -210,6 +212,7 @@ export type QuizDTO = {
 }
 
 export type QuizSummaryDTO = {
+  track: QuizTrack
   id: string
   title: string
   topic: string
@@ -230,6 +233,7 @@ export type QuizItemPublicDTO = {
 }
 
 export type QuizPublicDTO = {
+  track: QuizTrack
   id: string
   title: string
   topic: string
@@ -300,7 +304,7 @@ export async function apiJson<T>(
 
 // ---- Admin ----
 export const adminQuizzes = {
-  list: (token: string) => apiJson<QuizSummaryDTO[]>('/admin/quizzes', { method: 'GET', token }),
+  list: (token: string, track: QuizTrack = 'general') => apiJson<QuizSummaryDTO[]>(`/admin/quizzes?track=${track}`, { method: 'GET', token }),
   get: (token: string, id: string) =>
     apiJson<QuizDTO>(`/admin/quizzes/${id}`, { method: 'GET', token }),
   generate: (
@@ -310,6 +314,7 @@ export const adminQuizzes = {
       topic: string
       source_key: Source | null
       difficulty: Difficulty
+      track?: QuizTrack
       items_count: number
       /** true — писать по программе 8 класса, если в учебнике ничего не нашлось */
       allow_without_source?: boolean
@@ -340,6 +345,7 @@ export const adminQuizzes = {
       title: string
       topic: string
       difficulty: Difficulty
+      track?: QuizTrack
       items?: Omit<QuizItemDTO, 'id'>[]
     },
   ) => apiJson<QuizDTO>('/admin/quizzes', { method: 'POST', token, body }),
@@ -710,6 +716,7 @@ export type ImportResultDTO = {
 }
 
 export type StudentPublicDTO = {
+  preparation_track: 'oge' | 'ege' | null
   id: string
   name: string
   class_label: string
@@ -811,7 +818,7 @@ export const adminStudents = {
 
 // ---- Public ----
 export const publicQuizzes = {
-  list: () => apiJson<QuizSummaryDTO[]>('/quizzes', { method: 'GET' }),
+  list: (track: QuizTrack = 'general') => apiJson<QuizSummaryDTO[]>(`/quizzes?track=${track}`),
   get: (id: string) => apiJson<QuizPublicDTO>(`/quizzes/${id}`, { method: 'GET' }),
   attempt: (id: string, body: { student_name: string; answers: Record<string, string> }) =>
     apiJson<AttemptResultDTO>(`/quizzes/${id}/attempt`, { method: 'POST', body }),

@@ -6,10 +6,10 @@ import random
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
 from app.api.deps import get_optional_student, get_quiz_service
-from app.domain.quiz.types import Quiz
+from app.domain.quiz.types import Quiz, QuizTrack
 from app.domain.student.types import Student
 from app.schemas.quiz import (
     AttemptRequest,
@@ -26,6 +26,7 @@ def _summary(quiz: Quiz, items_count: int, attempted: bool = False) -> QuizSumma
     return QuizSummaryDTO(
         id=str(quiz.id),
         title=quiz.title,
+        track=quiz.track,
         topic=quiz.topic,
         difficulty=quiz.difficulty,
         status=quiz.status,
@@ -46,6 +47,7 @@ def _public(quiz: Quiz) -> QuizPublicDTO:
     return QuizPublicDTO(
         id=str(quiz.id),
         title=quiz.title,
+        track=quiz.track,
         topic=quiz.topic,
         difficulty=quiz.difficulty,
         items=[
@@ -66,21 +68,27 @@ def _public(quiz: Quiz) -> QuizPublicDTO:
 
 @router.get("", response_model=list[QuizSummaryDTO])
 async def list_published(
+    response: Response,
     svc: Annotated[QuizService, Depends(get_quiz_service)],
     student: Annotated[Student | None, Depends(get_optional_student)] = None,
+    track: QuizTrack = "general",
 ) -> list[QuizSummaryDTO]:
-    """Все опубликованные; пройденные помечены флагом, прячет их фронт."""
+    """Опубликованные тесты выбранного раздела, с проверкой QR-профиля."""
+    response.headers["Cache-Control"] = "private, no-store"
     quizzes, done = await svc.list_published_for(student)
     counts = await svc.items_counts()
-    return [_summary(q, counts.get(q.id, 0), q.id in done) for q in quizzes]
+    return [_summary(q, counts.get(q.id, 0), q.id in done) for q in quizzes if q.track == track]
 
 
 @router.get("/{quiz_id}", response_model=QuizPublicDTO)
 async def get_published(
+    response: Response,
     quiz_id: UUID,
     svc: Annotated[QuizService, Depends(get_quiz_service)],
+    student: Annotated[Student | None, Depends(get_optional_student)] = None,
 ) -> QuizPublicDTO:
-    quiz = await svc.get(quiz_id)
+    response.headers["Cache-Control"] = "private, no-store"
+    quiz = await svc.get_published_for(quiz_id, student)
     return _public(quiz)
 
 

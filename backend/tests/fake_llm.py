@@ -27,7 +27,7 @@ class FakeLLM:
             data = dict(summary='Тестовый анализ активности готов.', findings=[dict(ref='SITE', observation='Есть сохранённая активность.', recommendation='Сравните результаты за следующую неделю.', confidence='low')], next_steps=[dict(ref='SITE', action='Добавить тренировочный тест.', check='Сравнить первые попытки.')], limitations=['Небольшая выборка.'])
         elif prompt == WEEKLY_PROMPT:
             data = dict(title='Уравнение недели', body_md='Решите уравнение $x + 1 = 3$ и объясните ход решения.', answer_md='Вычтем единицу из обеих частей: $x = 2$. Ответ: 2.')
-        elif prompt == QUIZ_PROMPT:
+        elif prompt == QUIZ_PROMPT or prompt.startswith("Ты — учитель математики 9 класса") or prompt.startswith("Ты — учитель математики 11 класса"):
             data = dict(items=[dict(kind='mcq', question_md='Чему равно $2 + 2$?', choices=[dict(id='a', text='Четыре'), dict(id='b', text='Пять')], correct_answer='a', explanation='Складываем два и два.')])
         else:
             return ChatReply('Вычти единицу из обеих частей уравнения: $x = 2$.', model_version=self.name)

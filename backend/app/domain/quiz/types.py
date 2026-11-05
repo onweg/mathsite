@@ -10,6 +10,7 @@ from typing import Literal
 from uuid import UUID
 
 Difficulty = Literal["easy", "medium", "hard"]
+QuizTrack = Literal["general", "oge", "ege"]
 QuizStatus = Literal["draft", "published"]
 ItemKind = Literal["mcq", "short"]
 
@@ -44,6 +45,7 @@ class Quiz:
     created_at: datetime | None = None
     updated_at: datetime | None = None
     items: list[QuizItem] = field(default_factory=list)
+    track: QuizTrack = "general"
 
 
 @dataclass(frozen=True)

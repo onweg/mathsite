@@ -20,6 +20,7 @@ from app.api.deps import (
 )
 from app.core.errors import NotAuthenticated, RateLimited
 from app.domain.student.types import Student
+from app.domain.quiz.access import preparation_track
 from app.infrastructure.ratelimit.base import RateLimiter
 from app.schemas.student import (
     ActivateRequest,
@@ -37,7 +38,7 @@ router = APIRouter(prefix="/students", tags=["students"])
 
 
 def _public_dto(s: Student) -> StudentPublicDTO:
-    return StudentPublicDTO(id=str(s.id), name=s.name, class_label=s.class_label)
+    return StudentPublicDTO(id=str(s.id), name=s.name, class_label=s.class_label, preparation_track=preparation_track(s.class_label))
 
 
 @router.post("/activate", response_model=StudentPublicDTO)
@@ -71,8 +72,10 @@ async def activate(
 
 @router.get("/me", response_model=StudentPublicDTO)
 async def me(
+    response: Response,
     student: Annotated[Student, Depends(get_current_student)],
 ) -> StudentPublicDTO:
+    response.headers["Cache-Control"] = "private, no-store"
     return _public_dto(student)
 
 

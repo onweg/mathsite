@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends
 from app.api.deps import get_current_admin, get_quiz_service
 from app.domain.auth.types import User
 from app.domain.quiz.generation import looks_garbled
-from app.domain.quiz.types import Choice, Quiz, QuizItem
+from app.domain.quiz.types import Choice, Quiz, QuizItem, QuizTrack
 from app.schemas.quiz import (
     AttemptSummaryDTO,
     CreateQuizRequest,
@@ -49,6 +49,7 @@ def _quiz_to_dto(quiz: Quiz) -> QuizDTO:
     return QuizDTO(
         id=str(quiz.id),
         title=quiz.title,
+        track=quiz.track,
         topic=quiz.topic,
         difficulty=quiz.difficulty,
         status=quiz.status,
@@ -61,6 +62,7 @@ def _summary(quiz: Quiz, items_count: int) -> QuizSummaryDTO:
     return QuizSummaryDTO(
         id=str(quiz.id),
         title=quiz.title,
+        track=quiz.track,
         topic=quiz.topic,
         difficulty=quiz.difficulty,
         status=quiz.status,
@@ -82,6 +84,7 @@ async def generate(
         difficulty=body.difficulty,
         items_count=body.items_count,
         created_by=user.id,
+        track=body.track,
         allow_without_source=body.allow_without_source,
         use_materials=body.use_materials,
         hint=body.hint,
@@ -154,6 +157,7 @@ async def create(
         difficulty=body.difficulty,
         items=_items_from_dto(body.items),
         created_by=user.id,
+        track=body.track,
     )
     return _quiz_to_dto(quiz)
 
@@ -162,10 +166,11 @@ async def create(
 async def list_all(
     _: Annotated[User, Depends(get_current_admin)],
     svc: Annotated[QuizService, Depends(get_quiz_service)],
+    track: QuizTrack = "general",
 ) -> list[QuizSummaryDTO]:
     quizzes = await svc.list()
     counts = await svc.items_counts()
-    return [_summary(q, counts.get(q.id, 0)) for q in quizzes]
+    return [_summary(q, counts.get(q.id, 0)) for q in quizzes if q.track == track]
 
 
 @router.get("/{quiz_id}", response_model=QuizDTO)

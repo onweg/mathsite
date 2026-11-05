@@ -5,6 +5,7 @@ import {
   AttemptResultDTO,
   QuizPublicDTO,
   QuizSummaryDTO,
+  QuizTrack,
   publicQuizzes,
 } from '../lib/api'
 import { scrollToElement } from '../hooks/useLenis'
@@ -22,7 +23,9 @@ type Screen =
   | { kind: 'run'; quiz: QuizPublicDTO }
   | { kind: 'result'; quiz: QuizPublicDTO; result: AttemptResultDTO }
 
-export function Quizzes() {
+export function Quizzes({ track = 'general' }: { track?: QuizTrack }) {
+  const practice = track !== 'general'
+  const [filter, setFilter] = useState<'all' | 'pending' | 'done'>('all')
   const [quizzes, setQuizzes] = useState<QuizSummaryDTO[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [screen, setScreen] = useState<Screen>({ kind: 'list' })
@@ -34,11 +37,13 @@ export function Quizzes() {
   const firstScreen = useRef(true)
 
   useEffect(() => {
+    let alive = true
     publicQuizzes
-      .list()
-      .then(setQuizzes)
-      .catch((e) => setError(e instanceof Error ? e.message : 'не удалось загрузить тесты'))
-  }, [])
+      .list(track)
+      .then(q => { if (alive) setQuizzes(q) })
+      .catch((e) => { if (alive) setError(e instanceof Error ? e.message : 'не удалось загрузить тесты') })
+    return () => { alive = false }
+  }, [track])
 
   // Экраны квиза сильно разной высоты: список → прохождение → результат.
   // Без этого страница после смены экрана становится короче, скролл остаётся
@@ -53,17 +58,28 @@ export function Quizzes() {
 
   // Пройденные с главной убираем, но саму секцию оставляем: ученик должен
   // видеть, что раздел есть, просто сейчас в нём пусто.
-  const pending = (quizzes ?? []).filter((q) => !q.attempted)
+  const pending = (quizzes ?? []).filter((q) => practice ? filter === 'all' || (filter === 'done' ? q.attempted : !q.attempted) : !q.attempted)
   const allDone = pending.length === 0 && (quizzes?.length ?? 0) > 0
 
   return (
     <section
-      id="quizzes"
+      id={practice ? `practice-${track}` : 'quizzes'}
+      aria-label={practice ? 'Тесты для прохождения' : 'Общие тесты'}
       ref={sectionRef}
-      className="relative scroll-mt-24 border-y border-paper-50/5 bg-ink-950 py-32 md:py-44"
+      className={practice ? "relative scroll-mt-24 rounded-3xl border border-gold-500/25 bg-ink-950/60 p-5 md:p-8" : "relative scroll-mt-24 border-y border-paper-50/5 bg-ink-950 py-32 md:py-44"}
     >
-      <div className="mx-auto max-w-[1700px] px-6 md:px-10">
-        <header className="mb-14 md:mb-20">
+      <div className={practice ? "" : "mx-auto max-w-[1700px] px-6 md:px-10"}>
+        {practice ? <header className="mb-8 space-y-4">
+          <p className="text-xs uppercase tracking-widest text-gold-500">{track === 'oge' ? '9 класс · ОГЭ' : '11 класс · ЕГЭ'}</p>
+          <h3 className="font-display text-3xl md:text-4xl">Тесты для прохождения</h3>
+          <p className="max-w-2xl text-sm text-paper-50/65">Тренировочные задания от учителя. Проходи снова, разбирай ошибки и следи за результатами в профиле.</p>
+          <a href="/me" className="inline-block text-sm text-gold-500 underline underline-offset-4">Мои результаты</a>
+          {screen.kind === 'list' && <div className="flex flex-wrap gap-2" aria-label="Фильтр тренировочных тестов">
+            {([['all', 'Все тесты'], ['pending', 'Не пройдены'], ['done', 'Пройдены']] as const).map(([value, label]) => (
+              <button key={value} onClick={() => setFilter(value)} aria-pressed={filter === value} className={`rounded-full border px-4 py-2 text-sm ${filter === value ? 'border-gold-500 bg-gold-500/10 text-paper-50' : 'border-paper-50/20 text-paper-50/60'}`}>{label}</button>
+            ))}
+          </div>}
+        </header> : <header className="mb-14 md:mb-20">
           <div className="mb-5 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/60">
             <span className="h-px w-10 bg-paper-50/40" />
             <span>Тесты · Проверь себя</span>
@@ -74,7 +90,7 @@ export function Quizzes() {
               мгновенная проверка
             </RevealText>
           </h2>
-        </header>
+        </header>}
 
         {error && (
           <div className="mb-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300/90">
@@ -94,6 +110,8 @@ export function Quizzes() {
         {quizzes && screen.kind === 'list' && (
           <QuizList
             quizzes={pending}
+            practice={practice}
+            filtered={filter !== 'all'}
             allDone={allDone}
             onOpen={async (q) => {
               // Авторизованный ученик — сразу в прохождение, intro не нужен.
@@ -123,7 +141,10 @@ export function Quizzes() {
           <QuizRunner
             quiz={screen.quiz}
             onCancel={() => setScreen({ kind: 'list' })}
-            onDone={(result) => setScreen({ kind: 'result', quiz: screen.quiz, result })}
+            onDone={(result) => {
+              if (practice) setQuizzes(prev => prev?.map(q => q.id === screen.quiz.id ? { ...q, attempted: true } : q) ?? null)
+              setScreen({ kind: 'result', quiz: screen.quiz, result })
+            }}
           />
         )}
 
@@ -143,10 +164,14 @@ export function Quizzes() {
 
 function QuizList({
   quizzes,
+  practice = false,
+  filtered = false,
   allDone,
   onOpen,
 }: {
   quizzes: QuizSummaryDTO[]
+  practice?: boolean
+  filtered?: boolean
   /** Квизы есть, но этот ученик прошёл их все. */
   allDone: boolean
   onOpen: (q: QuizSummaryDTO) => void
@@ -156,14 +181,14 @@ function QuizList({
       <Reveal>
         <div className="rounded-2xl border border-dashed border-paper-50/15 px-8 py-12 text-center">
           <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-paper-50/40">
-            {allDone ? 'всё пройдено' : 'пока пусто'}
+            {practice ? 'Тренировочные тесты' : allDone ? 'всё пройдено' : 'пока пусто'}
           </div>
           <p className="mx-auto mt-4 max-w-md text-pretty text-paper-100/70">
-            {allDone
+            {practice ? (filtered ? 'Нет тестов с выбранным статусом. Выбери «Все тесты».' : 'Учитель ещё не опубликовал тренировочные тесты. Они появятся здесь.') : allDone
               ? 'Ты прошёл все открытые тесты. Результаты и разбор ошибок — в твоём профиле, а новые появятся здесь.'
               : 'Новых тестов пока нет. Как только учитель откроет тест, он появится в этом разделе.'}
           </p>
-          {allDone && (
+          {!practice && allDone && (
             <a
               href="/me"
               className="mt-6 inline-block font-mono text-[10px] uppercase tracking-[0.22em] text-paper-50/60 transition hover:text-gold-500"
@@ -196,6 +221,7 @@ function QuizList({
                 {q.title}
               </div>
               <div className="mt-2 text-sm text-paper-100/60">{q.topic}</div>
+              {practice && <div className="mt-5 text-sm text-gold-500">{q.attempted ? 'Пройти ещё раз →' : 'Начать тест →'}</div>}
             </button>
           </li>
         ))}

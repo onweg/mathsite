@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { QuizDTO, QuizSummaryDTO, adminQuizzes } from '../../lib/api'
+import { TRACK_LABELS } from '../../lib/quizTracks'
+import { QuizTrack, QuizDTO, QuizSummaryDTO, adminQuizzes } from '../../lib/api'
 import { QuizEditor } from './QuizEditor'
 import { QuizGenerateForm } from './QuizGenerateForm'
 import { QuizManualForm } from './QuizManualForm'
@@ -10,14 +11,14 @@ type View =
   | { mode: 'manual' }
   | { mode: 'edit'; quizId: string }
 
-export function QuizzesPage({ token }: { token: string }) {
+export function QuizzesPage({ token, track = 'general' }: { token: string; track?: QuizTrack }) {
   const [view, setView] = useState<View>({ mode: 'list' })
   const [quizzes, setQuizzes] = useState<QuizSummaryDTO[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   async function reload() {
     try {
-      setQuizzes(await adminQuizzes.list(token))
+      setQuizzes(await adminQuizzes.list(token, track))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'ошибка загрузки')
     }
@@ -30,6 +31,7 @@ export function QuizzesPage({ token }: { token: string }) {
   if (view.mode === 'generate') {
     return (
       <QuizGenerateForm
+        track={track}
         token={token}
         onCancel={() => setView({ mode: 'list' })}
         onDone={(q: QuizDTO) => {
@@ -43,6 +45,7 @@ export function QuizzesPage({ token }: { token: string }) {
   if (view.mode === 'manual') {
     return (
       <QuizManualForm
+        track={track}
         token={token}
         onCancel={() => setView({ mode: 'list' })}
         onCreated={(q: QuizDTO) => {
@@ -72,8 +75,8 @@ export function QuizzesPage({ token }: { token: string }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg text-paper-50 font-serif">Тесты</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg text-paper-50 font-serif">{track === 'general' ? 'Тесты' : TRACK_LABELS[track]}</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setView({ mode: 'generate' })}
@@ -89,6 +92,8 @@ export function QuizzesPage({ token }: { token: string }) {
           </button>
         </div>
       </div>
+
+      {track !== 'general' && <p className="text-sm text-paper-50/60">Эти тесты появятся в библиотеке после публикации. Доступ — по QR ученика {track === 'oge' ? '9' : '11'} класса. Общие тесты создаются во вкладке «Тесты».</p>}
 
       {error && (
         <div className="text-sm text-red-400/90 border border-red-500/30 bg-red-500/10 rounded-lg px-3 py-2">

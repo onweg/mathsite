@@ -6,6 +6,7 @@ import {
   LibraryKind,
   publicLibrary,
 } from '../../lib/api'
+import { PreparationTests } from './PreparationTests'
 import { BackLink } from './BackLink'
 import { ItemCard } from './ItemCard'
 import { COLLECTION_FALLBACK, KIND_LABEL, accentOf, plural } from './meta'
@@ -39,6 +40,9 @@ export function CollectionView({
 
   useEffect(() => {
     let alive = true
+    setItems(null)
+    setFailed(false)
+    setFilter('all')
     publicLibrary
       .items(slug)
       .then((list) => {
@@ -110,6 +114,11 @@ export function CollectionView({
           </div>
         )}
       </header>
+
+      {(slug === 'oge' || slug === 'ege') && <div className="mb-12">
+        <PreparationTests key={slug} track={slug} />
+        <h3 className="mt-12 font-display text-2xl text-paper-50">Материалы и ссылки</h3>
+      </div>}
 
       <div>
         {items === null ? (

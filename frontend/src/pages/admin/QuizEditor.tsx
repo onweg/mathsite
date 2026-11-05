@@ -1,3 +1,4 @@
+import { TRACK_LABELS } from '../../lib/quizTracks'
 import { useEffect, useState } from 'react'
 import { QuizDTO, QuizItemDTO, adminQuizzes } from '../../lib/api'
 import { QuizAttempts } from './QuizAttempts'
@@ -132,7 +133,8 @@ export function QuizEditor({
       </button>
 
       <header className="space-y-2">
-        <div className="flex items-center gap-3 text-[11px] uppercase tracking-widest text-paper-50/50">
+        <p className="text-sm text-gold-500">{TRACK_LABELS[quiz.track]}</p>
+        <div className="flex flex-wrap items-center gap-3 text-[11px] uppercase tracking-widest text-paper-50/50">
           <span>{quiz.topic}</span>
           <span>·</span>
           <span>{quiz.difficulty}</span>
@@ -144,7 +146,7 @@ export function QuizEditor({
         <h2 className="text-2xl font-serif text-paper-50">{quiz.title}</h2>
       </header>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {isPublished ? (
           <button
             onClick={unpublish}

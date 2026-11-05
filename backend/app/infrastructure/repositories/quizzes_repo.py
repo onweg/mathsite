@@ -122,11 +122,11 @@ class PgQuizzesRepository:
         async with self._pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
-                INSERT INTO quizzes (title, topic, source_key, difficulty, status, created_by)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO quizzes (title, topic, source_key, difficulty, status, created_by, track)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING id, created_at, updated_at
                 """,
-                (quiz.title, quiz.topic, quiz.source_key, quiz.difficulty, quiz.status, created_by),
+                (quiz.title, quiz.topic, quiz.source_key, quiz.difficulty, quiz.status, created_by, quiz.track),
             )
             quiz_id, created_at, updated_at = await cur.fetchone()
 
@@ -170,6 +170,7 @@ class PgQuizzesRepository:
             source_key=quiz.source_key,
             difficulty=quiz.difficulty,
             status=quiz.status,
+            track=quiz.track,
             created_at=created_at,
             updated_at=updated_at,
             items=inserted_items,
@@ -180,7 +181,7 @@ class PgQuizzesRepository:
             if status:
                 await cur.execute(
                     """
-                    SELECT id, title, topic, source_key, difficulty, status, created_at, updated_at
+                    SELECT id, title, topic, source_key, difficulty, status, created_at, updated_at, track
                     FROM quizzes WHERE status = %s ORDER BY created_at DESC
                     """,
                     (status,),
@@ -188,7 +189,7 @@ class PgQuizzesRepository:
             else:
                 await cur.execute(
                     """
-                    SELECT id, title, topic, source_key, difficulty, status, created_at, updated_at
+                    SELECT id, title, topic, source_key, difficulty, status, created_at, updated_at, track
                     FROM quizzes ORDER BY created_at DESC
                     """
                 )
@@ -203,6 +204,7 @@ class PgQuizzesRepository:
                 status=r[5],
                 created_at=r[6],
                 updated_at=r[7],
+                track=r[8],
                 items=[],
             )
             for r in rows
@@ -229,7 +231,7 @@ class PgQuizzesRepository:
         async with self._pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
-                SELECT id, title, topic, source_key, difficulty, status, created_at, updated_at
+                SELECT id, title, topic, source_key, difficulty, status, created_at, updated_at, track
                 FROM quizzes WHERE id = %s
                 """,
                 (quiz_id,),
@@ -267,6 +269,7 @@ class PgQuizzesRepository:
             status=row[5],
             created_at=row[6],
             updated_at=row[7],
+            track=row[8],
             items=items,
         )
 

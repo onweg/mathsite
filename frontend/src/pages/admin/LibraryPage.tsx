@@ -8,6 +8,7 @@ import {
   fileUrl,
   publicLibrary,
 } from '../../lib/api'
+import { QuizzesPage } from './QuizzesPage'
 import { LibraryStats } from './LibraryStats'
 
 const POLL_MS = 3000
@@ -17,7 +18,7 @@ const KIND_LABEL: Record<LibraryKind, string> = {
   file: 'файл',
 }
 
-type View = { mode: 'list' } | { mode: 'edit'; item: LibraryItemDTO } | { mode: 'stats' }
+type View = { mode: 'list' } | { mode: 'edit'; item: LibraryItemDTO } | { mode: 'stats' } | { mode: 'tests'; track: 'oge' | 'ege' }
 
 /**
  * Наполнение разделов «Математика вокруг нас», олимпиады, ОГЭ, ЕГЭ.
@@ -85,6 +86,13 @@ export function LibraryPage({ token }: { token: string }) {
     await act(() => adminLibrary.reorder(token, collection, next.map((i) => i.id)))
   }
 
+  if (view.mode === 'tests') {
+    return <div className="space-y-6">
+      <button onClick={() => setView({ mode: 'list' })} className="text-sm text-paper-50/60 hover:text-paper-50">← к материалам раздела</button>
+      <QuizzesPage key={view.track} token={token} track={view.track} />
+    </div>
+  }
+
   if (view.mode === 'stats') {
     return (
       <LibraryStats
@@ -146,6 +154,16 @@ export function LibraryPage({ token }: { token: string }) {
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400/90">
           {error}
+        </div>
+      )}
+
+      {(collection === 'oge' || collection === 'ege') && (
+        <div className="rounded-xl border border-gold-500/30 bg-gold-500/5 p-5 space-y-3">
+          <h3 className="font-serif text-lg">Тесты для прохождения</h3>
+          <p className="text-sm text-paper-50/60">Создавайте тренировочные тесты отдельно от ссылок и материалов. Результаты и попытки сохраняются в общей статистике.</p>
+          <button onClick={() => setView({ mode: 'tests', track: collection })} className="rounded-lg bg-paper-50 text-ink-950 px-4 py-2 text-sm">
+            {collection === 'oge' ? 'Управлять тестами ОГЭ' : 'Управлять тестами ЕГЭ'}
+          </button>
         </div>
       )}
 

@@ -1,3 +1,5 @@
+import { TRACK_LABELS } from '../../lib/quizTracks'
+import { QuizTrack } from '../../lib/api'
 import { useEffect, useState } from 'react'
 import {
   ApiError,
@@ -25,16 +27,18 @@ const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard']
 
 export function QuizGenerateForm({
   token,
+  track = 'general',
   onDone,
   onCancel,
 }: {
   token: string
+  track?: QuizTrack
   onDone: (quiz: QuizDTO) => void
   onCancel: () => void
 }) {
   const [title, setTitle] = useState('')
   const [topic, setTopic] = useState('')
-  const [source, setSource] = useState<string>('textbook_8_algebra')
+  const [source, setSource] = useState<string>(track === 'general' ? 'textbook_8_algebra' : NO_MATERIALS)
   const [difficulty, setDifficulty] = useState<Difficulty>('medium')
   const [count, setCount] = useState(5)
   const [hint, setHint] = useState('')
@@ -67,6 +71,7 @@ export function QuizGenerateForm({
         topic: topic.trim(),
         source_key: sourceKey,
         difficulty,
+        track,
         items_count: count,
         allow_without_source: allowWithoutSource,
         use_materials: useMaterials,
@@ -122,6 +127,8 @@ export function QuizGenerateForm({
           отмена
         </button>
       </div>
+
+      <p className="text-sm text-gold-500">{TRACK_LABELS[track]}</p>
 
       <Field label="название">
         <input
@@ -241,7 +248,7 @@ export function QuizGenerateForm({
           <p className="text-sm text-amber-200/90">
             По теме «{topic.trim()}» в выбранном источнике ничего не нашлось.
             Можно сменить источник или формулировку — либо сгенерировать без
-            учебника, по программе 8 класса.
+            учебника, по программе {track === 'oge' ? '9' : track === 'ege' ? '11' : '8'} класса.
           </p>
           <p className="text-xs text-paper-50/40">
             Без учебника вопросы пишутся из общих знаний модели, поэтому

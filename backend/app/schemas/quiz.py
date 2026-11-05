@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 from pydantic import BaseModel, Field
+from app.domain.quiz.types import QuizTrack
 
 
 class ChoiceDTO(BaseModel):
@@ -33,6 +34,7 @@ class QuizItemPublicDTO(BaseModel):
 
 
 class QuizSummaryDTO(BaseModel):
+    track: QuizTrack = "general"
     id: str
     title: str
     topic: str
@@ -45,6 +47,7 @@ class QuizSummaryDTO(BaseModel):
 
 
 class QuizDTO(BaseModel):
+    track: QuizTrack = "general"
     id: str
     title: str
     topic: str
@@ -55,6 +58,7 @@ class QuizDTO(BaseModel):
 
 
 class QuizPublicDTO(BaseModel):
+    track: QuizTrack = "general"
     id: str
     title: str
     topic: str
@@ -71,12 +75,13 @@ SOURCE_KEY_RE = r"^(textbook_8_algebra|textbook_8_geometry|olympiad|material_[0-
 
 
 class GenerateRequest(BaseModel):
+    track: QuizTrack = "general"
     title: str = Field(min_length=1, max_length=200)
     topic: str = Field(min_length=2, max_length=200)
     source_key: str | None = Field(default=None, pattern=SOURCE_KEY_RE)
     difficulty: Literal["easy", "medium", "hard"] = "medium"
     items_count: int = Field(default=5, ge=1, le=15)
-    # true — генерировать по программе 8 класса, если в учебнике ничего не нашлось
+    # true — генерировать по программе выбранного направления, если в учебнике ничего не нашлось
     allow_without_source: bool = False
     # false — не ходить в учебник вообще, писать вопросы из знаний модели
     use_materials: bool = True
@@ -114,6 +119,8 @@ class SourcePreviewDTO(BaseModel):
 
 class CreateQuizRequest(BaseModel):
     """Квиз, собранный учителем вручную. items можно прислать сразу или потом."""
+
+    track: QuizTrack = "general"
 
     title: str = Field(min_length=1, max_length=200)
     topic: str = Field(min_length=1, max_length=200)

@@ -14,7 +14,9 @@ from app.domain.quiz.generation import (
     build_refine_prompt,
     parse_generation,
 )
+from app.domain.quiz.access import can_access_quiz
 from app.domain.quiz.types import (
+    QuizTrack,
     AttemptResult,
     Choice,
     Difficulty,
@@ -68,7 +70,7 @@ class QuizService:
             min_similarity=_RAG_MIN_SIM,
         )
 
-    async def _ask_model(self, user_prompt: str) -> list[QuizItem]:
+    async def _ask_model(self, user_prompt: str, track: QuizTrack = "general") -> list[QuizItem]:
         """Спросить модель с повтором, называя ей причину отказа.
 
         Модель ломает JSON на LaTeX'е, переписывает в условие кашу из PDF и
@@ -77,11 +79,15 @@ class QuizService:
         повторяет ту же ошибку, поэтому в следующую попытку кладём текст
         претензии и просим исправить именно её. Попытки холоднее предыдущей.
         """
+        system_prompt = _SYSTEM_PROMPT
+        if track != "general":
+            audience = "9 класса, подготовка к ОГЭ" if track == "oge" else "11 класса, подготовка к ЕГЭ"
+            system_prompt = _SYSTEM_PROMPT.replace("8 класса", audience)
         last_error: LLMBadResponse | None = None
         for attempt, temperature in enumerate((0.3, 0.15, 0.1), start=1):
             reply = await self._llm.chat(
                 messages=[
-                    Message(role="system", text=_SYSTEM_PROMPT),
+                    Message(role="system", text=system_prompt),
                     Message(role="user", text=_with_retry_note(user_prompt, last_error)),
                 ],
                 temperature=temperature,
@@ -107,6 +113,7 @@ class QuizService:
         difficulty: Difficulty,
         items_count: int,
         created_by: UUID,
+        track: QuizTrack = "general",
         allow_without_source: bool = False,
         use_materials: bool = True,
         hint: str | None = None,
@@ -135,7 +142,9 @@ class QuizService:
                 items_count=items_count,
                 source_fragments=[h.text for h in hits],
                 hint=hint,
-            )
+                track=track,
+            ),
+            track=track,
         )
 
         draft = Quiz(
@@ -145,6 +154,7 @@ class QuizService:
             source_key=source_key if hits else None,
             difficulty=difficulty,
             status="draft",
+            track=track,
             items=items,
         )
         saved = await self._quizzes.create(draft, created_by)
@@ -178,7 +188,9 @@ class QuizService:
                 items=quiz.items,
                 instruction=instruction,
                 source_fragments=[h.text for h in hits],
-            )
+                track=quiz.track,
+            ),
+            track=quiz.track,
         )
         _validate_items(items)
         await self._quizzes.replace_items(
@@ -200,6 +212,7 @@ class QuizService:
         difficulty: Difficulty,
         items: list[QuizItem],
         created_by: UUID,
+        track: QuizTrack = "general",
     ) -> Quiz:
         """Квиз, собранный учителем руками. Создаётся черновиком, как и сгенерированный."""
         _validate_items(items)
@@ -210,6 +223,7 @@ class QuizService:
             source_key=None,
             difficulty=difficulty,
             status="draft",
+            track=track,
             items=[replace(it, position=i + 1) for i, it in enumerate(items)],
         )
         saved = await self._quizzes.create(draft, created_by)
@@ -230,6 +244,7 @@ class QuizService:
         «ты всё прошёл» от «учитель ещё ничего не опубликовал».
         """
         quizzes = await self._quizzes.list(status="published")
+        quizzes = [q for q in quizzes if can_access_quiz(q, student)]
         if not student:
             return quizzes, set()
         return quizzes, await self._quizzes.attempted_ids(student.id)
@@ -242,6 +257,12 @@ class QuizService:
         quiz = await self._quizzes.get(quiz_id)
         if not quiz:
             raise NotFound(f"quiz {quiz_id} не найден")
+        return quiz
+
+    async def get_published_for(self, quiz_id: UUID, student: Student | None) -> Quiz:
+        quiz = await self.get(quiz_id)
+        if not can_access_quiz(quiz, student) or quiz.status != "published":
+            raise NotFound("тест не найден")
         return quiz
 
     async def update_meta(
@@ -309,6 +330,8 @@ class QuizService:
     ) -> tuple[AttemptResult, UUID]:
         """Если `student` передан (есть cookie) — попытка привязывается к нему, иначе анон."""
         quiz = await self.get(quiz_id)
+        if not can_access_quiz(quiz, student):
+            raise NotFound("тест не найден")
         if quiz.status != "published":
             raise Conflict("тест не опубликован")
 

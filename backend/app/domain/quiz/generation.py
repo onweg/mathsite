@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.core.errors import LLMBadResponse
 from app.domain.llm_json import extract_json
-from app.domain.quiz.types import Choice, Difficulty, ItemKind, QuizItem
+from app.domain.quiz.types import Choice, Difficulty, ItemKind, QuizItem, QuizTrack
 
 
 class GChoice(BaseModel):
@@ -95,9 +95,14 @@ _DIFFICULTY_HINT: dict[Difficulty, str] = {
 }
 
 
-def _header(*, with_source: bool) -> str:
-    return _PROMPT_HEADER.format(
-        source_rule=_SOURCE_RULE if with_source else _NO_SOURCE_RULE
+def _header(*, with_source: bool, track: QuizTrack = "general") -> str:
+    header = _PROMPT_HEADER.format(source_rule=_SOURCE_RULE if with_source else _NO_SOURCE_RULE)
+    if track == "general":
+        return header
+    grade, exam = (9, "ОГЭ") if track == "oge" else (11, "ЕГЭ")
+    return header.replace("8 класса", f"{grade} класса") + (
+        f"\nНазначение: тренировочные тесты для подготовки к {exam}. "
+        "Это тематическая тренировка, не официальный экзаменационный вариант.\n"
     )
 
 
@@ -119,6 +124,7 @@ def build_generation_prompt(
     difficulty: Difficulty,
     items_count: int,
     source_fragments: list[str],
+    track: QuizTrack = "general",
     hint: str | None = None,
 ) -> str:
     """Собрать user-промпт для LLM.
@@ -128,7 +134,7 @@ def build_generation_prompt(
     программу 8 класса, иначе модель упрётся в отсутствующий источник.
     """
     return (
-        _header(with_source=bool(source_fragments))
+        _header(with_source=bool(source_fragments), track=track)
         + f"\nТема: {topic}\n"
         + f"Сложность: {difficulty}. {_DIFFICULTY_HINT[difficulty]}\n"
         + f"Количество вопросов: {items_count}.\n"
@@ -158,6 +164,7 @@ def build_refine_prompt(
     items: list[QuizItem],
     instruction: str,
     source_fragments: list[str],
+    track: QuizTrack = "general",
 ) -> str:
     """Промпт доработки: текущий черновик + замечание учителя.
 
@@ -167,7 +174,7 @@ def build_refine_prompt(
     бы заново весь тест и вычитывал его с нуля.
     """
     return (
-        _header(with_source=bool(source_fragments))
+        _header(with_source=bool(source_fragments), track=track)
         + "\nЭто ДОРАБОТКА уже готового черновика, а не новый тест.\n"
         + "- Верни полный список вопросов целиком, в том же формате JSON.\n"
         + "- Вопросы, которых замечание не касается, перенеси без изменений, слово в слово.\n"

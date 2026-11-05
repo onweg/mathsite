@@ -16,6 +16,8 @@ class StudentDTO(BaseModel):
 class StudentPublicDTO(BaseModel):
     """Для самого ученика через /students/me — без qr_token."""
 
+    preparation_track: Literal["oge", "ege"] | None = None
+
     id: str
     name: str
     class_label: str

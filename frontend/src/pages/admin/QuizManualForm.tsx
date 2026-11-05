@@ -1,3 +1,5 @@
+import { TRACK_LABELS } from '../../lib/quizTracks'
+import { QuizTrack } from '../../lib/api'
 import { useState } from 'react'
 import { Difficulty, QuizDTO, adminQuizzes } from '../../lib/api'
 
@@ -14,10 +16,12 @@ const DIFFICULTIES: { value: Difficulty; label: string }[] = [
  */
 export function QuizManualForm({
   token,
+  track = 'general',
   onCancel,
   onCreated,
 }: {
   token: string
+  track?: QuizTrack
   onCancel: () => void
   onCreated: (quiz: QuizDTO) => void
 }) {
@@ -35,6 +39,7 @@ export function QuizManualForm({
         title: title.trim(),
         topic: topic.trim() || title.trim(),
         difficulty,
+        track,
         items: [blankItem(1)],
       })
       onCreated(quiz)
@@ -55,6 +60,8 @@ export function QuizManualForm({
         Вопросы напишешь сам, нейросеть не участвует. Тест создастся черновиком
         с одним вопросом-заготовкой — дальше добавляй и правь сколько нужно.
       </p>
+
+      <p className="text-sm text-gold-500">{TRACK_LABELS[track]}</p>
 
       <Field label="название — его видят ученики">
         <input
