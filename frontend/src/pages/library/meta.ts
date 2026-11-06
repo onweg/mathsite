@@ -41,7 +41,7 @@ export const KIND_LABEL: Record<LibraryKind, string> = {
 }
 
 export const COLLECTION_FALLBACK: Record<LibraryCollection, string> = {
-  around: 'Математика вокруг нас',
+  around: 'Математика вокруг',
   olympiad: 'Подготовка к олимпиадам',
   oge: 'Подготовка к ОГЭ',
   ege: 'Подготовка к ЕГЭ',

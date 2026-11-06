@@ -100,14 +100,6 @@ export function StudentProfile() {
           <div className="text-paper-50/60">{student.class_label || 'без класса'}</div>
         </div>
 
-        {student.preparation_track && (
-          <a href={`/library/${student.preparation_track}`} className="block rounded-2xl border border-gold-500/40 bg-gold-500/5 p-6 hover:border-gold-500">
-            <span className="block text-xs uppercase tracking-widest text-gold-500">{student.preparation_track === 'oge' ? '9 класс · ОГЭ' : '11 класс · ЕГЭ'}</span>
-            <span className="mt-2 block font-serif text-2xl">Тесты для подготовки →</span>
-            <span className="mt-2 block text-sm text-paper-50/60">Тренируйся в библиотеке. Результаты каждой попытки появятся здесь.</span>
-          </a>
-        )}
-
         <section className="rounded-2xl border border-paper-50/10 bg-ink-900/40 p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm uppercase tracking-widest text-paper-50/60">Мои тесты</h2>

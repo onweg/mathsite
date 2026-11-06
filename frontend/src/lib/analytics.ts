@@ -48,7 +48,7 @@ export function getAnalytics(token: string, filters: {
 
 export const PAGE_LABELS: Record<string, string> = {
   home: 'Главная', ai: 'ИИ-теоретик', missed: 'Пропустил урок', weekly: 'Задача недели',
-  quizzes: 'Тесты', library: 'Библиотека', around: 'Математика вокруг нас',
+  quizzes: 'Тесты', library: 'Библиотека', around: 'Математика вокруг',
   olympiad: 'Олимпиады', oge: 'ОГЭ', ege: 'ЕГЭ', feedback: 'Опросы', profile: 'Личный кабинет',
 }
 

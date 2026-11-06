@@ -824,7 +824,7 @@ export const publicQuizzes = {
     apiJson<AttemptResultDTO>(`/quizzes/${id}/attempt`, { method: 'POST', body }),
 }
 
-// ====== Библиотека: «Математика вокруг нас», олимпиады, ОГЭ, ЕГЭ ======
+// ====== Библиотека: «Математика вокруг», олимпиады, ОГЭ, ЕГЭ ======
 
 /** Набор полок фиксирован на бэкенде (domain/library/types.py). */
 export type LibraryCollection = 'around' | 'olympiad' | 'oge' | 'ege'

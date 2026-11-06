@@ -75,7 +75,7 @@ SOURCE_KEY_RE = r"^(textbook_8_algebra|textbook_8_geometry|olympiad|material_[0-
 
 
 class GenerateRequest(BaseModel):
-    track: QuizTrack = "general"
+    track: Literal["general"] = "general"
     title: str = Field(min_length=1, max_length=200)
     topic: str = Field(min_length=2, max_length=200)
     source_key: str | None = Field(default=None, pattern=SOURCE_KEY_RE)
@@ -120,7 +120,7 @@ class SourcePreviewDTO(BaseModel):
 class CreateQuizRequest(BaseModel):
     """Квиз, собранный учителем вручную. items можно прислать сразу или потом."""
 
-    track: QuizTrack = "general"
+    track: Literal["general"] = "general"
 
     title: str = Field(min_length=1, max_length=200)
     topic: str = Field(min_length=1, max_length=200)

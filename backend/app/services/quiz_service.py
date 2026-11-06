@@ -306,6 +306,8 @@ class QuizService:
 
     async def publish(self, quiz_id: UUID) -> Quiz:
         quiz = await self.get(quiz_id)
+        if quiz.track != "general":
+            raise Conflict("тренировочные тесты ОГЭ и ЕГЭ больше не доступны")
         if not quiz.items:
             raise Conflict("нельзя опубликовать тест без вопросов")
         await self._quizzes.update_meta(quiz_id, status="published")

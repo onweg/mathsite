@@ -7,7 +7,7 @@ from typing import Literal
 PAGE_NAMES = {
     'home': 'Главная', 'ai': 'ИИ-теоретик', 'missed': 'Пропустил урок',
     'weekly': 'Задача недели', 'quizzes': 'Тесты', 'library': 'Библиотека',
-    'around': 'Математика вокруг нас', 'olympiad': 'Олимпиады',
+    'around': 'Математика вокруг', 'olympiad': 'Олимпиады',
     'oge': 'ОГЭ', 'ege': 'ЕГЭ', 'feedback': 'Опросы', 'profile': 'Личный кабинет',
 }
 FIELDS = {

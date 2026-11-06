@@ -235,77 +235,30 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         failed = await self.pupil.post('/chat', json=request)
         self.assertEqual(failed.status_code, 502)
 
-    async def test_exam_quizzes_are_separate_and_enforce_qr_grade(self):
+    async def test_retired_exam_quizzes_are_unavailable_but_history_is_preserved(self):
         common = await self.quiz()
         await self.call(self.admin, 'POST', f"/admin/quizzes/{common['id']}/publish")
         weekly = await self.weekly()
-        exams, students = {}, {}
-        clients = {'general': self.pupil}
-        for track, grade in (('oge', '9А'), ('ege', '11 Б')):
-            exams[track] = await self.call(self.admin, 'POST', '/admin/quizzes', json={
-                'title': f'Подготовка {track}', 'topic': 'Уравнения', 'track': track,
-                'items': [{'position': 1, 'kind': 'short', 'question_md': 'Сколько будет 2 + 2?', 'correct_answer': '4'}]})
-            student = await self.call(self.admin, 'POST', '/admin/students', json={'name': f'Ученик {grade}', 'class_label': grade})
-            students[track] = student
-            client = self.client()
-            clients[track] = client
-            activated = await self.call(client, 'POST', '/students/activate', json={'token': student['qr_token']})
-            self.assertEqual(activated['preparation_track'], track)
-            quiz = exams[track]
-            await self.call(client, 'GET', f"/quizzes/{quiz['id']}", status=404)
-            await self.call(self.admin, 'POST', f"/admin/quizzes/{quiz['id']}/publish")
-        for name, client in [('guest', self.guest), *clients.items()]:
-            self.assertEqual([q['id'] for q in await self.call(client, 'GET', '/quizzes')], [common['id']])
-            self.assertIn(weekly['id'], [q['id'] for q in await self.call(client, 'GET', '/weekly')])
-            await self.call(client, 'POST', f"/quizzes/{common['id']}/attempt", json={'answers': {common['items'][0]['id']: 'a'}})
-            for track, quiz in exams.items():
-                listed = await self.call(client, 'GET', f'/quizzes?track={track}')
-                url = f"/quizzes/{quiz['id']}"
-                if name != track:
-                    self.assertEqual(listed, [])
-                    await self.call(client, 'GET', url, status=404)
-                    await self.call(client, 'POST', url + '/attempt', status=404, json={'student_name': students[track]['name'], 'answers': {quiz['items'][0]['id']: '4'}})
-                    continue
-                self.assertEqual([q['id'] for q in listed], [quiz['id']])
-                public = await self.call(client, 'GET', url)
-                self.assertEqual(public['track'], track)
-                self.assertNotIn('correct_answer', public['items'][0])
-                self.assertIn('no-store', (await client.get(url)).headers['cache-control'])
-                for _ in range(2):
-                    result = await self.call(client, 'POST', url + '/attempt', json={'answers': {quiz['items'][0]['id']: '4'}})
-                    self.assertEqual(result['score'], 1)
-                self.assertTrue((await self.call(client, 'GET', f'/quizzes?track={track}'))[0]['attempted'])
-                history = await self.call(client, 'GET', '/students/me/attempts')
-                self.assertEqual(sum(a['quiz_id'] == quiz['id'] for a in history), 2)
-                summary = await self.call(self.admin, 'GET', f"/admin/quizzes/{quiz['id']}/attempts/summary")
-                self.assertEqual(summary['students'][0]['attempts_count'], 2)
-                report = await self.call(self.admin, 'GET', '/admin/analytics')
-                self.assertTrue(any(row['quiz_id'] == quiz['id'] and row['attempts'] == 2 for row in report['quizzes']))
-        self.assertEqual([q['id'] for q in await self.call(self.admin, 'GET', '/admin/quizzes')], [common['id']])
-        for track in exams:
-            self.assertEqual([q['id'] for q in await self.call(self.admin, 'GET', f'/admin/quizzes?track={track}')], [exams[track]['id']])
-        await self.call(self.admin, 'PATCH', f"/admin/students/{students['oge']['id']}", json={'class_label': '8А'})
-        self.assertEqual(await self.call(clients['oge'], 'GET', '/quizzes?track=oge'), [])
-        await self.call(clients['oge'], 'GET', f"/quizzes/{exams['oge']['id']}", status=404)
-        await self.call(self.admin, 'POST', f"/admin/students/{students['ege']['id']}/regenerate")
-        self.assertEqual(await self.call(clients['ege'], 'GET', '/quizzes?track=ege'), [])
-        await self.call(clients['ege'], 'POST', f"/quizzes/{exams['ege']['id']}/attempt", status=404, json={'answers': {exams['ege']['items'][0]['id']: '4'}})
-        await self.call(self.admin, 'POST', '/admin/quizzes', status=422, json={'title': 'Нет', 'topic': 'Тема', 'track': 'all'})
-
-    async def test_exam_generation_refinement_and_unpublication(self):
-        for track, grade in (('oge', 9), ('ege', 11)):
-            quiz = await self.call(self.admin, 'POST', '/admin/quizzes/generate', json={
-                'title': f'Тренировка {grade}', 'topic': 'Уравнения', 'track': track, 'use_materials': False})
-            self.assertEqual(quiz['track'], track)
-            self.assertIn(f'{grade} класса', self.llm.calls[-1][0].text)
-            self.assertNotIn('8 класса', self.llm.calls[-1][-1].text)
-            refined = await self.call(self.admin, 'POST', f"/admin/quizzes/{quiz['id']}/refine", json={'instruction': 'Сделай проще'})
-            self.assertEqual(refined['track'], track)
-            self.assertIn(f'{grade} класса', self.llm.calls[-1][0].text)
-            await self.call(self.admin, 'PATCH', f"/admin/students/{self.student['id']}", json={'class_label': str(grade)})
-            await self.call(self.admin, 'POST', f"/admin/quizzes/{quiz['id']}/publish")
-            await self.call(self.pupil, 'GET', f"/quizzes/{quiz['id']}")
-            await self.call(self.admin, 'POST', f"/admin/quizzes/{quiz['id']}/unpublish")
-            self.assertEqual(await self.call(self.pupil, 'GET', f'/quizzes?track={track}'), [])
-            await self.call(self.pupil, 'GET', f"/quizzes/{quiz['id']}", status=404)
-            await self.call(self.pupil, 'POST', f"/quizzes/{quiz['id']}/attempt", status=409, json={'answers': {refined['items'][0]['id']: 'a'}})
+        for track, grade in (('oge', '9А'), ('ege', '11А')):
+            old = await self.quiz()
+            await self.call(self.admin, 'POST', f"/admin/quizzes/{old['id']}/publish")
+            await self.call(self.pupil, 'POST', f"/quizzes/{old['id']}/attempt", json={'answers': {old['items'][0]['id']: 'a'}})
+            # Simulate a quiz and attempt created before exam practice was retired.
+            async with self.app.state.pool.connection() as conn:
+                await conn.execute('UPDATE quizzes SET track = %s WHERE id = %s', (track, old['id']))
+            await self.call(self.admin, 'PATCH', f"/admin/students/{self.student['id']}", json={'class_label': grade})
+            self.assertIsNone((await self.call(self.pupil, 'GET', '/students/me'))['preparation_track'])
+            for client in (self.guest, self.pupil):
+                self.assertEqual([q['id'] for q in await self.call(client, 'GET', '/quizzes')], [common['id']])
+                self.assertEqual(await self.call(client, 'GET', f'/quizzes?track={track}'), [])
+                await self.call(client, 'GET', f"/quizzes/{old['id']}", status=404)
+                await self.call(client, 'POST', f"/quizzes/{old['id']}/attempt", status=404, json={'answers': {old['items'][0]['id']: 'a'}})
+                self.assertIn(weekly['id'], [t['id'] for t in await self.call(client, 'GET', '/weekly')])
+                await self.call(client, 'POST', f"/quizzes/{common['id']}/attempt", json={'answers': {common['items'][0]['id']: 'a'}})
+            for endpoint in ('/admin/quizzes', '/admin/quizzes/generate'):
+                await self.call(self.admin, 'POST', endpoint, status=422, json={'title': 'Подготовка', 'topic': 'Алгебра', 'track': track})
+            await self.call(self.admin, 'POST', f"/admin/quizzes/{old['id']}/publish", status=409)
+            history = await self.call(self.pupil, 'GET', '/students/me/attempts')
+            self.assertTrue(any(a['quiz_id'] == old['id'] for a in history))
+            report = await self.call(self.admin, 'GET', '/admin/analytics')
+            self.assertTrue(any(r['quiz_id'] == old['id'] and r['attempts'] == 1 for r in report['quizzes']))
