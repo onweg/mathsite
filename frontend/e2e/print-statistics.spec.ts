@@ -1,0 +1,78 @@
+import { execFileSync } from 'node:child_process'
+import path from 'node:path'
+import { randomUUID } from 'node:crypto'
+import { test, expect, login, createQuiz, API } from './fixtures'
+
+test('print full statistics, all rows, class and pupil filters, and a multipage PDF', async ({ page, pupil, teacherApi }, testInfo) => {
+  test.setTimeout(90_000)
+  for (let i = 1; i <= 26; i++) {
+    expect((await teacherApi.post('/admin/students', { data: { name: `Ученик ${String(i).padStart(2, '0')}`, class_label: '8А' } })).ok()).toBeTruthy()
+  }
+  const specialName = '<img src=x onerror=alert(1)>'
+  const other = await (await teacherApi.post('/admin/students', { data: { name: specialName, class_label: '9А' } })).json()
+  const quiz = await createQuiz(teacherApi)
+  for (const answer of ['a', 'b']) expect((await pupil.request.post(`${API}/quizzes/${quiz.id}/attempt`, { data: { answers: { [quiz.items[0].id]: answer } } })).ok()).toBeTruthy()
+  expect((await pupil.request.post(`${API}/analytics/pulse`, { data: { id: randomUUID(), visit_id: randomUUID(), page: 'weekly', active_seconds: 10 } })).ok()).toBeTruthy()
+  const task = await (await teacherApi.post('/admin/weekly', { data: { title: 'Задача для отчёта', body_md: 'Решите', answer_md: 'Ответ' } })).json()
+  expect((await teacherApi.post(`/admin/weekly/${task.id}/publish`)).ok()).toBeTruthy()
+  expect((await pupil.request.post(`${API}/weekly/${task.id}/submissions`, { multipart: { solution_md: 'Подробное решение для печати.' } })).ok()).toBeTruthy()
+  await login(page)
+  await page.getByRole('button', { name: 'Статистика', exact: true }).click()
+  const button = page.getByRole('button', { name: 'Печать всей статистики', exact: true })
+  await expect(button).toBeEnabled()
+  const end = await page.getByLabel('Конец периода').inputValue()
+  await page.getByRole('tab', { name: 'Ученики', exact: true }).click()
+  await page.getByLabel('Поиск в статистике').fill('Иван')
+  // Printing the whole report must not inherit search or the 25-row pagination.
+  const popupPromise = page.waitForEvent('popup')
+  await button.click()
+  const popup = await popupPromise
+  await expect(popup.getByRole('heading', { name: 'Статистика сайта · Mathematica' })).toBeVisible()
+  const visits = popup.locator('section').filter({ has: popup.getByRole('heading', { name: /^Посещения учеников/ }) })
+  await expect(visits.locator('tbody tr')).toHaveCount(28)
+  await expect(visits.getByText('Ученик 26', { exact: true })).toBeVisible()
+  await expect(visits.getByText(specialName, { exact: true })).toBeVisible()
+  await expect(popup.locator('img, script')).toHaveCount(0)
+  const quizzes = popup.locator('section').filter({ has: popup.getByRole('heading', { name: /^Тесты и попытки/ }) })
+  await expect(quizzes.locator('tbody tr').first().locator('td').nth(2)).toHaveText('2')
+  await expect(popup.getByText('Подробное решение для печати.', { exact: true })).toBeVisible()
+  for (const title of ['Разделы и материалы', 'Опросы', 'Посещения разделов сайта', 'Активность по дням']) await expect(popup.getByRole('heading', { name: new RegExp(`^${title}`) })).toBeVisible()
+  const html = await popup.content()
+  expect(html).not.toContain(other.qr_token)
+  expect(html).not.toContain(await page.evaluate(() => localStorage.getItem('mathsite.admin.token')))
+  await popup.emulateMedia({ media: 'print' })
+  await expect(popup.locator('.toolbar')).toBeHidden()
+  await expect(popup.locator('body')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  const pdf = await popup.pdf({ path: testInfo.outputPath('statistics.pdf'), preferCSSPageSize: true })
+  const extracted = JSON.parse(execFileSync(process.env.TEST_PYTHON || path.resolve('../backend/.venv/bin/python'), ['-c', 'import io,json,sys; from pypdf import PdfReader; r=PdfReader(io.BytesIO(sys.stdin.buffer.read())); print(json.dumps({"pages":len(r.pages),"text":"\\n".join(p.extract_text() or "" for p in r.pages)}))'], { input: pdf, encoding: 'utf8' }))
+  expect(extracted.pages).toBeGreaterThan(1)
+  expect(extracted.text).toContain('Ученик 26')
+  expect(extracted.text).toContain('Подробное решение для печати.')
+  expect(extracted.text).not.toContain('Печать / сохранить PDF')
+  await popup.close()
+
+  await page.getByLabel('Класс', { exact: true }).selectOption('8А')
+  await expect(button).toBeEnabled()
+  const classPromise = page.waitForEvent('popup')
+  await button.click()
+  const classReport = await classPromise
+  await expect(classReport.locator('section').filter({ has: classReport.getByRole('heading', { name: /^Посещения учеников/ }) }).locator('tbody tr')).toHaveCount(27)
+  await expect(classReport.getByText(specialName, { exact: true })).toHaveCount(0)
+  await classReport.close()
+  await page.getByRole('button', { name: 'Иван Браузерный', exact: true }).click()
+  await expect(button).toBeEnabled()
+  const pupilPromise = page.waitForEvent('popup')
+  await button.click()
+  const pupilReport = await pupilPromise
+  await expect(pupilReport.locator('section').filter({ has: pupilReport.getByRole('heading', { name: /^Посещения учеников/ }) }).locator('tbody tr')).toHaveCount(1)
+  await expect(pupilReport.locator('header')).toContainText('Иван Браузерный')
+  await pupilReport.close()
+
+  await page.getByLabel('Конец периода').fill('2099-01-01')
+  await expect(button).toBeDisabled()
+  await page.getByLabel('Конец периода').fill(end)
+  await expect(button).toBeEnabled()
+  await page.evaluate(() => { window.open = () => null })
+  await button.click()
+  await expect(page.getByRole('alert')).toContainText('Браузер заблокировал окно печати')
+})

@@ -5,6 +5,7 @@ import { AnalyticsReport, getAnalytics, PAGE_LABELS } from '../../lib/analytics'
 import { Overview } from './analytics/Overview'
 import { AIInsights } from './analytics/AIInsights'
 import { dateTime, duration, percent, ReportTable } from './analytics/ReportTable'
+import { printAnalytics } from './analytics/PrintReport'
 
 type Screen = 'overview' | 'students' | 'quizzes' | 'weekly' | 'content' | 'polls' | 'insights'
 const SCREENS: [Screen, string][] = [
@@ -37,12 +38,16 @@ export default function StatisticsPage({ token }: { token: string }) {
   const [classes, setClasses] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [printError, setPrintError] = useState<string | null>(null)
+  const [loadedKey, setLoadedKey] = useState('')
+  const requestKey = JSON.stringify([start, end, classLabel, student?.id, revision])
   const invalid = !end || (start && start > end) || end > today()
 
   useEffect(() => {
     let cancelled = false
     setData(null)
     setError(null)
+    setPrintError(null)
     if (invalid) { setLoading(false); return }
     setLoading(true)
     const timer = window.setTimeout(() => {
@@ -50,13 +55,13 @@ export default function StatisticsPage({ token }: { token: string }) {
         start: start || undefined, end, class_label: classLabel === '__all__' ? undefined : classLabel,
         student_id: student?.id,
       }).then((report) => {
-        if (!cancelled) { setData(report); setClasses(report.classes) }
+        if (!cancelled) { setData(report); setClasses(report.classes); setLoadedKey(requestKey) }
       }).catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Не удалось загрузить статистику')
       }).finally(() => { if (!cancelled) setLoading(false) })
     }, 200)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [token, start, end, classLabel, student?.id, revision, invalid])
+  }, [token, start, end, classLabel, student?.id, revision, invalid, requestKey])
 
   function chooseStudent(id: string, name: string) {
     setStudent({ id, name }); setSearch(''); setScreen('overview')
@@ -78,8 +83,16 @@ export default function StatisticsPage({ token }: { token: string }) {
   return <div className="space-y-6">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div><h2 className="font-serif text-3xl">Статистика</h2><p className="mt-2 text-sm text-paper-50/45">Посещения, учебные результаты и интерес к материалам.</p></div>
-      <button className={`${CONTROL} disabled:opacity-40`} disabled={loading || !!invalid} onClick={() => setRevision((v) => v + 1)}>Обновить</button>
+      <div className="flex flex-wrap gap-2">
+        <button className={`${CONTROL} disabled:opacity-40`} disabled={!data || loading || !!invalid || loadedKey !== requestKey} onClick={() => {
+          if (!data || loadedKey !== requestKey) return
+          setPrintError(printAnalytics(data, { start, end, classLabel, studentName: student?.name }) ? null : 'Браузер заблокировал окно печати. Разреши всплывающие окна для сайта и нажми ещё раз.')
+        }}>Печать всей статистики</button>
+        <button className={`${CONTROL} disabled:opacity-40`} disabled={loading || !!invalid} onClick={() => setRevision((v) => v + 1)}>Обновить</button>
+      </div>
     </div>
+    <p className="text-xs text-paper-50/45">Печать включает все разделы за выбранный период, класс и ученика. Поиск внутри вкладки не ограничивает отчёт. В окне печати можно сохранить PDF.</p>
+    {printError && <p role="alert" className="text-sm text-red-300">{printError}</p>}
 
     <div className="space-y-4 rounded-xl border border-paper-50/10 bg-ink-900/20 p-4">
       <div className="flex flex-wrap gap-2">
@@ -91,7 +104,7 @@ export default function StatisticsPage({ token }: { token: string }) {
       <div className="flex flex-wrap items-end gap-3">
         <label className="space-y-1 text-xs text-paper-50/45"><span className="block">С даты</span><input aria-label="Начало периода" type="date" max={end || today()} value={start} onChange={(e) => setStart(e.target.value)} className={CONTROL} style={{ colorScheme: 'dark' }} /></label>
         <label className="space-y-1 text-xs text-paper-50/45"><span className="block">По дату включительно</span><input aria-label="Конец периода" type="date" max={today()} value={end} onChange={(e) => setEnd(e.target.value)} className={CONTROL} style={{ colorScheme: 'dark' }} /></label>
-        <label className="space-y-1 text-xs text-paper-50/45"><span className="block">Класс</span><select className={CONTROL} value={classLabel} onChange={(e) => { setClassLabel(e.target.value); setStudent(null) }}>
+        <label className="space-y-1 text-xs text-paper-50/45"><span className="block">Класс</span><select aria-label="Класс" className={CONTROL} value={classLabel} onChange={(e) => { setClassLabel(e.target.value); setStudent(null) }}>
           <option value="__all__">Все классы и гости</option>
           {classes.map((c) => <option key={c} value={c}>{c || 'Без класса'}</option>)}
         </select></label>
