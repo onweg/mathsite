@@ -128,6 +128,30 @@ class SolutionWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(checked['ai_result']['score'], 7)
         self.assertNotIn('teacher_id', json.dumps(checked))
 
+    async def test_delete_requires_teacher_and_title_and_discards_late_ai_result(self):
+        task = await self.task()
+        tid = task['id']
+        attempt = await self.call(self.pupil, 'POST', f'/solution-checks/{tid}/attempt', status=202, json=self.answer(task))
+        job = await self.svc.repo.claim()
+        url = f'/admin/solution-checks/{tid}'
+        await self.call(self.pupil, 'DELETE', url, status=401, json={'confirm_title': task['title']})
+        await self.call(self.admin, 'DELETE', url, status=422)
+        await self.call(self.admin, 'DELETE', url, status=409, json={'confirm_title': 'Другое задание'})
+        self.assertEqual(len(await self.call(self.pupil, 'GET', '/solution-checks/me')), 1)
+        await self.call(self.admin, 'DELETE', url, json={'confirm_title': task['title']})
+        await self.svc.repo.complete(job, {'score': 7}, 'fixture', {})
+        await self.svc.repo.fail(job)
+        self.assertEqual(await self.call(self.admin, 'GET', '/admin/solution-checks'), [])
+        self.assertEqual(await self.call(self.pupil, 'GET', '/solution-checks/me'), [])
+        await self.call(self.pupil, 'GET', f'/solution-checks/{tid}', status=404)
+        await self.call(self.pupil, 'GET', f"/solution-checks/me/{attempt['id']}", status=404)
+        await self.call(self.admin, 'DELETE', url, status=404, json={'confirm_title': task['title']})
+        # Drafts can also be deleted; student accounts are unaffected.
+        draft = await self.task(False)
+        await self.call(self.admin, 'DELETE', f"/admin/solution-checks/{draft['id']}", json={'confirm_title': draft['title']})
+        students = await self.call(self.admin, 'GET', '/admin/students')
+        self.assertIn(self.student['id'], [s['id'] for s in students])
+
     async def test_failures_retry_and_server_owned_choice_score(self):
         task = await self.task()
         attempt = await self.call(self.pupil, 'POST', f"/solution-checks/{task['id']}/attempt", status=202, json=self.answer(task, False))

@@ -2,7 +2,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.api.deps import get_current_admin, get_current_student, get_optional_student
 from app.core.errors import NotFound, RateLimited
@@ -54,6 +54,16 @@ async def update(task_id: UUID, body: Exercise, user: Teacher, svc: Svc):
 
 class ApprovePublication(BaseModel):
     reviewed: Literal[True]
+
+
+class DeleteExercise(BaseModel):
+    confirm_title: str = Field(min_length=3, max_length=200)
+
+
+@admin.delete('/{task_id}')
+async def delete(task_id: UUID, body: DeleteExercise, svc: Svc):
+    await svc.repo.delete_task(task_id, body.confirm_title)
+    return {'ok': True}
 
 
 @admin.post('/{task_id}/publish')

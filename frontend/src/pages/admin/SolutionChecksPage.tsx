@@ -48,6 +48,8 @@ function SolutionEditor({ task, token, onSaved, onBack }: { task: SolutionTask |
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [preview, setPreview] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteTitle, setDeleteTitle] = useState('')
   const published = task?.status === 'published'
   function update(patch: Partial<ExerciseInput>) { setDraft(prev => ({ ...prev, ...patch })); setDirty(true); setReviewed(false) }
   async function action(fn: () => Promise<SolutionTask>) { setBusy(true); setError(''); try { onSaved(await fn()) } catch (e) { setError((e as Error).message) } finally { setBusy(false) } }
@@ -56,6 +58,22 @@ function SolutionEditor({ task, token, onSaved, onBack }: { task: SolutionTask |
     <h2 className="font-serif text-2xl">{task ? task.title : 'Новое задание «Проверь решение»'}</h2>
     <p className="text-sm text-paper-50/65">Перед публикацией проверьте математику: нейросеть может ошибиться. В текстах четырёх решений не должно быть подсказок. Эталонные пояснения скрыты до сдачи ответа.</p>
     {error && <p role="alert" className="text-red-300">{error}</p>}
+    {task && <div className="rounded-xl border border-paper-50/20 p-4 space-y-4" aria-label="Управление заданием">
+      <p className="text-sm text-gold-500">{published ? 'Опубликовано — доступно ученикам' : 'Черновик — скрыто от учеников'}</p>
+    {task && (published ? <button className={btn} disabled={busy} onClick={() => action(() => api.unpublish(token, task.id))}>Снять с публикации</button> : <div className="space-y-3"><label className="flex gap-3 items-start text-sm"><input type="checkbox" checked={reviewed} disabled={dirty || busy} onChange={e => setReviewed(e.target.checked)} />Я проверил(а): одно решение правильное, три неверных, эталонные пояснения корректны.</label><button className={btn} disabled={!reviewed || dirty || busy} onClick={() => action(() => api.publish(token, task.id))}>Опубликовать задание</button>{dirty && <p className="text-xs text-paper-50/50">Сначала сохраните изменения.</p>}</div>)}
+    {published && <p className="text-sm text-paper-50/60">Для правки верните задание в черновик. Сданные ответы сохранят свою версию задания; новая публикация не сбрасывает попытки.</p>}
+      <button className={`${btn} text-red-300`} disabled={busy} onClick={() => { setDeleting(!deleting); setDeleteTitle('') }}>Удалить задание</button>
+    </div>}
+    {task && deleting && <form className="rounded-xl border border-red-400/40 p-4 space-y-3" onSubmit={async e => {
+      e.preventDefault(); if (busy || deleteTitle !== task.title) return
+      setBusy(true); setError('')
+      try { await api.delete(token, task.id, deleteTitle); onBack() } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+    }}>
+      <h3 className="font-serif text-xl">Удалить задание безвозвратно?</h3>
+      <p className="text-sm">Задание «{task.title}», все ответы учеников, оценки и история проверок будут удалены. Для временного скрытия используйте снятие с публикации.</p>
+      <label className="block">Для удаления введите название задания<input className={field} value={deleteTitle} onChange={e => setDeleteTitle(e.target.value)} autoComplete="off" maxLength={200} required /></label>
+      <div className="flex flex-wrap gap-3"><button className={`${btn} text-red-300`} disabled={busy || deleteTitle !== task.title}>Удалить безвозвратно</button><button type="button" className={btn} disabled={busy} onClick={() => setDeleting(false)}>Отмена</button></div>
+    </form>}
     <form onSubmit={e => { e.preventDefault(); void action(() => api.save(token, draft, task?.id)) }} className="space-y-5">
       <fieldset disabled={published || busy} className="space-y-4">
         <label className="block">Название<input className={field} value={draft.title} onChange={e => update({ title: e.target.value })} minLength={3} maxLength={200} required /></label>
@@ -71,8 +89,6 @@ function SolutionEditor({ task, token, onSaved, onBack }: { task: SolutionTask |
     </form>
     <button className={btn} onClick={() => setPreview(!preview)} aria-expanded={preview}>{preview ? 'Скрыть предпросмотр' : 'Предпросмотр задания'}</button>
     {preview && <div className="rounded-xl border border-paper-50/15 p-5 space-y-5"><Markdown text={draft.question_md} />{draft.solutions.map((s, i) => <div key={s.id}><p className="text-xs text-paper-50/60">Решение {i + 1}</p><Markdown text={s.body_md} /></div>)}</div>}
-    {task && (published ? <button className={btn} disabled={busy} onClick={() => action(() => api.unpublish(token, task.id))}>Снять с публикации</button> : <div className="space-y-3"><label className="flex gap-3 items-start text-sm"><input type="checkbox" checked={reviewed} disabled={dirty || busy} onChange={e => setReviewed(e.target.checked)} />Я проверил(а): одно решение правильное, три неверных, эталонные пояснения корректны.</label><button className={btn} disabled={!reviewed || dirty || busy} onClick={() => action(() => api.publish(token, task.id))}>Опубликовать задание</button>{dirty && <p className="text-xs text-paper-50/50">Сначала сохраните изменения.</p>}</div>)}
-    {published && <p className="text-sm text-paper-50/60">Для правки верните задание в черновик. Сданные ответы сохранят свою версию задания; новая публикация не сбрасывает попытки.</p>}
     {task && <TeacherAttempts token={token} taskId={task.id} />}
   </div>
 }
