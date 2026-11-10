@@ -201,6 +201,7 @@ export type QuizItemDTO = {
 }
 
 export type QuizDTO = {
+  is_completed: boolean
   track: QuizTrack
   id: string
   title: string
@@ -212,6 +213,7 @@ export type QuizDTO = {
 }
 
 export type QuizSummaryDTO = {
+  is_completed: boolean
   track: QuizTrack
   id: string
   title: string
@@ -245,7 +247,7 @@ export type AttemptResultDTO = {
   attempt_id: string
   score: number
   total: number
-  per_item: { item_id: string; correct: boolean; expected: string; got: string }[]
+  per_item: { item_id: string; correct: boolean; got: string }[]
 }
 
 export type AttemptSummaryDTO = {
@@ -379,6 +381,8 @@ export const adminQuizzes = {
     }),
   publish: (token: string, id: string) =>
     apiJson<QuizDTO>(`/admin/quizzes/${id}/publish`, { method: 'POST', token }),
+  finish: (token: string, id: string) =>
+    apiJson<QuizDTO>(`/admin/quizzes/${id}/finish`, { method: 'POST', token }),
   unpublish: (token: string, id: string) =>
     apiJson<QuizDTO>(`/admin/quizzes/${id}/unpublish`, { method: 'POST', token }),
   delete: (token: string, id: string) =>
@@ -722,7 +726,17 @@ export type StudentPublicDTO = {
   class_label: string
 }
 
+export type AttemptReviewDTO = {
+  attempt_id: string
+  quiz_title: string
+  score: number
+  total: number
+  legacy: boolean
+  items: { item_id: string; position: number; question_md: string; got: string; expected: string; correct: boolean; explanation: string | null }[]
+}
+
 export type StudentAttemptDTO = {
+  answers_available: boolean
   id: string
   quiz_id: string
   quiz_title: string
@@ -763,6 +777,8 @@ export const studentAuth = {
       () => null,
     ),
   logout: () => apiJson<void>('/students/logout', { method: 'POST' }).then(resetAnalyticsIdentity),
+  attemptReview: (id: string) =>
+    apiJson<AttemptReviewDTO>(`/students/me/attempts/${id}/review`, { method: 'GET' }),
   myAttempts: () =>
     apiJson<StudentAttemptDTO[]>('/students/me/attempts', { method: 'GET' }),
   myWeekly: () =>
@@ -820,7 +836,7 @@ export const adminStudents = {
 export const publicQuizzes = {
   list: (track: QuizTrack = 'general') => apiJson<QuizSummaryDTO[]>(`/quizzes?track=${track}`),
   get: (id: string) => apiJson<QuizPublicDTO>(`/quizzes/${id}`, { method: 'GET' }),
-  attempt: (id: string, body: { student_name: string; answers: Record<string, string> }) =>
+  attempt: (id: string, body: { student_name?: string; answers: Record<string, string> }) =>
     apiJson<AttemptResultDTO>(`/quizzes/${id}/attempt`, { method: 'POST', body }),
 }
 

@@ -74,31 +74,182 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         await self.call(self.pupil, 'POST', '/students/logout', status=204)
         await self.call(self.pupil, 'GET', '/students/me', status=401)
 
-    async def test_quiz_publication_grading_retries_and_statistics(self):
+    async def quiz_answers(self, client, quiz, correct=True):
+        public = await self.call(client, 'GET', f"/quizzes/{quiz['id']}")
+        item = public['items'][0]
+        option = next(c for c in item['choices'] if c['text'] == ('Четыре' if correct else 'Пять'))
+        return {item['id']: option['id']}
+
+    async def test_quiz_publication_single_attempt_and_private_answers(self):
         quiz = await self.quiz()
         qid, iid = quiz['id'], quiz['items'][0]['id']
-        self.assertEqual(await self.call(self.guest, 'GET', '/quizzes'), [])
-        await self.call(self.pupil, 'POST', f'/quizzes/{qid}/attempt', status=409, json={'answers': {iid: 'a'}})
+        await self.call(self.guest, 'GET', f'/quizzes/{qid}', status=401)
+        await self.call(self.guest, 'POST', f'/quizzes/{qid}/attempt', status=401, json={'answers': {iid: 'a'}})
+        await self.call(self.pupil, 'GET', f'/quizzes/{qid}', status=404)
         await self.call(self.admin, 'POST', f'/admin/quizzes/{qid}/publish')
         public = await self.call(self.pupil, 'GET', f'/quizzes/{qid}')
         self.assertNotIn('correct_answer', public['items'][0])
         self.assertNotIn('PRIVATE-EXPLANATION', json.dumps(public))
-        for answer, expected in (('b', 0), ('a', 1)):
-            result = await self.call(self.pupil, 'POST', f'/quizzes/{qid}/attempt', json={'student_name': 'Подмена имени', 'answers': {iid: answer}})
-            self.assertEqual(result['score'], expected)
-            self.assertEqual(result['total'], 1)
-        await self.call(self.guest, 'POST', f'/quizzes/{qid}/attempt', json={'answers': {iid: 'a'}})
-        summary = await self.call(self.admin, 'GET', f'/admin/quizzes/{qid}/attempts/summary')
-        self.assertEqual(summary['total_attempts'], 3)
-        self.assertEqual(summary['anonymous_attempts'], 1)
-        self.assertEqual(summary['students'][0]['attempts_count'], 2)
-        self.assertEqual(summary['students'][0]['student_name'], self.student['name'])
-        self.assertEqual(len(await self.call(self.pupil, 'GET', '/students/me/attempts')), 2)
-        self.assertTrue((await self.call(self.pupil, 'GET', '/quizzes'))[0]['attempted'])
-        await self.call(self.admin, 'POST', f'/admin/quizzes/{qid}/unpublish')
+        self.assertTrue(all(len(c['id']) == 32 for c in public['items'][0]['choices']))
         await self.call(self.pupil, 'POST', f'/quizzes/{qid}/attempt', status=409, json={'answers': {iid: 'a'}})
-        await self.call(self.admin, 'DELETE', f'/admin/quizzes/{qid}', status=204)
-        self.assertEqual(await self.call(self.pupil, 'GET', '/students/me/attempts'), [])
+        await self.call(self.pupil, 'POST', f'/quizzes/{qid}/attempt', status=409, json={'answers': {str(uuid4()): 'forged'}})
+        answers = await self.quiz_answers(self.pupil, quiz, correct=False)
+        result = await self.call(self.pupil, 'POST', f'/quizzes/{qid}/attempt', json={'student_name': 'Подмена имени', 'student_id': str(uuid4()), 'answers': answers})
+        self.assertEqual(result['score'], 0)
+        self.assertEqual(result['per_item'][0]['got'], 'Пять')
+        self.assertNotIn('expected', json.dumps(result))
+        self.assertNotIn('Четыре', json.dumps(result, ensure_ascii=False))
+        for _ in range(2):
+            await self.call(self.pupil, 'POST', f'/quizzes/{qid}/attempt', status=409, json={'answers': answers})
+        await self.call(self.pupil, 'GET', f'/quizzes/{qid}', status=409)
+        summary = await self.call(self.admin, 'GET', f'/admin/quizzes/{qid}/attempts/summary')
+        self.assertEqual(summary['total_attempts'], 1)
+        self.assertEqual(summary['anonymous_attempts'], 0)
+        self.assertEqual(summary['students'][0]['student_name'], self.student['name'])
+        await self.call(self.admin, 'POST', f'/admin/quizzes/{qid}/unpublish')
+        self.assertEqual(await self.call(self.pupil, 'GET', '/quizzes'), [])
+        await self.call(self.admin, 'POST', f'/admin/quizzes/{qid}/publish')
+        await self.call(self.pupil, 'POST', f'/quizzes/{qid}/attempt', status=409, json={'answers': answers})
+        rotated = await self.call(self.admin, 'POST', f"/admin/students/{self.student['id']}/regenerate")
+        await self.call(self.pupil, 'POST', '/students/activate', json={'token': rotated['qr_token']})
+        await self.call(self.pupil, 'POST', f'/quizzes/{qid}/attempt', status=409, json={'answers': answers})
+        other = self.client()
+        await self.call(other, 'POST', '/students/activate', json={'token': rotated['qr_token']})
+        await self.call(other, 'POST', f'/quizzes/{qid}/attempt', status=409, json={'answers': answers})
+        self.assertEqual(len(await self.call(self.pupil, 'GET', '/students/me/attempts')), 1)
+        self.assertTrue((await self.call(self.pupil, 'GET', '/quizzes'))[0]['attempted'])
+
+    async def test_quiz_parallel_submissions_accept_exactly_one(self):
+        quiz = await self.quiz()
+        await self.call(self.admin, 'POST', f"/admin/quizzes/{quiz['id']}/publish")
+        answers = await self.quiz_answers(self.pupil, quiz)
+        responses = await asyncio.gather(*(self.pupil.post(f"/quizzes/{quiz['id']}/attempt", json={'answers': answers}) for _ in range(8)))
+        self.assertEqual(sorted(r.status_code for r in responses), [200] + [409] * 7)
+        self.assertEqual(len(await self.call(self.pupil, 'GET', '/students/me/attempts')), 1)
+
+    async def test_legacy_attempts_remain_and_block_only_their_student(self):
+        quiz = await self.quiz()
+        await self.call(self.admin, 'POST', f"/admin/quizzes/{quiz['id']}/publish")
+        # Historical attempts predate the claim table and can include duplicates.
+        async with await AsyncConnection.connect(database_dsn()) as conn:
+            for _ in range(2):
+                await conn.execute("INSERT INTO quiz_attempts (quiz_id, student_id, student_name, answers, score, total) VALUES (%s, %s, %s, '{}', 0, 1)", (quiz['id'], self.student['id'], self.student['name']))
+        await self.call(self.pupil, 'POST', f"/quizzes/{quiz['id']}/attempt", status=409, json={'answers': {quiz['items'][0]['id']: 'a'}})
+        self.assertEqual(len(await self.call(self.pupil, 'GET', '/students/me/attempts')), 2)
+        second = await self.call(self.admin, 'POST', '/admin/students', json={'name': 'Другой ученик', 'class_label': '8А'})
+        await self.call(self.guest, 'POST', '/students/activate', json={'token': second['qr_token']})
+        answers = await self.quiz_answers(self.guest, quiz)
+        result = await self.call(self.guest, 'POST', f"/quizzes/{quiz['id']}/attempt", json={'answers': answers})
+        self.assertEqual(result['score'], 1)
+        self.assertEqual(len(await self.call(self.pupil, 'GET', '/students/me/attempts')), 2)
+
+    async def test_quiz_unpublication_serializes_with_submission(self):
+        quiz = await self.quiz()
+        await self.call(self.admin, 'POST', f"/admin/quizzes/{quiz['id']}/publish")
+        answers = await self.quiz_answers(self.pupil, quiz)
+        conn = await AsyncConnection.connect(database_dsn())
+        self.addAsyncCleanup(conn.close)
+        await conn.execute("UPDATE quizzes SET status='draft' WHERE id=%s", (quiz['id'],))
+        pending = asyncio.create_task(self.pupil.post(f"/quizzes/{quiz['id']}/attempt", json={'answers': answers}))
+        try:
+            async with await AsyncConnection.connect(database_dsn(), autocommit=True) as observer:
+                for _ in range(100):
+                    row = await (await observer.execute("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'")).fetchone()
+                    if row[0]: break
+                    await asyncio.sleep(.02)
+                else: self.fail('submission did not wait for quiz lock')
+            await conn.commit()
+            self.assertEqual((await asyncio.wait_for(pending, 5)).status_code, 409)
+            self.assertEqual(await self.call(self.pupil, 'GET', '/students/me/attempts'), [])
+            await self.call(self.admin, 'POST', f"/admin/quizzes/{quiz['id']}/publish")
+            await self.call(self.pupil, 'POST', f"/quizzes/{quiz['id']}/attempt", json={'answers': answers})
+        finally:
+            await conn.rollback()
+            if not pending.done(): pending.cancel()
+            await asyncio.gather(pending, return_exceptions=True)
+
+    async def test_finish_releases_only_own_review_and_preserves_snapshot(self):
+        quiz = await self.quiz()
+        qid, iid = quiz['id'], quiz['items'][0]['id']
+        finish = f'/admin/quizzes/{qid}/finish'
+        await self.call(self.admin, 'POST', finish, status=409)
+        await self.call(self.guest, 'POST', finish, status=401)
+        await self.call(self.pupil, 'POST', finish, status=401)
+        await self.call(self.admin, 'POST', f'/admin/quizzes/{qid}/publish')
+        answers = await self.quiz_answers(self.pupil, quiz, correct=False)
+        result = await self.call(self.pupil, 'POST', f'/quizzes/{qid}/attempt', json={'answers': answers})
+        review_url = f"/students/me/attempts/{result['attempt_id']}/review"
+        await self.call(self.pupil, 'GET', review_url, status=404)
+        self.assertFalse((await self.call(self.pupil, 'GET', '/students/me/attempts'))[0]['answers_available'])
+        # Changes after submission must never rewrite the answer key of that attempt.
+        await self.call(self.admin, 'PATCH', f'/admin/quizzes/{qid}/items/{iid}', json={'correct_answer': 'b', 'explanation': 'NEW-EXPLANATION'})
+        await self.call(self.admin, 'POST', f'/admin/quizzes/{qid}/unpublish')
+        await self.call(self.admin, 'PUT', f'/admin/quizzes/{qid}/items', json={'items': quiz['items']})
+        await self.call(self.admin, 'POST', f'/admin/quizzes/{qid}/publish')
+        completed = await self.call(self.admin, 'POST', finish)
+        self.assertTrue(completed['is_completed'])
+        await self.call(self.admin, 'POST', finish)  # idempotent
+        review_response = await self.pupil.get(review_url)
+        self.assertEqual(review_response.headers['cache-control'], 'private, no-store')
+        review = review_response.json()
+        self.assertFalse(review['legacy'])
+        self.assertEqual(review['score'], 0)
+        self.assertEqual(review['items'][0]['got'], 'Пять')
+        self.assertEqual(review['items'][0]['expected'], 'Четыре')
+        self.assertEqual(review['items'][0]['explanation'], 'PRIVATE-EXPLANATION')
+        self.assertFalse(review['items'][0]['correct'])
+        self.assertTrue((await self.call(self.pupil, 'GET', '/students/me/attempts'))[0]['answers_available'])
+        await self.call(self.guest, 'GET', review_url, status=401)
+        second = await self.call(self.admin, 'POST', '/admin/students', json={'name': 'Другой ученик', 'class_label': '8А'})
+        await self.call(self.guest, 'POST', '/students/activate', json={'token': second['qr_token']})
+        await self.call(self.guest, 'GET', review_url, status=404)
+        for client in (self.pupil, self.guest):
+            self.assertEqual(await self.call(client, 'GET', '/quizzes'), [])
+            await self.call(client, 'GET', f'/quizzes/{qid}', status=409)
+            await self.call(client, 'POST', f'/quizzes/{qid}/attempt', status=409, json={'answers': answers})
+        for action in ('publish', 'unpublish'):
+            await self.call(self.admin, 'POST', f'/admin/quizzes/{qid}/{action}', status=409)
+        await self.call(self.admin, 'PUT', f'/admin/quizzes/{qid}/items', status=409, json={'items': quiz['items']})
+        new_iid = completed['items'][0]['id']
+        await self.call(self.admin, 'PATCH', f'/admin/quizzes/{qid}/items/{new_iid}', status=409, json={'correct_answer': 'b'})
+        other_quiz = await self.quiz()
+        await self.call(self.admin, 'POST', f"/admin/quizzes/{other_quiz['id']}/publish")
+        self.assertEqual(len(await self.call(self.pupil, 'GET', '/quizzes')), 1)
+
+    async def test_legacy_review_is_labelled_and_missing_questions_are_not_invented(self):
+        quiz = await self.quiz()
+        await self.call(self.admin, 'POST', f"/admin/quizzes/{quiz['id']}/publish")
+        async with await AsyncConnection.connect(database_dsn()) as conn:
+            row = await (await conn.execute("INSERT INTO quiz_attempts (quiz_id, student_id, student_name, answers, score, total) VALUES (%s, %s, %s, %s, 0, 2) RETURNING id", (quiz['id'], self.student['id'], self.student['name'], json.dumps({quiz['items'][0]['id']: 'b', str(uuid4()): 'old'})))).fetchone()
+        await self.call(self.admin, 'POST', f"/admin/quizzes/{quiz['id']}/finish")
+        review = await self.call(self.pupil, 'GET', f'/students/me/attempts/{row[0]}/review')
+        self.assertTrue(review['legacy'])
+        self.assertEqual(review['total'], 2)
+        self.assertEqual(len(review['items']), 1)
+        self.assertEqual(review['items'][0]['expected'], 'Четыре')
+
+    async def test_finish_serializes_with_inflight_submission(self):
+        quiz = await self.quiz()
+        await self.call(self.admin, 'POST', f"/admin/quizzes/{quiz['id']}/publish")
+        answers = await self.quiz_answers(self.pupil, quiz)
+        conn = await AsyncConnection.connect(database_dsn())
+        self.addAsyncCleanup(conn.close)
+        await conn.execute("UPDATE quizzes SET is_completed=TRUE WHERE id=%s", (quiz['id'],))
+        pending = asyncio.create_task(self.pupil.post(f"/quizzes/{quiz['id']}/attempt", json={'answers': answers}))
+        try:
+            async with await AsyncConnection.connect(database_dsn(), autocommit=True) as observer:
+                for _ in range(100):
+                    row = await (await observer.execute("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'")).fetchone()
+                    if row[0]: break
+                    await asyncio.sleep(.02)
+                else: self.fail('submission did not wait for quiz completion lock')
+            await conn.commit()
+            self.assertEqual((await asyncio.wait_for(pending, 5)).status_code, 409)
+            self.assertEqual(await self.call(self.pupil, 'GET', '/students/me/attempts'), [])
+        finally:
+            await conn.rollback()
+            if not pending.done(): pending.cancel()
+            await asyncio.gather(pending, return_exceptions=True)
 
     async def test_weekly_submission_review_publish_hide_and_photo(self):
         first, second = await self.weekly(), await self.weekly('Вторая задача')
@@ -208,7 +359,7 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
     async def test_analytics_identity_filters_and_private_ai_pipeline(self):
         quiz = await self.quiz()
         await self.call(self.admin, 'POST', f"/admin/quizzes/{quiz['id']}/publish")
-        await self.call(self.pupil, 'POST', f"/quizzes/{quiz['id']}/attempt", json={'answers': {quiz['items'][0]['id']: 'a'}})
+        await self.call(self.pupil, 'POST', f"/quizzes/{quiz['id']}/attempt", json={'answers': await self.quiz_answers(self.pupil, quiz)})
         pulse = {'id': str(uuid4()), 'visit_id': str(uuid4()), 'page': 'weekly', 'active_seconds': 0, 'student_id': str(uuid4())}
         for _ in range(2):
             await self.call(self.pupil, 'POST', '/analytics/pulse', status=204, json=pulse)
@@ -242,7 +393,7 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         for track, grade in (('oge', '9А'), ('ege', '11А')):
             old = await self.quiz()
             await self.call(self.admin, 'POST', f"/admin/quizzes/{old['id']}/publish")
-            await self.call(self.pupil, 'POST', f"/quizzes/{old['id']}/attempt", json={'answers': {old['items'][0]['id']: 'a'}})
+            await self.call(self.pupil, 'POST', f"/quizzes/{old['id']}/attempt", json={'answers': await self.quiz_answers(self.pupil, old)})
             # Simulate a quiz and attempt created before exam practice was retired.
             async with self.app.state.pool.connection() as conn:
                 await conn.execute('UPDATE quizzes SET track = %s WHERE id = %s', (track, old['id']))
@@ -251,10 +402,10 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
             for client in (self.guest, self.pupil):
                 self.assertEqual([q['id'] for q in await self.call(client, 'GET', '/quizzes')], [common['id']])
                 self.assertEqual(await self.call(client, 'GET', f'/quizzes?track={track}'), [])
-                await self.call(client, 'GET', f"/quizzes/{old['id']}", status=404)
-                await self.call(client, 'POST', f"/quizzes/{old['id']}/attempt", status=404, json={'answers': {old['items'][0]['id']: 'a'}})
+                await self.call(client, 'GET', f"/quizzes/{old['id']}", status=401 if client is self.guest else 404)
+                await self.call(client, 'POST', f"/quizzes/{old['id']}/attempt", status=401 if client is self.guest else 404, json={'answers': {old['items'][0]['id']: 'a'}})
                 self.assertIn(weekly['id'], [t['id'] for t in await self.call(client, 'GET', '/weekly')])
-                await self.call(client, 'POST', f"/quizzes/{common['id']}/attempt", json={'answers': {common['items'][0]['id']: 'a'}})
+                await self.call(client, 'GET', f"/quizzes/{common['id']}", status=401 if client is self.guest else 200)
             for endpoint in ('/admin/quizzes', '/admin/quizzes/generate'):
                 await self.call(self.admin, 'POST', endpoint, status=422, json={'title': 'Подготовка', 'topic': 'Алгебра', 'track': track})
             await self.call(self.admin, 'POST', f"/admin/quizzes/{old['id']}/publish", status=409)

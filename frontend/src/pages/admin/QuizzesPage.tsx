@@ -15,6 +15,20 @@ export function QuizzesPage({ token, track = 'general' }: { token: string; track
   const [view, setView] = useState<View>({ mode: 'list' })
   const [quizzes, setQuizzes] = useState<QuizSummaryDTO[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [changing, setChanging] = useState<string | null>(null)
+
+  async function togglePublication(quiz: QuizSummaryDTO) {
+    if (changing) return
+    setChanging(quiz.id)
+    setError(null)
+    try {
+      const updated = quiz.status === 'published'
+        ? await adminQuizzes.unpublish(token, quiz.id)
+        : await adminQuizzes.publish(token, quiz.id)
+      setQuizzes(prev => prev?.map(q => q.id === quiz.id ? { ...q, status: updated.status } : q) ?? null)
+    } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось изменить публикацию') }
+    finally { setChanging(null) }
+  }
 
   async function reload() {
     try {
@@ -94,6 +108,7 @@ export function QuizzesPage({ token, track = 'general' }: { token: string; track
       </div>
 
       {track !== 'general' && <p className="text-sm text-paper-50/60">Эти тесты появятся в библиотеке после публикации. Доступ — по QR ученика {track === 'oge' ? '9' : '11'} класса. Общие тесты создаются во вкладке «Тесты».</p>}
+      <p className="text-sm text-paper-50/60">Снятый с публикации тест возвращается в черновики. Его можно опубликовать снова; результаты сохранятся. У каждого ученика одна попытка — повторная публикация её не сбрасывает.</p>
 
       {error && (
         <div className="text-sm text-red-400/90 border border-red-500/30 bg-red-500/10 rounded-lg px-3 py-2">
@@ -110,10 +125,10 @@ export function QuizzesPage({ token, track = 'general' }: { token: string; track
       ) : (
         <ul className="space-y-2">
           {quizzes.map((q) => (
-            <li key={q.id}>
+            <li key={q.id} className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setView({ mode: 'edit', quizId: q.id })}
-                className="w-full text-left rounded-xl border border-paper-50/10 bg-ink-900/30 hover:bg-ink-900/60 transition p-4 flex items-center justify-between gap-4"
+                className="min-w-0 flex-1 text-left rounded-xl border border-paper-50/10 bg-ink-900/30 hover:bg-ink-900/60 transition p-4 flex items-center justify-between gap-4"
               >
                 <div className="min-w-0">
                   <div className="text-paper-50 truncate">{q.title}</div>
@@ -121,7 +136,10 @@ export function QuizzesPage({ token, track = 'general' }: { token: string; track
                     {q.topic} · {q.difficulty} · {q.items_count} вопросов
                   </div>
                 </div>
-                <StatusBadge status={q.status} />
+                <StatusBadge status={q.status} completed={q.is_completed} />
+              </button>
+              <button disabled={q.is_completed || changing !== null || (q.status === 'draft' && q.items_count === 0)} onClick={() => togglePublication(q)} className="rounded-lg border border-paper-50/20 px-3 py-2 text-sm text-paper-50/80 disabled:opacity-40" title={q.status === 'published' ? 'Вернуть в черновик, сохранив результаты' : 'Снова открыть тест для учеников без попытки'}>
+                {q.is_completed ? 'ответы открыты' : q.status === 'published' ? 'снять с публикации' : 'опубликовать'}
               </button>
             </li>
           ))}
@@ -131,7 +149,8 @@ export function QuizzesPage({ token, track = 'general' }: { token: string; track
   )
 }
 
-function StatusBadge({ status }: { status: 'draft' | 'published' }) {
+function StatusBadge({ status, completed }: { status: 'draft' | 'published'; completed: boolean }) {
+  if (completed) return <span className="text-xs text-gold-500 shrink-0">завершён</span>
   if (status === 'published')
     return (
       <span className="inline-flex items-center gap-1.5 text-xs text-emerald-300 shrink-0">

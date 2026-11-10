@@ -57,6 +57,17 @@ export function QuizEditor({
     }
   }
 
+  async function finish() {
+    if (!quiz || !confirm('Завершить тест и открыть правильные ответы всем, кто его проходил? Приём ответов закроется. Возобновить этот тест будет нельзя.')) return
+    setBusy(true)
+    setError(null)
+    try {
+      setQuiz(await adminQuizzes.finish(token, quiz.id))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'не удалось завершить тест')
+    } finally { setBusy(false) }
+  }
+
   /**
    * Добавление и удаление вопросов идут через полную замену списка — отдельных
    * ручек на один вопрос в API нет. Побочный эффект: у всех вопросов меняются
@@ -141,15 +152,16 @@ export function QuizEditor({
           <span>·</span>
           <span>{quiz.items.length} вопросов</span>
           <span>·</span>
-          <StatusBadge status={quiz.status} />
+          <span>{quiz.is_completed ? 'завершён · ответы открыты' : <StatusBadge status={quiz.status} />}</span>
         </div>
         <h2 className="text-2xl font-serif text-paper-50">{quiz.title}</h2>
       </header>
 
       <div className="flex flex-wrap gap-2">
-        {isPublished ? (
+        {!quiz.is_completed && (isPublished ? (
           <button
             onClick={unpublish}
+            title="Вернуть в черновик, сохранив результаты"
             disabled={busy}
             className="rounded-lg border border-paper-50/20 px-4 py-2 text-sm text-paper-50/80 hover:bg-paper-50/5 disabled:opacity-50"
           >
@@ -163,7 +175,8 @@ export function QuizEditor({
           >
             опубликовать
           </button>
-        )}
+        ))}
+        {isPublished && !quiz.is_completed && <button onClick={finish} disabled={busy} className="rounded-lg bg-gold-500 px-4 py-2 text-sm font-medium text-ink-950 disabled:opacity-50">Завершить тест и показать ответы</button>}
         <a
           href={`/admin/print-quiz?quiz=${quiz.id}`}
           target="_blank"
@@ -187,24 +200,27 @@ export function QuizEditor({
         </div>
       )}
 
+      {quiz.is_completed ? <p className="rounded-xl border border-gold-500/30 p-4 text-sm text-paper-50/75">Тест завершён. Ученики, которые его прошли, видят свои ответы, правильные ответы и объяснения в профиле → «Тесты». Приём ответов закрыт, вопросы зафиксированы.</p> : <p className="text-sm text-paper-50/60">Правильные ответы скрыты от учеников. Кнопка «Завершить тест и показать ответы» закроет приём и откроет разбор в истории прошедших тест.</p>}
+
       <TrueFalseBalance items={quiz.items} />
 
       <div className="space-y-4">
         {quiz.items.map((it) => (
           <QuizItemCard
-            key={it.id ?? it.position}
+            key={`${it.id ?? it.position}-${quiz.is_completed}`}
+            readOnly={quiz.is_completed}
             token={token}
             quizId={quiz.id}
             item={it}
             onSaved={reload}
             onDelete={
-              isPublished ? undefined : () => removeQuestion(it.position)
+              isPublished || quiz.is_completed ? undefined : () => removeQuestion(it.position)
             }
           />
         ))}
       </div>
 
-      {!isPublished && quiz.items.length > 0 && (
+      {!quiz.is_completed && !isPublished && quiz.items.length > 0 && (
         <RefineBox
           examples={[
             'третий вопрос слишком лёгкий, усложни',
@@ -217,7 +233,7 @@ export function QuizEditor({
         />
       )}
 
-      {isPublished ? (
+      {!quiz.is_completed && (isPublished ? (
         <p className="text-xs text-paper-50/40">
           Состав вопросов у опубликованного теста не меняется — иначе уже
           сданные попытки перестанут соответствовать вопросам. Сними с
@@ -231,7 +247,7 @@ export function QuizEditor({
         >
           + добавить вопрос
         </button>
-      )}
+      ))}
 
       <QuizAttempts key={quiz.id} token={token} quizId={quiz.id} />
     </div>

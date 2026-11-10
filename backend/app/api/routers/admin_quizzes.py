@@ -53,6 +53,7 @@ def _quiz_to_dto(quiz: Quiz) -> QuizDTO:
         topic=quiz.topic,
         difficulty=quiz.difficulty,
         status=quiz.status,
+        is_completed=quiz.is_completed,
         source_key=quiz.source_key,
         items=[_item_to_dto(i) for i in quiz.items],
     )
@@ -66,6 +67,7 @@ def _summary(quiz: Quiz, items_count: int) -> QuizSummaryDTO:
         topic=quiz.topic,
         difficulty=quiz.difficulty,
         status=quiz.status,
+        is_completed=quiz.is_completed,
         source_key=quiz.source_key,
         items_count=items_count,
     )
@@ -242,6 +244,15 @@ async def unpublish(
     svc: Annotated[QuizService, Depends(get_quiz_service)],
 ) -> QuizDTO:
     return _quiz_to_dto(await svc.unpublish(quiz_id))
+
+
+@router.post("/{quiz_id}/finish", response_model=QuizDTO)
+async def finish(
+    quiz_id: UUID,
+    _: Annotated[User, Depends(get_current_admin)],
+    svc: Annotated[QuizService, Depends(get_quiz_service)],
+) -> QuizDTO:
+    return _quiz_to_dto(await svc.finish(quiz_id))
 
 
 @router.delete("/{quiz_id}", status_code=204, response_model=None)

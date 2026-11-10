@@ -7,7 +7,7 @@ import unicodedata
 from dataclasses import replace
 from uuid import UUID
 
-from app.core.errors import Conflict, LLMBadResponse, NoSourceMaterial, NotFound
+from app.core.errors import Conflict, LLMBadResponse, NoSourceMaterial, NotFound, NotAuthenticated
 from app.domain.chat.types import Message
 from app.domain.quiz.generation import (
     build_generation_prompt,
@@ -244,7 +244,7 @@ class QuizService:
         «ты всё прошёл» от «учитель ещё ничего не опубликовал».
         """
         quizzes = await self._quizzes.list(status="published")
-        quizzes = [q for q in quizzes if can_access_quiz(q, student)]
+        quizzes = [q for q in quizzes if can_access_quiz(q, student) and not q.is_completed]
         if not student:
             return quizzes, set()
         return quizzes, await self._quizzes.attempted_ids(student.id)
@@ -260,9 +260,15 @@ class QuizService:
         return quiz
 
     async def get_published_for(self, quiz_id: UUID, student: Student | None) -> Quiz:
+        if student is None:
+            raise NotAuthenticated("для прохождения теста войди по своему QR-коду")
         quiz = await self.get(quiz_id)
         if not can_access_quiz(quiz, student) or quiz.status != "published":
             raise NotFound("тест не найден")
+        if quiz.is_completed:
+            raise Conflict("тест завершён; приём ответов закрыт")
+        if quiz_id in await self._quizzes.attempted_ids(student.id):
+            raise Conflict("ты уже прошёл этот тест; доступна только одна попытка")
         return quiz
 
     async def update_meta(
@@ -317,6 +323,20 @@ class QuizService:
         await self._quizzes.update_meta(quiz_id, status="draft")
         return await self.get(quiz_id)
 
+    async def finish(self, quiz_id: UUID) -> Quiz:
+        await self._quizzes.finish(quiz_id)
+        return await self.get(quiz_id)
+
+    async def review_attempt(self, attempt_id: UUID, student: Student) -> dict:
+        record = await self._quizzes.review_attempt(attempt_id, student.id)
+        legacy = record['items'] is None
+        items = record['items']
+        if legacy:
+            quiz = await self.get(record['quiz_id'])
+            items = _review_items(quiz, record['answers'], existing_only=True)
+        return dict(attempt_id=str(attempt_id), quiz_title=record['quiz_title'],
+                    score=record['score'], total=record['total'], legacy=legacy, items=items)
+
     async def delete(self, quiz_id: UUID) -> None:
         await self._quizzes.delete(quiz_id)
 
@@ -324,18 +344,29 @@ class QuizService:
 
     async def attempt(
         self,
-        quiz_id: UUID,
+        quiz: Quiz,
         *,
         student_name: str,
         student: Student | None,
         answers: dict[str, str],
     ) -> tuple[AttemptResult, UUID]:
-        """Если `student` передан (есть cookie) — попытка привязывается к нему, иначе анон."""
-        quiz = await self.get(quiz_id)
+        """Результат отдаём только после атомарного сохранения единственной попытки."""
+        if student is None:
+            raise NotAuthenticated("для прохождения теста войди по своему QR-коду")
         if not can_access_quiz(quiz, student):
             raise NotFound("тест не найден")
+        if quiz.is_completed:
+            raise Conflict("тест завершён; приём ответов закрыт")
         if quiz.status != "published":
             raise Conflict("тест не опубликован")
+        if not quiz.items or set(answers) != {str(item.id) for item in quiz.items}:
+            raise Conflict("нужно ответить на все вопросы текущей версии теста")
+        for item in quiz.items:
+            value = answers[str(item.id)]
+            if not value.strip() or len(value) > 2000:
+                raise Conflict("проверь заполнение ответов")
+            if item.kind == "mcq" and value not in {c.id for c in item.choices}:
+                raise Conflict("неизвестный вариант ответа")
 
         per_item: list[dict] = []
         score = 0
@@ -347,19 +378,21 @@ class QuizService:
             if ok:
                 score += 1
             per_item.append(
-                {"item_id": iid, "correct": ok, "expected": item.correct_answer, "got": answers.get(iid, "")}
+                {"item_id": iid, "correct": ok, "got": next((c.text for c in item.choices if c.id == answers[iid]), answers[iid])}
             )
 
         # авторизованный ученик — всегда под своим именем
-        effective_name = student.name if student else (student_name.strip() or "аноним")
+        effective_name = student.name
 
         attempt_id = await self._quizzes.save_attempt(
-            quiz_id,
+            quiz.id,
             effective_name,
-            student.id if student else None,
+            student.id,
             answers,
             score,
             len(quiz.items),
+            quiz.updated_at,
+            _review_items(quiz, answers),
         )
         return AttemptResult(score=score, total=len(quiz.items), per_item=per_item), attempt_id
 
@@ -405,3 +438,19 @@ def _validate_items(items: list[QuizItem]) -> None:
 
 def _normalize(s: str) -> str:
     return unicodedata.normalize("NFKC", s).strip().lower()
+
+
+def _review_items(quiz: Quiz, answers: dict[str, str], *, existing_only: bool = False) -> list[dict]:
+    items = []
+    for item in quiz.items:
+        iid = str(item.id)
+        if existing_only and iid not in answers:
+            continue
+        got = answers.get(iid, '')
+        choices = {c.id: c.text for c in item.choices}
+        items.append(dict(item_id=iid, position=item.position, question_md=item.question_md,
+                          got=choices.get(got, got) if item.kind == 'mcq' else got,
+                          expected=choices.get(item.correct_answer, item.correct_answer) if item.kind == 'mcq' else item.correct_answer,
+                          correct=bool(_normalize(got)) and _normalize(got) == _normalize(item.correct_answer),
+                          explanation=item.explanation))
+    return items

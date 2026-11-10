@@ -46,6 +46,7 @@ class Quiz:
     updated_at: datetime | None = None
     items: list[QuizItem] = field(default_factory=list)
     track: QuizTrack = "general"
+    is_completed: bool = False
 
 
 @dataclass(frozen=True)
@@ -54,4 +55,4 @@ class AttemptResult:
 
     score: int
     total: int
-    per_item: list[dict]  # [{"item_id": ..., "correct": bool, "expected": ..., "got": ...}]
+    per_item: list[dict]  # [{"item_id": ..., "correct": bool, "got": ...}], без ключей ответов

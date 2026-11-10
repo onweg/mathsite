@@ -8,7 +8,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response
 
-from app.api.deps import get_optional_student, get_quiz_service
+from app.api.deps import get_optional_student, get_current_student, get_quiz_service
+from app.core.config import settings
+from app.core.errors import Conflict
+from app.domain.quiz.choice_tokens import choice_token
 from app.domain.quiz.types import Quiz, QuizTrack
 from app.domain.student.types import Student
 from app.schemas.quiz import (
@@ -39,10 +42,8 @@ def _summary(quiz: Quiz, items_count: int, attempted: bool = False) -> QuizSumma
 def _public(quiz: Quiz) -> QuizPublicDTO:
     """Варианты отдаём в случайном порядке — на каждое открытие свой.
 
-    Перемешиваем только порядок в списке, id вариантов остаются при своих
-    текстах. Поэтому проверка ответа не меняется: ученик присылает id, а он
-    по-прежнему сравнивается с correct_answer. Подписи «а/б/в/г» фронт рисует
-    по позиции в списке, а не по id.
+    Авторские id заменяем непрозрачными идентификаторами, чтобы исходные
+    a/b/c не выдавали закономерность расположения правильных вариантов.
     """
     return QuizPublicDTO(
         id=str(quiz.id),
@@ -57,7 +58,7 @@ def _public(quiz: Quiz) -> QuizPublicDTO:
                 "kind": it.kind,
                 "question_md": it.question_md,
                 "choices": [
-                    {"id": c.id, "text": c.text}
+                    {"id": choice_token(settings.jwt_secret, quiz.id, it.id, c.id), "text": c.text}
                     for c in random.sample(it.choices, len(it.choices))
                 ],
             }
@@ -85,7 +86,7 @@ async def get_published(
     response: Response,
     quiz_id: UUID,
     svc: Annotated[QuizService, Depends(get_quiz_service)],
-    student: Annotated[Student | None, Depends(get_optional_student)] = None,
+    student: Annotated[Student, Depends(get_current_student)],
 ) -> QuizPublicDTO:
     response.headers["Cache-Control"] = "private, no-store"
     quiz = await svc.get_published_for(quiz_id, student)
@@ -94,16 +95,27 @@ async def get_published(
 
 @router.post("/{quiz_id}/attempt", response_model=AttemptResultDTO)
 async def attempt(
+    response: Response,
     quiz_id: UUID,
     body: AttemptRequest,
     svc: Annotated[QuizService, Depends(get_quiz_service)],
-    student: Annotated[Student | None, Depends(get_optional_student)] = None,
+    student: Annotated[Student, Depends(get_current_student)],
 ) -> AttemptResultDTO:
+    response.headers["Cache-Control"] = "private, no-store"
+    quiz = await svc.get_published_for(quiz_id, student)
+    answers = dict(body.answers)
+    for item in quiz.items:
+        if item.kind == "mcq" and str(item.id) in answers:
+            options = {choice_token(settings.jwt_secret, quiz.id, item.id, c.id): c.id for c in item.choices}
+            value = options.get(answers[str(item.id)])
+            if value is None:
+                raise Conflict("варианты теста изменились; открой тест заново")
+            answers[str(item.id)] = value
     result, attempt_id = await svc.attempt(
-        quiz_id,
+        quiz,
         student_name=body.student_name,
         student=student,
-        answers=body.answers,
+        answers=answers,
     )
     return AttemptResultDTO(
         attempt_id=str(attempt_id),

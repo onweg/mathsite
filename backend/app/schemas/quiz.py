@@ -23,6 +23,11 @@ class QuizItemDTO(BaseModel):
     explanation: str | None = None
 
 
+class PublicChoiceDTO(BaseModel):
+    id: str
+    text: str
+
+
 class QuizItemPublicDTO(BaseModel):
     """Для публики — без correct_answer и explanation."""
 
@@ -30,10 +35,11 @@ class QuizItemPublicDTO(BaseModel):
     position: int
     kind: Literal["mcq", "short"]
     question_md: str
-    choices: list[ChoiceDTO]
+    choices: list[PublicChoiceDTO]
 
 
 class QuizSummaryDTO(BaseModel):
+    is_completed: bool = False
     track: QuizTrack = "general"
     id: str
     title: str
@@ -47,6 +53,7 @@ class QuizSummaryDTO(BaseModel):
 
 
 class QuizDTO(BaseModel):
+    is_completed: bool = False
     track: QuizTrack = "general"
     id: str
     title: str
@@ -152,11 +159,17 @@ class AttemptRequest(BaseModel):
     answers: dict[str, str] = Field(min_length=1)
 
 
+class AttemptItemResultDTO(BaseModel):
+    item_id: str
+    correct: bool
+    got: str
+
+
 class AttemptResultDTO(BaseModel):
     attempt_id: str
     score: int
     total: int
-    per_item: list[dict]
+    per_item: list[AttemptItemResultDTO]
 
 
 class AttemptSummaryDTO(BaseModel):

@@ -12,7 +12,9 @@ export function QuizItemCard({
   item,
   onSaved,
   onDelete,
+  readOnly = false,
 }: {
+  readOnly?: boolean
   token: string
   quizId: string
   item: QuizItemDTO
@@ -64,12 +66,12 @@ export function QuizItemCard({
             № {item.position}
           </div>
           <div className="flex gap-2">
-            <button
+            {!readOnly && <button
               onClick={() => setEditing(true)}
               className="text-xs text-paper-50/60 hover:text-paper-50 border border-paper-50/10 rounded px-2 py-1"
             >
               править
-            </button>
+            </button>}
             {onDelete && (
               <button
                 onClick={onDelete}

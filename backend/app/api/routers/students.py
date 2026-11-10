@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response
 
@@ -23,6 +24,7 @@ from app.domain.student.types import Student
 from app.infrastructure.ratelimit.base import RateLimiter
 from app.schemas.student import (
     ActivateRequest,
+    AttemptReviewDTO,
     StudentAttemptDTO,
     StudentPollAnswerDTO,
     StudentPublicDTO,
@@ -85,21 +87,35 @@ async def logout(response: Response) -> None:
 
 @router.get("/me/attempts", response_model=list[StudentAttemptDTO])
 async def my_attempts(
+    response: Response,
     student: Annotated[Student, Depends(get_current_student)],
     quizzes: Annotated[QuizService, Depends(get_quiz_service)],
 ) -> list[StudentAttemptDTO]:
+    response.headers["Cache-Control"] = "private, no-store"
     attempts = await quizzes.list_attempts_by_student(student.id)
     return [
         StudentAttemptDTO(
             id=str(a.id),
             quiz_id=str(a.quiz_id),
             quiz_title=a.quiz_title,
+            answers_available=a.answers_available,
             score=a.score,
             total=a.total,
             created_at=a.created_at.isoformat(),
         )
         for a in attempts
     ]
+
+
+@router.get("/me/attempts/{attempt_id}/review", response_model=AttemptReviewDTO)
+async def attempt_review(
+    attempt_id: UUID,
+    response: Response,
+    student: Annotated[Student, Depends(get_current_student)],
+    quizzes: Annotated[QuizService, Depends(get_quiz_service)],
+) -> AttemptReviewDTO:
+    response.headers["Cache-Control"] = "private, no-store"
+    return AttemptReviewDTO(**await quizzes.review_attempt(attempt_id, student))
 
 
 @router.get("/me/weekly", response_model=list[StudentWeeklyDTO])

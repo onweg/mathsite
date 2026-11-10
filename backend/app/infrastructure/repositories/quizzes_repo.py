@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from app.domain.quiz.types import Choice, Quiz, QuizItem, QuizStatus
+from app.core.errors import Conflict, NotAuthenticated, NotFound
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,7 @@ class StudentAttempt:
     score: int
     total: int
     created_at: datetime
+    answers_available: bool = False
 
 
 class QuizzesRepository(Protocol):
@@ -94,7 +96,13 @@ class QuizzesRepository(Protocol):
         answers: dict[str, str],
         score: int,
         total: int,
+        revision: datetime | None,
+        review_items: list[dict],
     ) -> UUID: ...
+
+    async def finish(self, quiz_id: UUID) -> None: ...
+
+    async def review_attempt(self, attempt_id: UUID, student_id: UUID) -> dict: ...
 
     async def list_attempts(self, quiz_id: UUID) -> list[AttemptSummary]: ...
 
@@ -181,7 +189,7 @@ class PgQuizzesRepository:
             if status:
                 await cur.execute(
                     """
-                    SELECT id, title, topic, source_key, difficulty, status, created_at, updated_at, track
+                    SELECT id, title, topic, source_key, difficulty, status, created_at, updated_at, track, is_completed
                     FROM quizzes WHERE status = %s ORDER BY created_at DESC
                     """,
                     (status,),
@@ -189,7 +197,7 @@ class PgQuizzesRepository:
             else:
                 await cur.execute(
                     """
-                    SELECT id, title, topic, source_key, difficulty, status, created_at, updated_at, track
+                    SELECT id, title, topic, source_key, difficulty, status, created_at, updated_at, track, is_completed
                     FROM quizzes ORDER BY created_at DESC
                     """
                 )
@@ -205,6 +213,7 @@ class PgQuizzesRepository:
                 created_at=r[6],
                 updated_at=r[7],
                 track=r[8],
+                is_completed=r[9],
                 items=[],
             )
             for r in rows
@@ -231,7 +240,7 @@ class PgQuizzesRepository:
         async with self._pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
-                SELECT id, title, topic, source_key, difficulty, status, created_at, updated_at, track
+                SELECT id, title, topic, source_key, difficulty, status, created_at, updated_at, track, is_completed
                 FROM quizzes WHERE id = %s
                 """,
                 (quiz_id,),
@@ -270,6 +279,7 @@ class PgQuizzesRepository:
             created_at=row[6],
             updated_at=row[7],
             track=row[8],
+            is_completed=row[9],
             items=items,
         )
 
@@ -297,6 +307,11 @@ class PgQuizzesRepository:
         sets.append("updated_at = NOW()")
         params.append(quiz_id)
         async with self._pool.connection() as conn, conn.cursor() as cur:
+            if status is not None:
+                await cur.execute("SELECT is_completed FROM quizzes WHERE id=%s FOR UPDATE", (quiz_id,))
+                row = await cur.fetchone()
+                if row and row[0]:
+                    raise Conflict("тест завершён, ответы уже открыты; повторная публикация невозможна")
             await cur.execute(
                 f"UPDATE quizzes SET {', '.join(sets)} WHERE id = %s",  # noqa: S608
                 params,
@@ -305,6 +320,10 @@ class PgQuizzesRepository:
 
     async def replace_items(self, quiz_id: UUID, items: list[QuizItem]) -> None:
         async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute("SELECT is_completed FROM quizzes WHERE id = %s FOR UPDATE", (quiz_id,))
+            row = await cur.fetchone()
+            if row and row[0]:
+                raise Conflict("вопросы завершённого теста нельзя менять")
             await cur.execute("DELETE FROM quiz_items WHERE quiz_id = %s", (quiz_id,))
             for item in items:
                 await cur.execute(
@@ -353,10 +372,16 @@ class PgQuizzesRepository:
             return
         params.append(item_id)
         async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute("SELECT q.id, q.is_completed FROM quizzes q JOIN quiz_items i ON i.quiz_id=q.id WHERE i.id=%s FOR UPDATE OF q", (item_id,))
+            parent = await cur.fetchone()
+            if parent and parent[1]:
+                raise Conflict("вопросы завершённого теста нельзя менять")
             await cur.execute(
                 f"UPDATE quiz_items SET {', '.join(sets)} WHERE id = %s",  # noqa: S608
                 params,
             )
+            if parent:
+                await cur.execute("UPDATE quizzes SET updated_at=NOW() WHERE id=%s", (parent[0],))
             await conn.commit()
 
     async def delete(self, quiz_id: UUID) -> None:
@@ -372,16 +397,37 @@ class PgQuizzesRepository:
         answers: dict[str, str],
         score: int,
         total: int,
+        revision: datetime | None,
+        review_items: list[dict],
     ) -> UUID:
+        if student_id is None:
+            raise NotAuthenticated("для прохождения теста войди по своему QR-коду")
         async with self._pool.connection() as conn, conn.cursor() as cur:
+            # Shared quiz lock serializes submission with publication and question edits.
+            await cur.execute("SELECT status, track, updated_at, is_completed FROM quizzes WHERE id=%s FOR SHARE", (quiz_id,))
+            quiz = await cur.fetchone()
+            if not quiz or quiz[1] != 'general':
+                raise NotFound("тест не найден")
+            if quiz[3]:
+                raise Conflict("тест завершён; приём ответов закрыт")
+            if quiz[0] != 'published':
+                raise Conflict("тест снят с публикации; ответы не отправлены")
+            if quiz[2] != revision:
+                raise Conflict("тест изменился; открой его заново")
+            await cur.execute("SELECT 1 FROM quiz_attempts WHERE quiz_id=%s AND student_id=%s LIMIT 1", (quiz_id, student_id))
+            if await cur.fetchone():
+                raise Conflict("ты уже прошёл этот тест; доступна только одна попытка")
+            await cur.execute("INSERT INTO quiz_attempt_claims (quiz_id, student_id) VALUES (%s, %s) ON CONFLICT DO NOTHING RETURNING quiz_id", (quiz_id, student_id))
+            if not await cur.fetchone():
+                raise Conflict("ты уже прошёл этот тест; доступна только одна попытка")
             await cur.execute(
                 """
                 INSERT INTO quiz_attempts
-                    (quiz_id, student_name, student_id, answers, score, total)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                    (quiz_id, student_name, student_id, answers, score, total, review_items)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
-                (quiz_id, student_name, student_id, Jsonb(answers), score, total),
+                (quiz_id, student_name, student_id, Jsonb(answers), score, total, Jsonb(review_items)),
             )
             (attempt_id,) = await cur.fetchone()
             await conn.commit()
@@ -455,7 +501,7 @@ class PgQuizzesRepository:
         async with self._pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
-                SELECT a.id, a.quiz_id, q.title, a.score, a.total, a.created_at
+                SELECT a.id, a.quiz_id, q.title, a.score, a.total, a.created_at, q.is_completed
                 FROM quiz_attempts a
                 JOIN quizzes q ON q.id = a.quiz_id
                 WHERE a.student_id = %s
@@ -473,6 +519,33 @@ class PgQuizzesRepository:
                 score=r[3],
                 total=r[4],
                 created_at=r[5],
+                answers_available=r[6],
             )
             for r in rows
         ]
+
+
+    async def finish(self, quiz_id: UUID) -> None:
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute("SELECT status, track, is_completed FROM quizzes WHERE id=%s FOR UPDATE", (quiz_id,))
+            row = await cur.fetchone()
+            if not row or row[1] != 'general':
+                raise NotFound("тест не найден")
+            if not row[2]:
+                if row[0] != 'published':
+                    raise Conflict("сначала опубликуй тест")
+                await cur.execute("UPDATE quizzes SET is_completed=TRUE, updated_at=NOW() WHERE id=%s", (quiz_id,))
+            await conn.commit()
+
+    async def review_attempt(self, attempt_id: UUID, student_id: UUID) -> dict:
+        # Ownership and release are checked in SQL, before loading any answer key.
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute("""
+                SELECT a.quiz_id, q.title, a.score, a.total, a.answers, a.review_items
+                FROM quiz_attempts a JOIN quizzes q ON q.id=a.quiz_id
+                WHERE a.id=%s AND a.student_id=%s AND q.is_completed AND q.track='general'
+            """, (attempt_id, student_id))
+            row = await cur.fetchone()
+        if not row:
+            raise NotFound("разбор пока недоступен")
+        return dict(quiz_id=row[0], quiz_title=row[1], score=row[2], total=row[3], answers=row[4], items=row[5])

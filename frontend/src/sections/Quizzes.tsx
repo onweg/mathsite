@@ -11,15 +11,12 @@ import {
 import { scrollToElement } from '../hooks/useLenis'
 import { useStudent } from '../lib/student'
 
-const NAME_KEY = 'mathsite.student.name'
-
 // Подписи вариантов считаем от позиции: сервер отдаёт их перемешанными,
 // id остаются привязаны к текстам, поэтому по id подписывать нельзя.
 const CHOICE_LABELS = ['а', 'б', 'в', 'г', 'д', 'е']
 
 type Screen =
   | { kind: 'list' }
-  | { kind: 'intro'; quiz: QuizSummaryDTO }
   | { kind: 'run'; quiz: QuizPublicDTO }
   | { kind: 'result'; quiz: QuizPublicDTO; result: AttemptResultDTO }
 
@@ -97,6 +94,7 @@ export function Quizzes({ track = 'general' }: { track?: QuizTrack }) {
             {error}
           </div>
         )}
+        <p className="mb-6 text-sm text-paper-50/65">На каждый тест даётся одна попытка. Отправляй ответы, когда всё проверишь. {auth.status === 'anon' && <a href="/me" className="text-gold-500 underline">Для прохождения войди по личному QR-коду учителя.</a>}</p>
 
         {/* Пока список едет с сервера, секция уже стоит на месте со своим
             id: иначе пункт меню «Тесты», нажатый сразу после загрузки, ведёт
@@ -123,17 +121,9 @@ export function Quizzes({ track = 'general' }: { track?: QuizTrack }) {
                   setError(e instanceof Error ? e.message : 'не удалось загрузить тест')
                 }
               } else {
-                setScreen({ kind: 'intro', quiz: q })
+                setError('Для прохождения теста войди по личному QR-коду учителя.')
               }
             }}
-          />
-        )}
-
-        {screen.kind === 'intro' && (
-          <QuizIntro
-            quiz={screen.quiz}
-            onCancel={() => setScreen({ kind: 'list' })}
-            onStart={(full) => setScreen({ kind: 'run', quiz: full })}
           />
         )}
 
@@ -142,7 +132,7 @@ export function Quizzes({ track = 'general' }: { track?: QuizTrack }) {
             quiz={screen.quiz}
             onCancel={() => setScreen({ kind: 'list' })}
             onDone={(result) => {
-              if (practice) setQuizzes(prev => prev?.map(q => q.id === screen.quiz.id ? { ...q, attempted: true } : q) ?? null)
+              setQuizzes(prev => prev?.map(q => q.id === screen.quiz.id ? { ...q, attempted: true } : q) ?? null)
               setScreen({ kind: 'result', quiz: screen.quiz, result })
             }}
           />
@@ -185,7 +175,7 @@ function QuizList({
           </div>
           <p className="mx-auto mt-4 max-w-md text-pretty text-paper-100/70">
             {practice ? (filtered ? 'Нет тестов с выбранным статусом. Выбери «Все тесты».' : 'Учитель ещё не опубликовал тренировочные тесты. Они появятся здесь.') : allDone
-              ? 'Ты прошёл все открытые тесты. Результаты и разбор ошибок — в твоём профиле, а новые появятся здесь.'
+              ? 'Ты прошёл все открытые тесты. Результаты — в твоём профиле, а новые тесты появятся здесь.'
               : 'Новых тестов пока нет. Как только учитель откроет тест, он появится в этом разделе.'}
           </p>
           {!practice && allDone && (
@@ -230,93 +220,6 @@ function QuizList({
   )
 }
 
-function QuizIntro({
-  quiz,
-  onCancel,
-  onStart,
-}: {
-  quiz: QuizSummaryDTO
-  onCancel: () => void
-  onStart: (full: QuizPublicDTO) => void
-}) {
-  const [name, setName] = useState(() => {
-    try {
-      return localStorage.getItem(NAME_KEY) || ''
-    } catch {
-      return ''
-    }
-  })
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function start() {
-    const trimmed = name.trim()
-    if (!trimmed) {
-      setError('напиши как тебя зовут — учитель увидит кто проходил')
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      try {
-        localStorage.setItem(NAME_KEY, trimmed)
-      } catch {
-        /* ignore */
-      }
-      const full = await publicQuizzes.get(quiz.id)
-      onStart(full)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'не удалось загрузить тест')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Reveal>
-      <div className="mx-auto max-w-xl rounded-2xl border border-paper-50/10 bg-ink-900/60 p-8 space-y-6">
-        <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-paper-50/50">
-            {quiz.topic} · {labelDiff(quiz.difficulty)} · {quiz.items_count} вопросов
-          </div>
-          <h3 className="mt-2 font-serif text-2xl text-paper-50">{quiz.title}</h3>
-        </div>
-
-        <label className="block space-y-1.5">
-          <span className="text-xs uppercase tracking-wider text-paper-50/60">Твоё имя</span>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Иван Петров, 8А"
-            className="w-full rounded-lg border border-paper-50/10 bg-ink-950/80 px-3 py-2.5 text-paper-50 outline-none focus:border-gold-500/60"
-          />
-        </label>
-
-        {error && (
-          <div className="text-sm text-red-400/90">{error}</div>
-        )}
-
-        <div className="flex gap-3">
-          <button
-            onClick={start}
-            disabled={busy}
-            className="flex-1 rounded-full bg-paper-50 py-3 text-sm font-medium text-ink-950 disabled:opacity-50"
-          >
-            {busy ? 'загружаем…' : 'начать'}
-          </button>
-          <button
-            onClick={onCancel}
-            className="rounded-full border border-paper-50/20 px-5 text-sm text-paper-50/70 hover:text-paper-50"
-          >
-            назад
-          </button>
-        </div>
-      </div>
-    </Reveal>
-  )
-}
-
 function QuizRunner({
   quiz,
   onCancel,
@@ -340,9 +243,7 @@ function QuizRunner({
     setBusy(true)
     setError(null)
     try {
-      const studentName = (localStorage.getItem(NAME_KEY) || 'аноним').trim()
       const result = await publicQuizzes.attempt(quiz.id, {
-        student_name: studentName,
         answers,
       })
       onDone(result)
@@ -466,7 +367,6 @@ function QuizResult({
           const r = byItem.get(item.id)
           const correct = r?.correct ?? false
           const got = r?.got || '—'
-          const expected = r?.expected || '?'
           return (
             <li
               key={item.id}
@@ -493,8 +393,7 @@ function QuizResult({
               </div>
               {!correct && (
                 <div className="text-sm text-paper-50/70">
-                  Твой ответ: <code className="font-mono text-red-300">{got}</code> · правильный:{' '}
-                  <code className="font-mono text-emerald-300">{expected}</code>
+                  Твой ответ: <code className="font-mono text-red-300">{got}</code>
                 </div>
               )}
             </li>
@@ -502,6 +401,7 @@ function QuizResult({
         })}
       </ol>
 
+      <p className="text-center text-sm text-paper-50/65">После завершения теста учителем правильные ответы и объяснения появятся в <a href="/me" className="text-gold-500 underline">твоём профиле</a>.</p>
       <div className="flex justify-center pt-2">
         <button
           onClick={onBack}

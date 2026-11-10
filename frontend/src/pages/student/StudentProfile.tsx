@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   StudentAttemptDTO,
+  AttemptReviewDTO,
   StudentPollAnswerDTO,
   StudentWeeklyDTO,
   fileUrl,
@@ -38,6 +39,22 @@ export function StudentProfile() {
       .myPolls()
       .then(setPolls)
       .catch(() => setPolls([]))
+  }, [auth.status])
+
+  useEffect(() => {
+    if (auth.status !== 'authed') return
+    let alive = true
+    const refresh = () => {
+      if (document.visibilityState === 'hidden') return
+      studentAuth.myAttempts().then(rows => { if (alive) setAttempts(rows) }).catch(() => {})
+    }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      alive = false
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
   }, [auth.status])
 
   if (auth.status === 'loading') {
@@ -119,15 +136,7 @@ export function StudentProfile() {
           ) : (
             <ul className="divide-y divide-paper-50/5">
               {attempts.map((a) => (
-                <li key={a.id} className="py-3 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-paper-50 truncate">{a.quiz_title}</div>
-                    <div className="text-[11px] text-paper-50/40 mt-0.5">
-                      {formatDate(a.created_at)}
-                    </div>
-                  </div>
-                  <ScoreBadge score={a.score} total={a.total} />
-                </li>
+                <AttemptRow key={a.id} attempt={a} />
               ))}
             </ul>
           )}
@@ -288,6 +297,48 @@ function WeeklyRow({ item }: { item: StudentWeeklyDTO }) {
       )}
     </li>
   )
+}
+
+function AttemptRow({ attempt }: { attempt: StudentAttemptDTO }) {
+  const [open, setOpen] = useState(false)
+  const [review, setReview] = useState<AttemptReviewDTO | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function toggle() {
+    if (open) { setOpen(false); return }
+    setOpen(true)
+    if (review) return
+    setBusy(true)
+    setError(null)
+    try { setReview(await studentAuth.attemptReview(attempt.id)) }
+    catch (e) { setError(e instanceof Error ? e.message : 'Не удалось загрузить разбор') }
+    finally { setBusy(false) }
+  }
+
+  return <li className="py-4 space-y-3">
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="text-paper-50 break-words">{attempt.quiz_title}</div>
+        <div className="mt-1 text-[11px] text-paper-50/40">{formatDate(attempt.created_at)}</div>
+      </div>
+      <ScoreBadge score={attempt.score} total={attempt.total} />
+    </div>
+    {attempt.answers_available ? <button onClick={toggle} disabled={busy} aria-expanded={open} className="rounded-lg border border-gold-500/40 px-3 py-2 text-sm text-gold-500 disabled:opacity-50">{open ? 'Скрыть разбор' : 'Посмотреть ответы и разбор'}</button> : <p className="text-xs text-paper-50/50">Правильные ответы появятся, когда учитель завершит тест.</p>}
+    {open && <div className="space-y-4">
+      {busy && <p className="text-sm text-paper-50/50">Загружаем разбор…</p>}
+      {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+      {review?.legacy && <p className="text-sm text-amber-200/80">Архивная попытка: разбор по сохранённым ответам и текущей версии вопросов. Исходная оценка не пересчитывается. Удалённые вопросы восстановить нельзя.</p>}
+      {review && review.items.length < review.total && <p className="text-sm text-paper-50/60">Часть старых вопросов не сохранилась. Доступно вопросов: {review.items.length} из {review.total}.</p>}
+      {review?.items.map(item => <article key={item.item_id} className="rounded-xl border border-paper-50/10 bg-ink-950/50 p-4 space-y-3">
+        <div className="flex justify-between gap-3 text-sm"><span>Вопрос {item.position}</span><span className={item.correct ? 'text-emerald-300' : 'text-red-300'}>{item.correct ? 'Верно' : 'Ошибка'}</span></div>
+        <Markdown text={item.question_md} />
+        <div><p className="mb-1 text-xs text-paper-50/50">Твой ответ</p><Markdown text={item.got || 'Ответ не дан'} /></div>
+        <div className="border-l-2 border-emerald-500/50 pl-3"><p className="mb-1 text-xs text-emerald-300">Правильный ответ</p><Markdown text={item.expected} /></div>
+        {item.explanation && <div><p className="mb-1 text-xs text-paper-50/50">Объяснение</p><Markdown text={item.explanation} /></div>}
+      </article>)}
+    </div>}
+  </li>
 }
 
 function ScoreBadge({ score, total }: { score: number; total: number }) {

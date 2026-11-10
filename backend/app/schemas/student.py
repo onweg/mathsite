@@ -62,12 +62,32 @@ class ActivateRequest(BaseModel):
 
 
 class StudentAttemptDTO(BaseModel):
+    answers_available: bool = False
     id: str
     quiz_id: str
     quiz_title: str
     score: int
     total: int
     created_at: str
+
+
+class AttemptReviewItemDTO(BaseModel):
+    item_id: str
+    position: int
+    question_md: str
+    got: str
+    expected: str
+    correct: bool
+    explanation: str | None = None
+
+
+class AttemptReviewDTO(BaseModel):
+    attempt_id: str
+    quiz_title: str
+    score: int
+    total: int
+    legacy: bool
+    items: list[AttemptReviewItemDTO]
 
 
 class StudentWeeklyDTO(BaseModel):
