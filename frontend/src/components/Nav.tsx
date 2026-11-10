@@ -15,6 +15,7 @@ const links = [
   { label: 'Задача недели', href: '#weekly' },
   { label: 'Тесты', href: '#quizzes' },
   { label: 'Проверь решение', href: '#solution-checks' },
+  { label: 'Матбатл', href: '#battles' },
   { label: 'Библиотека', href: '#library' },
   { label: 'Обратная связь', href: '#feedback' },
   { label: 'Классы', href: '#classes' },

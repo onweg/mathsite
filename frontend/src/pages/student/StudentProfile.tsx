@@ -119,6 +119,7 @@ export function StudentProfile() {
         </div>
 
         <SolutionHistory />
+        <a href="/#battles" className="block rounded-2xl border border-gold-500/30 p-6 text-gold-500">Математический батл · мои задачи, решения и рейтинг →</a>
 
         <section className="rounded-2xl border border-paper-50/10 bg-ink-900/40 p-6 space-y-4">
           <div className="flex items-center justify-between">

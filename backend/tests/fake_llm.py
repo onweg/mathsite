@@ -5,6 +5,7 @@ from app.domain.rag.prompts import CLASSIFIER_PROMPT
 from app.domain.weekly.generation import SYSTEM_PROMPT as WEEKLY_PROMPT
 from app.domain.analytics_insights import SYSTEM_PROMPT as INSIGHTS_PROMPT
 from app.domain.solution_checks import GENERATION_PROMPT, GRADING_PROMPT
+from app.domain.battles import BATTLE_PROMPT
 from app.services.quiz_service import _SYSTEM_PROMPT as QUIZ_PROMPT
 
 
@@ -30,6 +31,8 @@ class FakeLLM:
                 dict(body_md='2x − 6 = 8; 2x = 2; x = 1.', is_correct=False, error_explanation='PRIVATE-RUBRIC: при переносе −6 знак меняется на плюс.'),
                 dict(body_md='2x − 6 = 8; 2x = 14; x = 14.', is_correct=False, error_explanation='PRIVATE-RUBRIC: обе части нужно разделить на 2.'),
             ])
+        elif prompt == BATTLE_PROMPT:
+            data = dict(reasoning=4, calculations=4, context=2, feedback='Решение верное, практический смысл объяснён.')
         elif prompt == GRADING_PROMPT:
             payload = json.loads(messages[-1].text)
             data = dict(grades=[dict(solution_id=s['solution_id'], points=2 if 'ошибка' in s['student_explanation'].lower() else 0,

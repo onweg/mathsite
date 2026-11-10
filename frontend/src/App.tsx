@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Cursor } from './components/Cursor'
 import { Nav } from './components/Nav'
+import { Battles } from './components/Battles'
 import { Preloader } from './components/Preloader'
 import { AITeacher } from './sections/AITeacher'
 import { CTA } from './sections/CTA'
@@ -63,6 +64,7 @@ function PublicSite() {
           <Weekly />
           <Quizzes />
           <SolutionChecks />
+          <section id="battles" aria-label="Математический батл" className="scroll-mt-40 border-b border-paper-50/10 px-6 py-24 md:px-10"><div className="mx-auto max-w-5xl"><Battles /></div></section>
           <Library />
           <Poll />
           <Classes />
