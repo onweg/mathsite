@@ -13,7 +13,7 @@ const METRICS: Record<string, string> = {
   link_clicks: 'Переходы по ссылке', opens: 'Открытия раздела', submissions: 'Решения', pending: 'Не проверено',
   correct: 'Верно', partial: 'Частично', wrong: 'Неверно', answers: 'Ответы',
 }
-const GROUPS: Record<string, string> = { quizzes: 'Тесты', materials: 'Материалы', sections: 'Разделы', weekly: 'Задачи недели', polls: 'Опросы' }
+const GROUPS: Record<string, string> = { quizzes: 'Тесты', materials: 'Материалы', sections: 'Разделы', weekly: 'Задачи недели', polls: 'Обратная связь' }
 const CONFIDENCE = { low: 'Предварительный вывод', medium: 'Умеренная уверенность', high: 'Высокая уверенность' }
 
 export function AIInsights({ token, start, end }: { token: string; start: string; end: string }) {

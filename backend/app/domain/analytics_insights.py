@@ -8,7 +8,7 @@ PAGE_NAMES = {
     'home': 'Главная', 'ai': 'ИИ-теоретик', 'missed': 'Пропустил урок',
     'weekly': 'Задача недели', 'quizzes': 'Тесты', 'library': 'Библиотека',
     'around': 'Математика вокруг', 'olympiad': 'Олимпиады',
-    'oge': 'ОГЭ', 'ege': 'ЕГЭ', 'feedback': 'Опросы', 'profile': 'Личный кабинет',
+    'oge': 'ОГЭ', 'ege': 'ЕГЭ', 'feedback': 'Обратная связь', 'profile': 'Личный кабинет',
 }
 FIELDS = {
     'site': ('visits', 'visitors', 'active_seconds', 'quiz_attempts', 'library_events', 'weekly_submissions', 'poll_answers'),

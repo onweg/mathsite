@@ -15,7 +15,7 @@ const TABS: { id: Tab; label: string; ready: boolean }[] = [
   { id: 'quizzes', label: 'Тесты', ready: true },
   { id: 'weekly', label: 'Задача недели', ready: true },
   { id: 'library', label: 'Разделы', ready: true },
-  { id: 'polls', label: 'Опросы', ready: true },
+  { id: 'polls', label: 'Обратная связь', ready: true },
   { id: 'materials', label: 'Материалы', ready: true },
   { id: 'students', label: 'Класс', ready: true },
   { id: 'statistics', label: 'Статистика', ready: true },

@@ -36,7 +36,7 @@ test('print full statistics, all rows, class and pupil filters, and a multipage 
   const quizzes = popup.locator('section').filter({ has: popup.getByRole('heading', { name: /^Тесты и попытки/ }) })
   await expect(quizzes.locator('tbody tr').first().locator('td').nth(2)).toHaveText('2')
   await expect(popup.getByText('Подробное решение для печати.', { exact: true })).toBeVisible()
-  for (const title of ['Разделы и материалы', 'Опросы', 'Посещения разделов сайта', 'Активность по дням']) await expect(popup.getByRole('heading', { name: new RegExp(`^${title}`) })).toBeVisible()
+  for (const title of ['Разделы и материалы', 'Обратная связь', 'Посещения разделов сайта', 'Активность по дням']) await expect(popup.getByRole('heading', { name: new RegExp(`^${title}`) })).toBeVisible()
   const html = await popup.content()
   expect(html).not.toContain(other.qr_token)
   expect(html).not.toContain(await page.evaluate(() => localStorage.getItem('mathsite.admin.token')))

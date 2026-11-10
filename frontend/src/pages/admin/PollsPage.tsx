@@ -62,7 +62,7 @@ export function PollsPage({ token }: { token: string }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg text-paper-50 font-serif">Опросы</h2>
+        <h2 className="text-lg text-paper-50 font-serif">Обратная связь</h2>
         <button
           onClick={() => setView({ mode: 'edit' })}
           className="bg-paper-50 text-ink-950 rounded-lg px-4 py-2 text-sm font-medium"

@@ -113,7 +113,7 @@ test('weekly task submission, review, per-task publication and reopening', async
 
 test('poll created in admin, answer edited by pupil, totals visible to teacher', async ({ page, pupil, teacherApi }) => {
   await login(page)
-  await page.getByRole('button', { name: 'Опросы', exact: true }).click()
+  await page.getByRole('button', { name: 'Обратная связь', exact: true }).click()
   await page.getByRole('button', { name: /новый опрос/ }).click()
   await page.getByPlaceholder('Например: Какую тему повторить на следующем уроке?').fill('Что повторить?')
   await page.getByPlaceholder('Вариант 1', { exact: true }).fill('Алгебра')

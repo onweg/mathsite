@@ -10,7 +10,7 @@ import { printAnalytics } from './analytics/PrintReport'
 type Screen = 'overview' | 'students' | 'quizzes' | 'weekly' | 'content' | 'polls' | 'insights'
 const SCREENS: [Screen, string][] = [
   ['overview', 'Обзор'], ['students', 'Ученики'], ['quizzes', 'Тесты'],
-  ['weekly', 'Задачи недели'], ['content', 'Разделы и материалы'], ['polls', 'Опросы'],
+  ['weekly', 'Задачи недели'], ['content', 'Разделы и материалы'], ['polls', 'Обратная связь'],
   ['insights', 'Анализ ИИ'],
 ]
 const STATUS = { new: 'Ждёт проверки', correct: 'Верно', partial: 'Частично', wrong: 'Неверно' }
@@ -131,7 +131,7 @@ export default function StatisticsPage({ token }: { token: string }) {
       {screen === 'overview' && <Overview data={data} start={start} end={end} />}
       {screen === 'students' && <>
         <p className="text-xs text-paper-50/40">Здесь также видны ученики без активности. Последняя активность включает решения, ответы и просмотры; последний визит — только новый счётчик посещений.</p>
-        <ReportTable key={tableKey} headers={['Ученик', 'Визиты', 'На сайте', 'Последний визит', 'Последняя активность', 'Тесты / средний балл', 'Задачи / верно', 'Библиотека', 'Опросы']} rows={sortedStudents.map((s) => ({ key: s.id, cells: [
+        <ReportTable key={tableKey} headers={['Ученик', 'Визиты', 'На сайте', 'Последний визит', 'Последняя активность', 'Тесты / средний балл', 'Задачи / верно', 'Библиотека', 'Обратная связь']} rows={sortedStudents.map((s) => ({ key: s.id, cells: [
           person(s.id, s.name, s.class_label), s.visits, duration(s.active_seconds), dateTime(s.last_visit),
           <div className="min-w-36">{dateTime(s.last_activity)}{s.last_seen && Date.now() - Date.parse(s.last_seen) < 90_000 && <div className="mt-1 text-xs text-sage-500">Активность менее 2 мин назад</div>}</div>,
           `${s.quiz_attempts} / ${percent(s.average_score)}`, `${s.weekly_submissions} / ${s.weekly_correct}`, s.library_views, s.poll_answers,

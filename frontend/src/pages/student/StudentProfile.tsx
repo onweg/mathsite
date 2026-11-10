@@ -164,7 +164,7 @@ export function StudentProfile() {
 
         <section className="rounded-2xl border border-paper-50/10 bg-ink-900/40 p-6 space-y-4">
           <h2 className="text-sm uppercase tracking-widest text-paper-50/60">
-            Мои ответы на опросы
+            Моя обратная связь
           </h2>
 
           {polls === null ? (
