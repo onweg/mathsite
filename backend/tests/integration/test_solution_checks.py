@@ -12,9 +12,31 @@ from app.domain.chat.types import ChatReply
 from app.services.solution_checks_service import SolutionChecksService
 from tests.fake_llm import FakeLLM
 from tests.support import reset_database, EMAIL, PASSWORD, database_dsn
+from app.infrastructure.llm.yandex import YandexProvider
+from app.domain.solution_checks import GENERATION_PROMPT
+from app.domain.chat.types import Message
 
 
 class SolutionWorkflowTests(unittest.IsolatedAsyncioTestCase):
+    async def test_real_provider_http_400_fallback_generates_valid_draft(self):
+        generated = await FakeLLM().chat([Message(role='system', text=GENERATION_PROMPT)])
+        calls = []
+        async def respond(request):
+            body = json.loads(request.content)
+            calls.append(body)
+            if 'json_schema' in body:
+                return httpx.Response(400, json={'error': {'message': 'unsupported schema'}})
+            self.assertTrue(body['json_object'])
+            return httpx.Response(200, json={'result': {'alternatives': [{'message': {'text': generated.text}}]}})
+        async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+            self.app.state.solution_llm = YandexProvider(folder_id='fixture', api_key='fixture', model_chat='yandexgpt-5.1', model_embed_doc='', model_embed_query='', client=client)
+            task = await self.call(self.admin, 'POST', '/admin/solution-checks/generate', json={'topic': 'Рациональные уравнения'})
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(task['status'], 'draft')
+        self.assertEqual(len(task['solutions']), 4)
+        self.assertEqual(sum(s['is_correct'] for s in task['solutions']), 1)
+        self.assertEqual(len(await self.call(self.admin, 'GET', '/admin/solution-checks')), 1)
+
     async def asyncSetUp(self):
         reset_database()
         self.app = create_app()

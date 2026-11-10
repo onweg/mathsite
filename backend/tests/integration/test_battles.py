@@ -281,3 +281,70 @@ class BattleWorkflowTests(unittest.IsolatedAsyncioTestCase):
         rows = (await self.call(self.solver, 'GET', f'/battles/{rid}'))['rankings']['solvers']
         self.assertEqual([row['score'] for row in rows], [1, 1])
         self.assertEqual([row['place'] for row in rows], [1, 1])
+
+    async def test_unpublish_republish_preserves_work_and_denies_student_actions(self):
+        rid = (await self.round())['id']
+        task = await self.task(rid)
+        tid = task['id']
+        aid = (await self.answer(rid, task))['id']
+        await self.call(self.solver, 'PUT', f'/battles/{rid}/tasks/{tid}/like', json=dict(enabled=True))
+        await self.call(self.solver, 'PUT', f'/admin/battles/{rid}/publication', status=401, json=dict(published=False))
+        await self.call(self.admin, 'PUT', f'/admin/battles/{rid}/publication', json=dict(published=False))
+        self.assertEqual(await self.call(self.solver, 'GET', '/battles'), [])
+        for client in (self.author, self.solver, self.guest):
+            await self.call(client, 'GET', f'/battles/{rid}', status=404)
+        await self.call(self.other, 'PUT', f'/battles/{rid}/my-task', status=404, json=TASK)
+        await self.call(self.solver, 'PUT', f'/battles/{rid}/tasks/{tid}/like', status=404, json=dict(enabled=False))
+        await self.call(self.other, 'POST', f'/battles/{rid}/tasks/{tid}/answer', status=404, json=dict(revision=task['revision'], answer='Четыре литра краски'))
+        await self.call(self.author, 'POST', f'/battles/{rid}/tasks/{tid}/status', status=404, json=dict(action='withdraw'))
+        await self.call(self.author, 'PUT', f'/battles/{rid}/attempts/{aid}/review', status=404, json=GRADE)
+        # Teacher and queued AI may finish existing reviews while hidden.
+        await self.grade(rid, aid)
+        await self.worker.run_one()
+        hidden = await self.call(self.admin, 'GET', f'/admin/battles/{rid}')
+        self.assertFalse(hidden['round']['is_visible'])
+        self.assertEqual(hidden['round']['status'], 'open')
+        self.assertEqual(hidden['tasks'][0]['likes'], 1)
+        self.assertEqual(hidden['attempts'][0]['id'], aid)
+        await self.call(self.admin, 'PUT', f'/admin/battles/{rid}/publication', json=dict(published=True))
+        visible = await self.call(self.solver, 'GET', f'/battles/{rid}')
+        self.assertEqual(visible['attempts'][0]['id'], aid)
+        self.assertEqual(visible['round']['solve_deadline'], hidden['round']['solve_deadline'])
+        self.assertEqual(visible['tasks'][0]['likes'], 1)
+        await self.call(self.author, 'PUT', f'/battles/{rid}/attempts/{aid}/review', json=GRADE)
+        await self.call(self.admin, 'POST', f'/admin/battles/{rid}/stop')
+        await self.call(self.admin, 'POST', f'/admin/battles/{rid}/finalize')
+        before = await self.call(self.solver, 'GET', f'/battles/{rid}')
+        await self.call(self.admin, 'PUT', f'/admin/battles/{rid}/publication', json=dict(published=False))
+        await self.call(self.admin, 'PUT', f'/admin/battles/{rid}/publication', json=dict(published=True))
+        after = await self.call(self.solver, 'GET', f'/battles/{rid}')
+        self.assertEqual(after['round']['status'], 'closed')
+        self.assertEqual(after['rankings'], before['rankings'])
+
+    async def test_delete_round_requires_admin_confirmation_and_cleans_dependants(self):
+        r = await self.round()
+        rid = r['id']
+        tid = (await self.task(rid))['id']
+        task = (await self.call(self.solver, 'GET', f'/battles/{rid}'))['tasks'][0]
+        aid = (await self.answer(rid, task))['id']
+        await self.call(self.other, 'PUT', f'/battles/{rid}/tasks/{tid}/like', json=dict(enabled=True))
+        await self.grade(rid, aid)
+        job = await self.worker.repo.claim()
+        await self.call(self.solver, 'DELETE', f'/admin/battles/{rid}', status=401, json=dict(confirm_title=r['title']))
+        await self.call(self.admin, 'DELETE', f'/admin/battles/{rid}', status=422)
+        await self.call(self.admin, 'DELETE', f'/admin/battles/{rid}', status=409, json=dict(confirm_title='Не тот раунд'))
+        await self.call(self.admin, 'DELETE', f'/admin/battles/{rid}', json=dict(confirm_title=r['title']))
+        await self.worker.repo.finish_job(job, GRADE)  # no resurrection after an in-flight response
+        await self.worker.repo.finish_job(job)  # an in-flight failure is also harmless
+        await self.call(self.admin, 'GET', f'/admin/battles/{rid}', status=404)
+        self.assertEqual(await self.call(self.guest, 'GET', '/battles'), [])
+        async with await AsyncConnection.connect(database_dsn()) as conn:
+            for table in ('battle_rounds', 'battle_tasks', 'battle_attempts', 'battle_reviews', 'battle_likes'):
+                count = await (await conn.execute(f'SELECT count(*) FROM {table}')).fetchone()
+                self.assertEqual(count[0], 0, table)
+            students = await (await conn.execute('SELECT count(*) FROM students')).fetchone()
+            self.assertEqual(students[0], 3)
+        # Drafts can be deleted without ever being published.
+        draft = await self.round(start=False)
+        await self.call(self.admin, 'PUT', f"/admin/battles/{draft['id']}/publication", status=409, json=dict(published=True))
+        await self.call(self.admin, 'DELETE', f"/admin/battles/{draft['id']}", json=dict(confirm_title=draft['title']))

@@ -36,6 +36,14 @@ class GradeInput(BaseModel):
     reason: str = Field(default='', max_length=1500)
 
 
+class PublicationInput(BaseModel):
+    published: bool
+
+
+class DeleteInput(BaseModel):
+    confirm_title: str = Field(min_length=3, max_length=160)
+
+
 @admin.get('')
 async def admin_list(db: Repo):
     return await db.list(admin=True)
@@ -54,6 +62,18 @@ async def update(rid: UUID, body: RoundInput, db: Repo):
 @admin.get('/{rid}')
 async def admin_detail(rid: UUID, db: Repo):
     return await db.detail(rid, admin=True)
+
+
+@admin.put('/{rid}/publication')
+async def publication_round(rid: UUID, body: PublicationInput, db: Repo):
+    await db.publication(rid, body.published)
+    return {'ok': True}
+
+
+@admin.delete('/{rid}')
+async def delete_round(rid: UUID, body: DeleteInput, db: Repo):
+    await db.delete(rid, body.confirm_title)
+    return {'ok': True}
 
 
 @admin.post('/{rid}/{action}')

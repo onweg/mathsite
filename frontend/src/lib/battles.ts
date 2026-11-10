@@ -2,8 +2,8 @@ import { apiJson } from './api'
 
 export type Reviewer = 'teacher' | 'author' | 'ai'
 export const reviewerNames: Record<Reviewer, string> = { teacher: 'Учитель', author: 'Автор задачи', ai: 'Нейросеть' }
-export type BattleRound = { id: string; title: string; description: string; reviewers: Reviewer[]; task_deadline: string; solve_deadline: string; status: 'draft' | 'open' | 'grading' | 'closed' }
-export type RoundInput = Omit<BattleRound, 'id' | 'status'>
+export type BattleRound = { id: string; title: string; description: string; reviewers: Reviewer[]; task_deadline: string; solve_deadline: string; status: 'draft' | 'open' | 'grading' | 'closed'; is_visible: boolean }
+export type RoundInput = Omit<BattleRound, 'id' | 'status' | 'is_visible'>
 export type TaskInput = { title: string; question: string; practical_use: string; reference: string }
 export type BattleTask = Omit<TaskInput, 'reference'> & { reference?: string; id: string; revision: number; status: 'draft' | 'pending' | 'published'; author_name: string; own: boolean; likes: number; liked: boolean; has_answers: boolean; moderation_note: string }
 export type BattleGrade = { reasoning: number; calculations: number; context: number; feedback: string; corrected_by_teacher?: boolean; correction_reason?: string }
@@ -18,6 +18,8 @@ export function battlesApi(token?: string) {
     detail: (id: string) => apiJson<BattleDetail>(`${root}/${id}`, { method: 'GET', token }),
     saveRound: (body: RoundInput, id?: string) => apiJson<BattleRound>(`${root}${id ? '/' + id : ''}`, { method: id ? 'PUT' : 'POST', token, body }),
     transition: (id: string, action: 'start' | 'stop' | 'finalize') => apiJson(`${root}/${id}/${action}`, { method: 'POST', token }),
+    publication: (id: string, published: boolean) => apiJson(`${root}/${id}/publication`, { method: 'PUT', token, body: { published } }),
+    delete: (id: string, confirm_title: string) => apiJson(`${root}/${id}`, { method: 'DELETE', token, body: { confirm_title } }),
     taskStatus: (rid: string, tid: string, action: string, note = '') => apiJson(`${root}/${rid}/tasks/${tid}/status`, { method: 'POST', token, body: { action, note } }),
     saveTask: (rid: string, body: TaskInput) => apiJson(`/battles/${rid}/my-task`, { method: 'PUT', body }),
     like: (rid: string, tid: string, enabled: boolean) => apiJson(`/battles/${rid}/tasks/${tid}/like`, { method: 'PUT', body: { enabled } }),

@@ -8,6 +8,7 @@ import httpx
 
 from app.core.errors import LLMBadResponse, LLMUnavailable
 from app.domain.chat.types import ChatReply, EmbedKind, Message, ModerationResult
+from app.infrastructure.llm.structured import portable_schema, messages_with_schema
 
 CHAT_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 EMBED_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/textEmbedding"
@@ -51,17 +52,29 @@ class YandexProvider:
         max_tokens: int = 2000,
         response_schema: dict | None = None,
     ) -> ChatReply:
-        payload = self._chat_payload(messages, temperature, max_tokens, stream=False)
+        payload = self._chat_payload(messages_with_schema(messages, response_schema) if response_schema is not None else messages,
+                                     temperature, max_tokens, stream=False)
         if response_schema is not None:
-            payload["json_schema"] = {"schema": response_schema}
+            payload["json_schema"] = {"schema": portable_schema(response_schema)}
         try:
             r = await self._client.post(CHAT_URL, json=payload, headers=self._headers())
+            if response_schema is not None and r.status_code == 400:
+                # Some model versions reject constrained decoding. Retry once in
+                # documented JSON mode; the original schema stays in the prompt
+                # and Exercise/AIGrade/ReviewInput still validate the actual reply.
+                log.warning('yandex structured output rejected (HTTP 400); retrying JSON mode')
+                payload.pop('json_schema')
+                payload['json_object'] = True
+                r = await self._client.post(CHAT_URL, json=payload, headers=self._headers())
             r.raise_for_status()
         except httpx.HTTPStatusError as e:
             log.warning(
                 "yandex chat http %s: %s", e.response.status_code, e.response.text[:300]
             )
-            raise LLMUnavailable(self.name, f"HTTP {e.response.status_code}") from e
+            detail = f"HTTP {e.response.status_code}"
+            if e.response.status_code == 400:
+                detail += ': YandexGPT отклонил параметры запроса. Проверьте настройку модели на сервере.'
+            raise LLMUnavailable(self.name, detail) from e
         except httpx.HTTPError as e:
             log.exception("yandex chat transport")
             raise LLMUnavailable(self.name, "transport") from e

@@ -32,16 +32,39 @@ class BattlesRepository:
         return row
 
     def accepting(self, row, tasks=False):
+        self.require_visible(row)
         if row['status'] != 'open' or datetime.now(timezone.utc) >= row['task_deadline' if tasks else 'solve_deadline']:
             raise Conflict('Приём задач закрыт' if tasks else 'Приём решений и голосов закрыт')
 
     async def list(self, admin=False):
         async with self.cursor() as cur:
-            await cur.execute("SELECT * FROM battle_rounds WHERE (%s OR status <> 'draft') ORDER BY created_at DESC", (admin,))
+            await cur.execute("SELECT * FROM battle_rounds WHERE (%s OR (status <> 'draft' AND is_visible)) ORDER BY created_at DESC", (admin,))
             return [self.round_dto(r) for r in await cur.fetchall()]
 
     def round_dto(self, row):
-        return {k: row[k] for k in ('id', 'title', 'description', 'reviewers', 'task_deadline', 'solve_deadline', 'status')}
+        return {k: row[k] for k in ('id', 'title', 'description', 'reviewers', 'task_deadline', 'solve_deadline', 'status', 'is_visible')}
+
+    def require_visible(self, row):
+        if not row['is_visible']:
+            raise NotFound('Раунд снят с публикации')
+
+    async def publication(self, rid, published):
+        async with self.cursor() as cur:
+            row = await self.round(cur, rid, True)
+            if row['status'] == 'draft':
+                raise Conflict('Сначала запустите раунд')
+            await cur.execute('UPDATE battle_rounds SET is_visible=%s WHERE id=%s', (published, rid))
+
+    async def delete(self, rid, confirm_title):
+        async with self.cursor() as cur:
+            row = await self.round(cur, rid, True)
+            if confirm_title != row['title']:
+                raise Conflict('Для удаления введите точное название раунда')
+            # Reviews cascade from attempts. Delete all dependants in this same
+            # transaction; the parent lock excludes submissions and worker writes.
+            await cur.execute('DELETE FROM battle_attempts WHERE task_id IN (SELECT id FROM battle_tasks WHERE round_id=%s)', (rid,))
+            await cur.execute('DELETE FROM battle_tasks WHERE round_id=%s', (rid,))
+            await cur.execute('DELETE FROM battle_rounds WHERE id=%s', (rid,))
 
     async def save_round(self, body, rid=None):
         async with self.cursor() as cur:
@@ -97,6 +120,8 @@ class BattlesRepository:
     async def task_action(self, rid, tid, action, sid=None, admin=False, note=''):
         async with self.cursor() as cur:
             row = await self.round(cur, rid, True)
+            if not admin:
+                self.require_visible(row)
             if row['status'] != 'open':
                 raise Conflict('Раунд не принимает изменения публикаций')
             task = await self.task(cur, rid, tid)
@@ -133,6 +158,7 @@ class BattlesRepository:
     async def answer(self, rid, tid, sid, body):
         async with self.cursor() as cur:
             row = await self.round(cur, rid, True)
+            self.require_visible(row)
             task = await self.task(cur, rid, tid)
             await cur.execute('SELECT id,answer FROM battle_attempts WHERE task_id=%s AND student_id=%s', (tid, sid))
             previous = await cur.fetchone()
@@ -166,6 +192,8 @@ class BattlesRepository:
     async def review(self, rid, aid, role, body, sid=None, admin=False, reason=''):
         async with self.cursor() as cur:
             row = await self.round(cur, rid, True)
+            if not admin:
+                self.require_visible(row)
             if row['status'] not in ('open', 'grading'):
                 raise Conflict('Оценки раунда уже зафиксированы или раунд не начат')
             attempt = await self.attempt(cur, rid, aid)
@@ -235,6 +263,8 @@ class BattlesRepository:
             row = await self.round(cur, rid, True)
             if row['status'] == 'draft' and not admin:
                 raise NotFound('Раунд ещё не запущен')
+            if not admin:
+                self.require_visible(row)
             await cur.execute('''SELECT t.*,coalesce(s.name,'Удалённый ученик') AS author_name,
                 (SELECT count(*) FROM battle_likes l WHERE l.task_id=t.id) AS likes,
                 EXISTS(SELECT 1 FROM battle_likes l WHERE l.task_id=t.id AND l.student_id=%s) AS liked,
@@ -275,8 +305,8 @@ class BattlesRepository:
                                      and (admin or not data.get(role, {}).get('corrected_by_teacher'))))
             return dict(round=self.round_dto(row), tasks=tasks, attempts=attempts,
                         rankings=row['results'] if row['status'] == 'closed' else await self.rankings(cur, row),
-                        can_author=row['status'] == 'open' and datetime.now(timezone.utc) < row['task_deadline'],
-                        can_solve=row['status'] == 'open' and datetime.now(timezone.utc) < row['solve_deadline'])
+                        can_author=row['is_visible'] and row['status'] == 'open' and datetime.now(timezone.utc) < row['task_deadline'],
+                        can_solve=row['is_visible'] and row['status'] == 'open' and datetime.now(timezone.utc) < row['solve_deadline'])
 
     async def retry(self, rid, aid):
         async with self.cursor() as cur:
@@ -311,7 +341,10 @@ class BattlesRepository:
 
     async def finish_job(self, job, result=None):
         async with self.cursor() as cur:
-            row = await self.round(cur, job['round_id'], True)
+            await cur.execute('SELECT * FROM battle_rounds WHERE id=%s FOR UPDATE', (job['round_id'],))
+            row = await cur.fetchone()
+            if row is None:
+                return  # Deleted while the remote model was responding.
             a = await self.attempt(cur, row['id'], job['id'])
             if row['status'] not in ('open', 'grading') or a['ai_status'] != 'checking' or a['lease_id'] != job['lease_id']:
                 return
