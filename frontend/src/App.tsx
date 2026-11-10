@@ -11,6 +11,7 @@ import { Library } from './sections/Library'
 import { Marquee } from './sections/Marquee'
 import { MissedClass } from './sections/MissedClass'
 import { Poll } from './sections/Poll'
+import { SolutionChecks } from './sections/SolutionChecks'
 import { Quizzes } from './sections/Quizzes'
 import { Sections } from './sections/Sections'
 import { Weekly } from './sections/Weekly'
@@ -61,6 +62,7 @@ function PublicSite() {
           <MissedClass />
           <Weekly />
           <Quizzes />
+          <SolutionChecks />
           <Library />
           <Poll />
           <Classes />

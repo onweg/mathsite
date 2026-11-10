@@ -1,6 +1,8 @@
 """Создание FastAPI-приложения + lifespan для внешних ресурсов."""
 
 import logging
+import asyncio
+from contextlib import suppress
 from contextlib import asynccontextmanager
 
 import httpx
@@ -45,6 +47,9 @@ from .routers import polls as polls_router
 from .routers import quizzes as quizzes_router
 from .routers import rag as rag_router
 from .routers import students as students_router
+from .routers import solution_checks as solution_router
+from app.infrastructure.repositories.solution_checks_repo import SolutionChecksRepository
+from app.services.solution_checks_service import grading_loop
 from .routers import weekly as weekly_router
 
 
@@ -72,6 +77,13 @@ async def _lifespan(app: FastAPI):
         model_embed_query=settings.yc_model_embed_query,
         client=http_client,
     )
+    app.state.solution_checks_repo = SolutionChecksRepository(pool)
+    app.state.solution_llm = YandexProvider(
+        folder_id=settings.yc_folder_id, api_key=settings.yc_api_key,
+        model_chat=settings.yc_model_solution, model_embed_doc=settings.yc_model_embed_doc,
+        model_embed_query=settings.yc_model_embed_query, client=http_client,
+    )
+    app.state.solution_generation_limiter = InMemoryRateLimiter((Limit(max_requests=5, window_seconds=60), Limit(max_requests=30, window_seconds=3600)))
     app.state.chunks_repo = PgChunksRepository(pool)
     app.state.analytics_repo = PgAnalyticsRepository(pool)
     app.state.analytics_insights_repo = PgAnalyticsInsightsRepository(pool)
@@ -96,9 +108,14 @@ async def _lifespan(app: FastAPI):
         Limit(max_requests=settings.rate_limit_per_hour, window_seconds=3600),
     ))
 
+    worker = asyncio.create_task(grading_loop(app.state)) if settings.solution_worker_enabled else None
     try:
         yield
     finally:
+        if worker:
+            worker.cancel()
+            with suppress(asyncio.CancelledError):
+                await worker
         await http_client.aclose()
         await pool.close()
 
@@ -129,6 +146,8 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestIdMiddleware)
     register_error_handlers(app)
 
+    app.include_router(solution_router.router)
+    app.include_router(solution_router.admin)
     app.include_router(health_router.router)
     app.include_router(chat_router.router)
     app.include_router(rag_router.router)

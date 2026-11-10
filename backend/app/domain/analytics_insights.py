@@ -6,6 +6,7 @@ from typing import Literal
 
 PAGE_NAMES = {
     'home': 'Главная', 'ai': 'ИИ-теоретик', 'missed': 'Пропустил урок',
+    'solution-checks': 'Проверь решение',
     'weekly': 'Задача недели', 'quizzes': 'Тесты', 'library': 'Библиотека',
     'around': 'Математика вокруг', 'olympiad': 'Олимпиады',
     'oge': 'ОГЭ', 'ege': 'ЕГЭ', 'feedback': 'Обратная связь', 'profile': 'Личный кабинет',

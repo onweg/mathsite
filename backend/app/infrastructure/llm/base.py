@@ -19,6 +19,7 @@ class LLMProvider(Protocol):
         *,
         temperature: float = 0.4,
         max_tokens: int = 2000,
+        response_schema: dict | None = None,
     ) -> ChatReply:
         """Один синхронный запрос, вся генерация целиком."""
         ...

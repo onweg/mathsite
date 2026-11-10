@@ -31,6 +31,8 @@ services:
       YC_FOLDER_ID: ${YC_FOLDER_ID}
       YC_API_KEY: ${YC_API_KEY}
       YC_API_KEY_ID: ${YC_API_KEY_ID:-}
+      YC_MODEL_SOLUTION: ${YC_MODEL_SOLUTION:-yandexgpt-5.1}
+      SOLUTION_WORKER_ENABLED: ${SOLUTION_WORKER_ENABLED:-true}
       APP_ENV: prod
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET не задан в deploy/.env.prod}
       CORS_ORIGINS: ${CORS_ORIGINS:-}

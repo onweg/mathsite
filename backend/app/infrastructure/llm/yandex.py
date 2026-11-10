@@ -49,8 +49,11 @@ class YandexProvider:
         *,
         temperature: float = 0.4,
         max_tokens: int = 2000,
+        response_schema: dict | None = None,
     ) -> ChatReply:
         payload = self._chat_payload(messages, temperature, max_tokens, stream=False)
+        if response_schema is not None:
+            payload["json_schema"] = {"schema": response_schema}
         try:
             r = await self._client.post(CHAT_URL, json=payload, headers=self._headers())
             r.raise_for_status()

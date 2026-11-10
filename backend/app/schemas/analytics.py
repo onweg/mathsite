@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # Only section identifiers, never URLs containing QR tokens or query strings.
 AnalyticsPage = Literal[
     'home', 'ai', 'missed', 'weekly', 'quizzes', 'library',
-    'around', 'olympiad', 'oge', 'ege', 'feedback', 'profile',
+    'around', 'olympiad', 'oge', 'ege', 'feedback', 'profile', 'solution-checks',
 ]
 
 

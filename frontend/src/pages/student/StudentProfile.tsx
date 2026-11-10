@@ -7,6 +7,7 @@ import {
   fileUrl,
   studentAuth,
 } from '../../lib/api'
+import { SolutionHistory } from '../../components/SolutionAttempt'
 import { Markdown } from '../../components/Markdown'
 import { useStudent } from '../../lib/student'
 
@@ -116,6 +117,8 @@ export function StudentProfile() {
           <h1 className="font-display text-5xl text-paper-50">{student.name}</h1>
           <div className="text-paper-50/60">{student.class_label || 'без класса'}</div>
         </div>
+
+        <SolutionHistory />
 
         <section className="rounded-2xl border border-paper-50/10 bg-ink-900/40 p-6 space-y-4">
           <div className="flex items-center justify-between">

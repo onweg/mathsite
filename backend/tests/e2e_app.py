@@ -6,6 +6,8 @@ No testing/reset endpoints are added to the production API.
 from contextlib import asynccontextmanager
 from tests.support import configure_environment, database_dsn
 
+import os
+os.environ["TEST_SOLUTION_WORKER"] = "true"
 configure_environment()
 database_dsn()
 from app.api.app_factory import create_app
@@ -20,6 +22,7 @@ async def lifespan(app):
     async with production_lifespan(app):
         await app.state.pool.wait(timeout=15)
         app.state.llm = FakeLLM()
+        app.state.solution_llm = app.state.llm
         yield
 
 

@@ -5,6 +5,7 @@ import { ANALYTICS_IDENTITY_EVENT, currentVisit } from '../lib/analyticsSession'
 
 const SECTIONS: Record<string, string> = {
   top: 'home', ai: 'ai', missed: 'missed', weekly: 'weekly', quizzes: 'quizzes',
+  'solution-checks': 'solution-checks',
   library: 'library', feedback: 'feedback',
 }
 const IDLE_MS = 120_000

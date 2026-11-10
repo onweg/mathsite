@@ -4,6 +4,7 @@ from app.domain.chat.types import ChatReply, ModerationResult
 from app.domain.rag.prompts import CLASSIFIER_PROMPT
 from app.domain.weekly.generation import SYSTEM_PROMPT as WEEKLY_PROMPT
 from app.domain.analytics_insights import SYSTEM_PROMPT as INSIGHTS_PROMPT
+from app.domain.solution_checks import GENERATION_PROMPT, GRADING_PROMPT
 from app.services.quiz_service import _SYSTEM_PROMPT as QUIZ_PROMPT
 
 
@@ -14,14 +15,26 @@ class FakeLLM:
         self.calls = []
         self.failure = None
 
-    async def chat(self, messages, *, temperature=0.4, max_tokens=2000):
+    async def chat(self, messages, *, temperature=0.4, max_tokens=2000, response_schema=None):
         self.calls.append(messages)
         if self.failure:
             raise self.failure
         prompt = messages[0].text
         if prompt == CLASSIFIER_PROMPT:
             return ChatReply('yes')
-        if prompt == INSIGHTS_PROMPT:
+        if prompt == GENERATION_PROMPT:
+            data = dict(title='Проверь раскрытие скобок', topic='Уравнения', difficulty='easy',
+                        question_md='Решите уравнение 2(x − 3) = 8.', solutions=[
+                dict(body_md='2x − 6 = 8; 2x = 14; x = 7.', is_correct=True, error_explanation='Все преобразования верны, ответ 7.'),
+                dict(body_md='2x − 3 = 8; 2x = 11; x = 5,5.', is_correct=False, error_explanation='PRIVATE-RUBRIC: множитель 2 нужно умножить и на 3.'),
+                dict(body_md='2x − 6 = 8; 2x = 2; x = 1.', is_correct=False, error_explanation='PRIVATE-RUBRIC: при переносе −6 знак меняется на плюс.'),
+                dict(body_md='2x − 6 = 8; 2x = 14; x = 14.', is_correct=False, error_explanation='PRIVATE-RUBRIC: обе части нужно разделить на 2.'),
+            ])
+        elif prompt == GRADING_PROMPT:
+            payload = json.loads(messages[-1].text)
+            data = dict(grades=[dict(solution_id=s['solution_id'], points=2 if 'ошибка' in s['student_explanation'].lower() else 0,
+                                    feedback='Ошибка найдена и объяснена.' if 'ошибка' in s['student_explanation'].lower() else 'Нужно указать ошибочный шаг.') for s in payload['to_grade']])
+        elif prompt == INSIGHTS_PROMPT:
             payload = json.loads(messages[-1].text)
             assert 'site' in payload
             data = dict(summary='Тестовый анализ активности готов.', findings=[dict(ref='SITE', observation='Есть сохранённая активность.', recommendation='Сравните результаты за следующую неделю.', confidence='low')], next_steps=[dict(ref='SITE', action='Добавить тренировочный тест.', check='Сравнить первые попытки.')], limitations=['Небольшая выборка.'])

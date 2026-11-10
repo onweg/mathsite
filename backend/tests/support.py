@@ -22,6 +22,7 @@ def configure_environment():
     parsed = urlparse(dsn)
     os.environ.update({
         'YC_FOLDER_ID': 'test-only', 'YC_API_KEY': 'test-only', 'YC_API_KEY_ID': '',
+        'SOLUTION_WORKER_ENABLED': os.environ.get('TEST_SOLUTION_WORKER', 'false'),
         'JWT_SECRET': 'test-only-signing-key-not-for-production-123456', 'APP_ENV': 'test',
         'POSTGRES_HOST': parsed.hostname or '127.0.0.1', 'POSTGRES_PORT': str(parsed.port or 5432),
         'POSTGRES_DB': parsed.path[1:], 'POSTGRES_USER': unquote(parsed.username or 'postgres'),

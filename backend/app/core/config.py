@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     yc_api_key: str
     yc_api_key_id: str = ""
 
+    yc_model_solution: str = "yandexgpt-5.1"
+    solution_worker_enabled: bool = True
+
     yc_model_chat: str = "yandexgpt/latest"
     yc_model_embed_doc: str = "text-search-doc/latest"
     yc_model_embed_query: str = "text-search-query/latest"

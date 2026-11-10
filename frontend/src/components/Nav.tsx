@@ -14,6 +14,7 @@ const links = [
   { label: 'Пропустил урок', href: '#missed' },
   { label: 'Задача недели', href: '#weekly' },
   { label: 'Тесты', href: '#quizzes' },
+  { label: 'Проверь решение', href: '#solution-checks' },
   { label: 'Библиотека', href: '#library' },
   { label: 'Обратная связь', href: '#feedback' },
   { label: 'Классы', href: '#classes' },
@@ -40,8 +41,8 @@ export function Nav() {
           : 'border-transparent bg-transparent'
       }`}
     >
-      <div className="mx-auto flex max-w-[1700px] items-center justify-between px-6 py-5 md:px-10">
-        <a href={sectionHref('#top')} data-cursor data-cursor-label="В начало" className="group flex items-center gap-3">
+      <div className="mx-auto flex max-w-[1920px] flex-wrap items-center justify-between gap-x-3 gap-y-4 px-6 py-5 md:gap-x-10 md:px-10">
+        <a href={sectionHref('#top')} data-cursor data-cursor-label="В начало" className="group flex shrink-0 items-center gap-3">
           <span className="relative inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-paper-50/20">
             <span className="font-display text-base italic text-paper-50">∫</span>
           </span>
@@ -50,13 +51,13 @@ export function Nav() {
           </span>
         </a>
 
-        <nav className="hidden items-center gap-5 md:flex lg:gap-8">
+        <nav aria-label="Разделы сайта" className="order-last hidden w-full flex-wrap items-center justify-center gap-x-6 gap-y-3 border-t border-paper-50/10 pt-4 md:flex min-[1800px]:order-none min-[1800px]:w-auto min-[1800px]:flex-1 min-[1800px]:border-0 min-[1800px]:pt-0">
           {links.map((l) => (
             <a
               key={l.href}
               href={l.href.startsWith('#') ? sectionHref(l.href) : l.href}
               data-cursor
-              className="group relative font-mono text-[11px] uppercase tracking-[0.22em] text-paper-50/70 transition-colors hover:text-paper-50"
+              className="group relative shrink-0 whitespace-nowrap font-mono text-[11px] uppercase tracking-[0.22em] text-paper-50/70 transition-colors hover:text-paper-50"
             >
               <span>{l.label}</span>
               <span className="absolute -bottom-1 left-0 h-px w-0 bg-gold-500 transition-all duration-500 ease-out-expo group-hover:w-full" />
@@ -64,7 +65,7 @@ export function Nav() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           <VoiceToggle />
           {student.status === 'authed' ? (
             <Magnetic strength={0.4}>

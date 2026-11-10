@@ -3,16 +3,18 @@ import { AdminUser } from '../lib/api'
 import { LibraryPage } from './admin/LibraryPage'
 import { MaterialsPage } from './admin/MaterialsPage'
 import { PollsPage } from './admin/PollsPage'
+import { SolutionChecksPage } from './admin/SolutionChecksPage'
 import { QuizzesPage } from './admin/QuizzesPage'
 import { StudentsPage } from './admin/StudentsPage'
 import { WeeklyPage } from './admin/WeeklyPage'
 
 const StatisticsPage = lazy(() => import('./admin/StatisticsPage'))
 
-type Tab = 'quizzes' | 'weekly' | 'library' | 'polls' | 'materials' | 'students' | 'statistics'
+type Tab = 'solution-checks' | 'quizzes' | 'weekly' | 'library' | 'polls' | 'materials' | 'students' | 'statistics'
 
 const TABS: { id: Tab; label: string; ready: boolean }[] = [
   { id: 'quizzes', label: 'Тесты', ready: true },
+  { id: 'solution-checks', label: 'Проверь решение', ready: true },
   { id: 'weekly', label: 'Задача недели', ready: true },
   { id: 'library', label: 'Разделы', ready: true },
   { id: 'polls', label: 'Обратная связь', ready: true },
@@ -77,6 +79,7 @@ export function AdminDashboard({
       </nav>
 
       <main className={`${tab === 'statistics' ? 'max-w-7xl' : 'max-w-4xl'} mx-auto px-6 py-10`}>
+        {tab === 'solution-checks' && <SolutionChecksPage token={token} />}
         {tab === 'quizzes' && <QuizzesPage token={token} />}
         {tab === 'weekly' && <WeeklyPage token={token} />}
         {tab === 'library' && <LibraryPage token={token} />}
