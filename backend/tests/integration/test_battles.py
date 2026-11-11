@@ -321,7 +321,7 @@ class BattleWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(after['round']['status'], 'closed')
         self.assertEqual(after['rankings'], before['rankings'])
 
-    async def test_delete_round_requires_admin_confirmation_and_cleans_dependants(self):
+    async def test_delete_round_requires_admin_and_cleans_dependants(self):
         r = await self.round()
         rid = r['id']
         tid = (await self.task(rid))['id']
@@ -330,10 +330,8 @@ class BattleWorkflowTests(unittest.IsolatedAsyncioTestCase):
         await self.call(self.other, 'PUT', f'/battles/{rid}/tasks/{tid}/like', json=dict(enabled=True))
         await self.grade(rid, aid)
         job = await self.worker.repo.claim()
-        await self.call(self.solver, 'DELETE', f'/admin/battles/{rid}', status=401, json=dict(confirm_title=r['title']))
-        await self.call(self.admin, 'DELETE', f'/admin/battles/{rid}', status=422)
-        await self.call(self.admin, 'DELETE', f'/admin/battles/{rid}', status=409, json=dict(confirm_title='Не тот раунд'))
-        await self.call(self.admin, 'DELETE', f'/admin/battles/{rid}', json=dict(confirm_title=r['title']))
+        await self.call(self.solver, 'DELETE', f'/admin/battles/{rid}', status=401)
+        await self.call(self.admin, 'DELETE', f'/admin/battles/{rid}')
         await self.worker.repo.finish_job(job, GRADE)  # no resurrection after an in-flight response
         await self.worker.repo.finish_job(job)  # an in-flight failure is also harmless
         await self.call(self.admin, 'GET', f'/admin/battles/{rid}', status=404)
@@ -347,4 +345,4 @@ class BattleWorkflowTests(unittest.IsolatedAsyncioTestCase):
         # Drafts can be deleted without ever being published.
         draft = await self.round(start=False)
         await self.call(self.admin, 'PUT', f"/admin/battles/{draft['id']}/publication", status=409, json=dict(published=True))
-        await self.call(self.admin, 'DELETE', f"/admin/battles/{draft['id']}", json=dict(confirm_title=draft['title']))
+        await self.call(self.admin, 'DELETE', f"/admin/battles/{draft['id']}")

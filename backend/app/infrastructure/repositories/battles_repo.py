@@ -55,11 +55,9 @@ class BattlesRepository:
                 raise Conflict('Сначала запустите раунд')
             await cur.execute('UPDATE battle_rounds SET is_visible=%s WHERE id=%s', (published, rid))
 
-    async def delete(self, rid, confirm_title):
+    async def delete(self, rid):
         async with self.cursor() as cur:
-            row = await self.round(cur, rid, True)
-            if confirm_title != row['title']:
-                raise Conflict('Для удаления введите точное название раунда')
+            await self.round(cur, rid, True)
             # Reviews cascade from attempts. Delete all dependants in this same
             # transaction; the parent lock excludes submissions and worker writes.
             await cur.execute('DELETE FROM battle_attempts WHERE task_id IN (SELECT id FROM battle_tasks WHERE round_id=%s)', (rid,))

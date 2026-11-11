@@ -69,8 +69,6 @@ function BattleWorkspace({ id, token, onBack }: { id: string; token?: string; on
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [editingRound, setEditingRound] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [deleteTitle, setDeleteTitle] = useState('')
   const [refresh, setRefresh] = useState(0)
   const api = battlesApi(token)
   useEffect(() => {
@@ -110,21 +108,16 @@ function BattleWorkspace({ id, token, onBack }: { id: string; token?: string; on
       {r.status !== 'draft' && <button className={btn} disabled={busy} onClick={() => {
         if (!r.is_visible || confirm('Скрыть раунд от учеников? Задачи, решения, оценки и итоги сохранятся. Сроки раунда продолжат действовать.')) click(() => api.publication(id, !r.is_visible))
       }}>{r.is_visible ? 'Снять с публикации' : 'Опубликовать снова'}</button>}
-      <button className={`${btn} text-red-300`} disabled={busy} onClick={() => { setDeleting(!deleting); setDeleteTitle('') }}>Удалить раунд</button>
+      <button className={`${btn} text-red-300`} disabled={busy} onClick={async () => {
+        if (busy || !confirm(`Удалить раунд «${r.title}» вместе с задачами, решениями, оценками и рейтингом? Это действие нельзя отменить.`)) return
+        setBusy(true); setError('')
+        try { await api.delete(id); onBack() } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+      }}>Удалить раунд</button>
       {r.status === 'draft' && <><button className={btn} onClick={() => setEditingRound(!editingRound)}>Изменить настройки</button><button className={btn} disabled={busy} onClick={() => { if (confirm('Запустить батл? Сроки и состав проверяющих будут зафиксированы.')) click(() => api.transition(id, 'start')) }}>Запустить батл</button></>}
       {r.status === 'open' && <button className={btn} disabled={busy} onClick={() => { if (confirm('Завершить приём задач, решений и лайков? Вернуться к приёму в этом раунде нельзя.')) click(() => api.transition(id, 'stop')) }}>Завершить приём работ</button>}
       {r.status === 'grading' && <><button className={btn} disabled={busy || data.rankings.pending > 0} onClick={() => { if (confirm('Зафиксировать итоговый рейтинг? Изменять оценки после этого нельзя.')) click(() => api.transition(id, 'finalize')) }}>Подвести итоги</button><span className="text-sm self-center">Ждут оценок: {data.rankings.pending}</span></>}
     </div>}
     {token && !r.is_visible && <p className="text-amber-200">Раунд снят с публикации. Ученики его не видят и не могут отправлять работы или голоса. Данные сохранены; сроки не сдвигаются.</p>}
-    {token && deleting && <form className={`${panel} border-red-400/40`} onSubmit={async e => {
-      e.preventDefault(); if (busy || deleteTitle !== r.title) return; setBusy(true); setError('')
-      try { await api.delete(id, deleteTitle); onBack() } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
-    }}>
-      <h3 className="font-serif text-xl">Удалить раунд безвозвратно?</h3>
-      <p className="text-sm">Будут удалены раунд «{r.title}», его задачи ({data.tasks.length}), решения ({data.attempts.length}), лайки, оценки и итоговый рейтинг. Восстановить их через сайт нельзя.</p>
-      <label className="block">Для удаления введите название раунда<input className={field} value={deleteTitle} onChange={e => setDeleteTitle(e.target.value)} autoComplete="off" maxLength={160} required /></label>
-      <div className="flex flex-wrap gap-3"><button className={`${btn} text-red-300`} disabled={busy || deleteTitle !== r.title}>Удалить безвозвратно</button><button type="button" className={btn} disabled={busy} onClick={() => setDeleting(false)}>Отмена</button></div>
-    </form>}
     {token && editingRound && r.status === 'draft' && <RoundEditor initial={r} onSave={async body => { await act(() => api.saveRound(body, id)); setEditingRound(false) }} />}
     <div className="flex flex-wrap gap-2 border-b border-paper-50/15 pb-3" role="tablist" aria-label="Вкладки батла">
       {[['tasks', 'Задачи'], ...(!token ? [['mine', 'Моё участие']] : []), ['reviews', token ? 'Проверка работ' : 'Я проверяю'], ['rankings', 'Итоги и рейтинг']].map(([value, title]) => <button role="tab" aria-selected={tab === value} key={value} className={`${btn} ${tab === value ? 'border-gold-500 text-gold-500' : ''}`} onClick={() => setTab(value)}>{title}</button>)}

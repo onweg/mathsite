@@ -19,7 +19,7 @@ export function battlesApi(token?: string) {
     saveRound: (body: RoundInput, id?: string) => apiJson<BattleRound>(`${root}${id ? '/' + id : ''}`, { method: id ? 'PUT' : 'POST', token, body }),
     transition: (id: string, action: 'start' | 'stop' | 'finalize') => apiJson(`${root}/${id}/${action}`, { method: 'POST', token }),
     publication: (id: string, published: boolean) => apiJson(`${root}/${id}/publication`, { method: 'PUT', token, body: { published } }),
-    delete: (id: string, confirm_title: string) => apiJson(`${root}/${id}`, { method: 'DELETE', token, body: { confirm_title } }),
+    delete: (id: string) => apiJson(`${root}/${id}`, { method: 'DELETE', token }),
     taskStatus: (rid: string, tid: string, action: string, note = '') => apiJson(`${root}/${rid}/tasks/${tid}/status`, { method: 'POST', token, body: { action, note } }),
     saveTask: (rid: string, body: TaskInput) => apiJson(`/battles/${rid}/my-task`, { method: 'PUT', body }),
     like: (rid: string, tid: string, enabled: boolean) => apiJson(`/battles/${rid}/tasks/${tid}/like`, { method: 'PUT', body: { enabled } }),

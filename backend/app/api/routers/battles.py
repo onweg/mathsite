@@ -40,10 +40,6 @@ class PublicationInput(BaseModel):
     published: bool
 
 
-class DeleteInput(BaseModel):
-    confirm_title: str = Field(min_length=3, max_length=160)
-
-
 @admin.get('')
 async def admin_list(db: Repo):
     return await db.list(admin=True)
@@ -71,8 +67,8 @@ async def publication_round(rid: UUID, body: PublicationInput, db: Repo):
 
 
 @admin.delete('/{rid}')
-async def delete_round(rid: UUID, body: DeleteInput, db: Repo):
-    await db.delete(rid, body.confirm_title)
+async def delete_round(rid: UUID, db: Repo):
+    await db.delete(rid)
     return {'ok': True}
 
 
