@@ -31,7 +31,7 @@ export function SolutionChecksPage({ token }: { token: string }) {
     <div className="flex flex-wrap gap-3"><button className={btn} onClick={() => setGenerating(!generating)} disabled={busy}>Сгенерировать задание</button><button className={btn} onClick={() => setEditing('new')} disabled={busy}>Создать вручную</button></div>
     {error && <p role="alert" className="text-red-300">{error}</p>}
     {generating && <form onSubmit={generate} className="rounded-xl border border-gold-500/30 p-5 space-y-4">
-      <label className="block">Тема задания<input className={field} value={topic} onChange={e => setTopic(e.target.value)} minLength={2} maxLength={200} required /></label>
+      <label className="block">Тема задания<input className={field} value={topic} onChange={e => setTopic(e.target.value)} minLength={1} maxLength={200} required /></label>
       <label className="block">Сложность<select className={field} value={difficulty} onChange={e => setDifficulty(e.target.value)}><option value="easy">Простое</option><option value="medium">Среднее</option><option value="hard">Сложное</option></select></label>
       <label className="block">Пожелания нейросети<textarea className={field} value={hint} onChange={e => setHint(e.target.value)} maxLength={1000} placeholder="Например: 8 класс, ошибки раскрытия скобок и переноса слагаемых" /></label>
       <button className={btn} disabled={busy}>{busy ? 'Нейросеть готовит черновик…' : 'Создать черновик с нейросетью'}</button>
@@ -48,8 +48,6 @@ function SolutionEditor({ task, token, onSaved, onBack }: { task: SolutionTask |
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [preview, setPreview] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [deleteTitle, setDeleteTitle] = useState('')
   const published = task?.status === 'published'
   function update(patch: Partial<ExerciseInput>) { setDraft(prev => ({ ...prev, ...patch })); setDirty(true); setReviewed(false) }
   async function action(fn: () => Promise<SolutionTask>) { setBusy(true); setError(''); try { onSaved(await fn()) } catch (e) { setError((e as Error).message) } finally { setBusy(false) } }
@@ -62,22 +60,16 @@ function SolutionEditor({ task, token, onSaved, onBack }: { task: SolutionTask |
       <p className="text-sm text-gold-500">{published ? 'Опубликовано — доступно ученикам' : 'Черновик — скрыто от учеников'}</p>
     {task && (published ? <button className={btn} disabled={busy} onClick={() => action(() => api.unpublish(token, task.id))}>Снять с публикации</button> : <div className="space-y-3"><label className="flex gap-3 items-start text-sm"><input type="checkbox" checked={reviewed} disabled={dirty || busy} onChange={e => setReviewed(e.target.checked)} />Я проверил(а): одно решение правильное, три неверных, эталонные пояснения корректны.</label><button className={btn} disabled={!reviewed || dirty || busy} onClick={() => action(() => api.publish(token, task.id))}>Опубликовать задание</button>{dirty && <p className="text-xs text-paper-50/50">Сначала сохраните изменения.</p>}</div>)}
     {published && <p className="text-sm text-paper-50/60">Для правки верните задание в черновик. Сданные ответы сохранят свою версию задания; новая публикация не сбрасывает попытки.</p>}
-      <button className={`${btn} text-red-300`} disabled={busy} onClick={() => { setDeleting(!deleting); setDeleteTitle('') }}>Удалить задание</button>
+      <button className={`${btn} text-red-300`} disabled={busy} onClick={async () => {
+        if (busy || !confirm(`Вы хотите удалить задание «${task.title}» вместе с ответами учеников и оценками? Это действие нельзя отменить.`)) return
+        setBusy(true); setError('')
+        try { await api.delete(token, task.id); onBack() } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+      }}>Удалить задание</button>
     </div>}
-    {task && deleting && <form className="rounded-xl border border-red-400/40 p-4 space-y-3" onSubmit={async e => {
-      e.preventDefault(); if (busy || deleteTitle !== task.title) return
-      setBusy(true); setError('')
-      try { await api.delete(token, task.id, deleteTitle); onBack() } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
-    }}>
-      <h3 className="font-serif text-xl">Удалить задание безвозвратно?</h3>
-      <p className="text-sm">Задание «{task.title}», все ответы учеников, оценки и история проверок будут удалены. Для временного скрытия используйте снятие с публикации.</p>
-      <label className="block">Для удаления введите название задания<input className={field} value={deleteTitle} onChange={e => setDeleteTitle(e.target.value)} autoComplete="off" maxLength={200} required /></label>
-      <div className="flex flex-wrap gap-3"><button className={`${btn} text-red-300`} disabled={busy || deleteTitle !== task.title}>Удалить безвозвратно</button><button type="button" className={btn} disabled={busy} onClick={() => setDeleting(false)}>Отмена</button></div>
-    </form>}
     <form onSubmit={e => { e.preventDefault(); void action(() => api.save(token, draft, task?.id)) }} className="space-y-5">
       <fieldset disabled={published || busy} className="space-y-4">
         <label className="block">Название<input className={field} value={draft.title} onChange={e => update({ title: e.target.value })} minLength={3} maxLength={200} required /></label>
-        <label className="block">Тема<input className={field} value={draft.topic} onChange={e => update({ topic: e.target.value })} minLength={2} maxLength={200} required /></label>
+        <label className="block">Тема<input className={field} value={draft.topic} onChange={e => update({ topic: e.target.value })} minLength={1} maxLength={200} required /></label>
         <label className="block">Условие<textarea className={field} value={draft.question_md} onChange={e => update({ question_md: e.target.value })} minLength={5} maxLength={5000} required /></label>
         {draft.solutions.map((s, i) => <fieldset key={s.id} className="rounded-xl border border-paper-50/15 p-4 space-y-3"><legend className="px-2">Решение {i + 1}</legend>
           <label className="flex items-center gap-2"><input type="radio" name="teacher-correct" checked={s.is_correct} onChange={() => update({ solutions: draft.solutions.map(x => ({ ...x, is_correct: x.id === s.id })) })} />Правильное решение {i + 1}</label>

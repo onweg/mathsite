@@ -8,7 +8,7 @@ test('battle round: student publication, peer and AI reviews, likes and frozen w
   await page.getByRole('button', { name: 'Математический батл', exact: true }).click()
   await page.getByRole('button', { name: 'Создать раунд', exact: true }).click()
   await page.getByLabel('Название раунда', { exact: true }).fill('Ремонт без лишних расходов')
-  await page.getByLabel('Тема и правила', { exact: true }).fill('Придумайте полезную задачу про ремонт.')
+  await page.getByLabel('Тема и правила', { exact: true }).fill('Быт')
   await page.getByRole('button', { name: 'Сохранить раунд', exact: true }).click()
   await page.getByRole('button', { name: 'Запустить батл', exact: true }).click()
   await expect(page.getByText('Идёт батл', { exact: true })).toBeVisible()

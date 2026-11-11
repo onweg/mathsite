@@ -9,7 +9,7 @@ Reviewer = Literal['teacher', 'author', 'ai']
 class RoundInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     title: str = Field(min_length=3, max_length=160)
-    description: str = Field(min_length=5, max_length=4000)
+    description: str = Field(min_length=1, max_length=4000)
     reviewers: list[Reviewer] = Field(min_length=1, max_length=3)
     task_deadline: AwareDatetime
     solve_deadline: AwareDatetime

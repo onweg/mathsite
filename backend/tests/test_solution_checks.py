@@ -5,7 +5,7 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from app.domain.solution_checks import Exercise, AIGrade, GENERATION_PROMPT
+from app.domain.solution_checks import Exercise, AIGrade, GENERATION_PROMPT, GenerateExercise
 from app.domain.chat.types import Message
 from app.infrastructure.llm.yandex import YandexProvider
 from app.infrastructure.llm.structured import portable_schema
@@ -20,6 +20,14 @@ async def _exercise_validation():
     reply = await FakeLLM().chat([Message(role='system', text=GENERATION_PROMPT)])
     data = json.loads(reply.text)
     Exercise.model_validate(data)
+    for topic in ('x', 'НОД', '  НОК  '):
+        assert GenerateExercise(topic=topic).topic == topic.strip()
+        assert Exercise.model_validate(data | {'topic': topic}).topic == topic.strip()
+    for topic in ('', '   '):
+        with pytest.raises(ValidationError):
+            GenerateExercise(topic=topic)
+        with pytest.raises(ValidationError):
+            Exercise.model_validate(data | {'topic': topic})
     data['solutions'][1]['is_correct'] = True
     with pytest.raises(ValidationError):
         Exercise.model_validate(data)

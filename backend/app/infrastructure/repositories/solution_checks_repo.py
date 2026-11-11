@@ -72,15 +72,13 @@ class SolutionChecksRepository:
                 raise Conflict('ты уже отправил ответ; доступна одна попытка')
             return previous['id']  # retry after a lost HTTP response does not enqueue again
 
-    async def delete_task(self, task_id, confirm_title):
+    async def delete_task(self, task_id):
         async with self.pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
             # Serialize deletion with publication/editing and incoming answers.
             await cur.execute('SELECT data FROM solution_tasks WHERE id=%s FOR UPDATE', (task_id,))
             task = await cur.fetchone()
             if not task:
                 raise NotFound('задание не найдено')
-            if confirm_title != task['data']['title']:
-                raise Conflict('Для удаления введите точное название задания')
             await cur.execute('DELETE FROM solution_attempts WHERE task_id=%s', (task_id,))
             await cur.execute('DELETE FROM solution_tasks WHERE id=%s', (task_id,))
 

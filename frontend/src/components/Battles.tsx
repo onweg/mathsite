@@ -53,7 +53,7 @@ function RoundEditor({ initial, onSave }: { initial?: BattleRound; onSave: (body
     catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }}>
     <label className="block">Название раунда<input className={field} value={title} onChange={e => setTitle(e.target.value)} minLength={3} maxLength={160} required /></label>
-    <label className="block">Тема и правила<textarea className={field} value={description} onChange={e => setDescription(e.target.value)} minLength={5} maxLength={4000} required /></label>
+    <label className="block">Тема и правила<textarea className={field} value={description} onChange={e => setDescription(e.target.value)} minLength={1} maxLength={4000} required /></label>
     <fieldset className="space-y-2"><legend className="mb-2">Кто оценивает решения</legend>{(Object.keys(reviewerNames) as Reviewer[]).map(role => <label key={role} className="flex items-center gap-3"><input type="checkbox" checked={roles.includes(role)} onChange={e => setRoles(prev => e.target.checked ? [...prev, role] : prev.filter(r => r !== role))} />{reviewerNames[role]}</label>)}</fieldset>
     <div className="grid gap-4 sm:grid-cols-2"><label>Задачи принимаются до<input type="datetime-local" className={field} value={taskDate} onChange={e => setTaskDate(e.target.value)} required /></label><label>Решения и лайки принимаются до<input type="datetime-local" className={field} value={solveDate} min={taskDate} onChange={e => setSolveDate(e.target.value)} required /></label></div>
     <p className="text-xs text-paper-50/60">Время указано в часовом поясе вашего устройства. Одна авторская задача на участника. После запуска сроки и состав проверяющих фиксируются.</p>

@@ -16,7 +16,7 @@ class Solution(BaseModel):
 class Exercise(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     title: str = Field(min_length=3, max_length=200)
-    topic: str = Field(min_length=2, max_length=200)
+    topic: str = Field(min_length=1, max_length=200)
     difficulty: Literal['easy', 'medium', 'hard'] = 'medium'
     question_md: str = Field(min_length=5, max_length=5000)
     solutions: list[Solution] = Field(min_length=4, max_length=4)
@@ -36,7 +36,7 @@ class Exercise(BaseModel):
 
 class GenerateExercise(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
-    topic: str = Field(min_length=2, max_length=200)
+    topic: str = Field(min_length=1, max_length=200)
     difficulty: Literal['easy', 'medium', 'hard'] = 'medium'
     hint: str = Field(default='', max_length=1000)
 

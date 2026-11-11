@@ -25,6 +25,11 @@ def test_round_requires_valid_roles_and_ordered_timezone_aware_deadlines():
     now = datetime.now(timezone.utc)
     valid = dict(title='Новый раунд', description='Практические задачи', reviewers=['teacher'], task_deadline=now, solve_deadline=now + timedelta(days=1))
     RoundInput(**valid)
+    for topic in ('x', 'Быт', '  НОК  '):
+        assert RoundInput(**(valid | dict(description=topic))).description == topic.strip()
+    for topic in ('', '   '):
+        with pytest.raises(ValidationError):
+            RoundInput(**(valid | dict(description=topic)))
     for patch in [dict(reviewers=[]), dict(reviewers=['teacher', 'teacher']), dict(reviewers=['student']), dict(solve_deadline=now - timedelta(days=1)), dict(task_deadline=now.replace(tzinfo=None))]:
         with pytest.raises(ValidationError):
             RoundInput(**(valid | patch))
