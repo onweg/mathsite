@@ -42,11 +42,91 @@ class BattlesRepository:
             return [self.round_dto(r) for r in await cur.fetchall()]
 
     def round_dto(self, row):
-        return {k: row[k] for k in ('id', 'title', 'description', 'reviewers', 'task_deadline', 'solve_deadline', 'status', 'is_visible')}
+        return {k: row[k] for k in ('id', 'title', 'description', 'reviewers', 'task_deadline', 'solve_deadline', 'status', 'is_visible', 'submission_format')}
 
     def require_visible(self, row):
         if not row['is_visible']:
             raise NotFound('Раунд снят с публикации')
+
+    def ai_enabled(self, row):
+        return row['submission_format'] == 'text' and 'ai' in row['reviewers']
+
+    async def validate_photos(self, cur, row, sid, purpose, ids):
+        if not ids:
+            return
+        if row['submission_format'] != 'photos':
+            raise Conflict('В этом раунде принимаются только текстовые работы')
+        if len(set(ids)) != len(ids):
+            raise Conflict('Фотографии не должны повторяться')
+        await cur.execute('''SELECT id FROM battle_photos WHERE id=ANY(%s)
+            AND round_id=%s AND owner_id=%s AND purpose=%s''', (ids, row['id'], sid, purpose))
+        if len(await cur.fetchall()) != len(ids):
+            raise Conflict('Фотография недоступна или прикреплена не к тому полю. Загрузите её заново')
+        await cur.execute('UPDATE battle_photos SET used=TRUE WHERE id=ANY(%s)', (ids,))
+
+    async def upload_photo(self, rid, sid, purpose, content, media_type, tid=None):
+        async with self.cursor() as cur:
+            row = await self.round(cur, rid, True)
+            self.accepting(row, tasks=purpose != 'answer')
+            if row['submission_format'] != 'photos':
+                raise Conflict('В этом раунде принимаются только текстовые работы')
+            if purpose == 'answer':
+                task = await self.task(cur, rid, tid)
+                if task['author_id'] == sid or task['status'] != 'published':
+                    raise Conflict('Можно решать только опубликованные чужие задачи')
+                await cur.execute('SELECT 1 FROM battle_attempts WHERE task_id=%s AND student_id=%s', (tid, sid))
+                if await cur.fetchone():
+                    raise Conflict('Решение уже отправлено')
+            else:
+                await cur.execute('''SELECT t.status, EXISTS(SELECT 1 FROM battle_attempts a WHERE a.task_id=t.id) AS answered
+                    FROM battle_tasks t WHERE round_id=%s AND author_id=%s''', (rid, sid))
+                task = await cur.fetchone()
+                if task and (task['status'] != 'draft' or task['answered']):
+                    raise Conflict('Задача уже отправлена или на неё есть решения')
+            # Bound abandoned uploads. Saved photos are retained with their work.
+            await cur.execute("DELETE FROM battle_photos WHERE round_id=%s AND owner_id=%s AND NOT used AND created_at < now()-interval '24 hours'", (rid, sid))
+            await cur.execute('SELECT count(*) AS n FROM battle_photos WHERE round_id=%s AND owner_id=%s AND NOT used', (rid, sid))
+            if (await cur.fetchone())['n'] >= 12:
+                raise Conflict('Слишком много несохранённых фотографий. Удалите лишние вложения')
+            await cur.execute('''INSERT INTO battle_photos(round_id,owner_id,purpose,content,media_type)
+                VALUES (%s,%s,%s,%s,%s) RETURNING id''', (rid, sid, purpose, content, media_type))
+            return (await cur.fetchone())['id']
+
+    async def discard_photo(self, rid, pid, sid):
+        async with self.cursor() as cur:
+            self.require_visible(await self.round(cur, rid, True))
+            # Saved attachments may be in a frozen snapshot; never delete those here.
+            await cur.execute('DELETE FROM battle_photos WHERE id=%s AND round_id=%s AND owner_id=%s AND NOT used', (pid, rid, sid))
+
+    async def photo(self, rid, pid, sid=None, admin=False):
+        async with self.cursor() as cur:
+            row = await self.round(cur, rid, True)
+            if not admin:
+                self.require_visible(row)
+                if row['status'] == 'draft':
+                    raise NotFound('Раунд ещё не запущен')
+            await cur.execute('SELECT * FROM battle_photos WHERE id=%s AND round_id=%s', (pid, rid))
+            photo = await cur.fetchone()
+            if not photo:
+                raise NotFound('Фотография не найдена')
+            allowed = admin or (sid is not None and photo['owner_id'] == sid)
+            if not allowed:
+                # A UUID is not a permission. Check the exact visibility of the
+                # associated task or attempt, including withdrawn tasks/snapshots.
+                await cur.execute('''SELECT 1 FROM battle_tasks t WHERE round_id=%s AND
+                    (t.data->'question_images' ? %s OR (t.data->'reference_images' ? %s AND %s))
+                    AND t.status='published' LIMIT 1''', (rid, str(pid), str(pid), row['status'] == 'closed'))
+                allowed = bool(await cur.fetchone())
+            if not allowed and sid is not None:
+                await cur.execute('''SELECT 1 FROM battle_attempts a JOIN battle_tasks t ON t.id=a.task_id
+                    WHERE t.round_id=%s AND (a.student_id=%s OR (t.author_id=%s AND %s)) AND
+                    (a.images ? %s OR a.snapshot->'question_images' ? %s OR
+                     (a.snapshot->'reference_images' ? %s AND (t.author_id=%s OR %s))) LIMIT 1''',
+                    (rid, sid, sid, 'author' in row['reviewers'], str(pid), str(pid), str(pid), sid, row['status'] == 'closed'))
+                allowed = bool(await cur.fetchone())
+            if not allowed:
+                raise NotFound('Фотография недоступна')
+            return photo
 
     async def publication(self, rid, published):
         async with self.cursor() as cur:
@@ -68,11 +148,11 @@ class BattlesRepository:
         async with self.cursor() as cur:
             if rid and (await self.round(cur, rid, True))['status'] != 'draft':
                 raise Conflict('Правила можно менять только до запуска раунда')
-            values = (body.title, body.description, Jsonb(body.reviewers), body.task_deadline, body.solve_deadline)
+            values = (body.title, body.description, Jsonb(body.reviewers), body.task_deadline, body.solve_deadline, body.submission_format)
             if rid:
-                await cur.execute('UPDATE battle_rounds SET title=%s,description=%s,reviewers=%s,task_deadline=%s,solve_deadline=%s WHERE id=%s RETURNING *', (*values, rid))
+                await cur.execute('UPDATE battle_rounds SET title=%s,description=%s,reviewers=%s,task_deadline=%s,solve_deadline=%s,submission_format=%s WHERE id=%s RETURNING *', (*values, rid))
             else:
-                await cur.execute('INSERT INTO battle_rounds(title,description,reviewers,task_deadline,solve_deadline) VALUES (%s,%s,%s,%s,%s) RETURNING *', values)
+                await cur.execute('INSERT INTO battle_rounds(title,description,reviewers,task_deadline,solve_deadline,submission_format) VALUES (%s,%s,%s,%s,%s,%s) RETURNING *', values)
             return self.round_dto(await cur.fetchone())
 
     async def transition(self, rid, action):
@@ -99,7 +179,10 @@ class BattlesRepository:
 
     async def save_task(self, rid, sid, body):
         async with self.cursor() as cur:
-            self.accepting(await self.round(cur, rid, True), tasks=True)
+            row = await self.round(cur, rid, True)
+            self.accepting(row, tasks=True)
+            await self.validate_photos(cur, row, sid, 'question', body.question_images)
+            await self.validate_photos(cur, row, sid, 'reference', body.reference_images)
             await cur.execute('SELECT * FROM battle_tasks WHERE round_id=%s AND author_id=%s', (rid, sid))
             old = await cur.fetchone()
             if old:
@@ -108,11 +191,17 @@ class BattlesRepository:
                 await cur.execute('SELECT 1 FROM battle_attempts WHERE task_id=%s LIMIT 1', (old['id'],))
                 if await cur.fetchone():
                     raise Conflict('На задачу уже прислали решения. Условие и эталон менять нельзя')
-                if old['data'] != body.model_dump():
+                if old['data'] != body.model_dump(mode='json'):
                     await cur.execute('DELETE FROM battle_likes WHERE task_id=%s', (old['id'],))
-                    await cur.execute("UPDATE battle_tasks SET data=%s,revision=revision+1,moderation_note='' WHERE id=%s", (Jsonb(body.model_dump()), old['id']))
+                    await cur.execute("UPDATE battle_tasks SET data=%s,revision=revision+1,moderation_note='' WHERE id=%s", (Jsonb(body.model_dump(mode='json')), old['id']))
+                    # No attempts exist here, so no snapshot can still need a
+                    # removed task photo. Keep pending uploads for other tabs.
+                    await cur.execute('''DELETE FROM battle_photos p WHERE p.round_id=%s AND p.owner_id=%s
+                        AND p.used AND p.purpose IN ('question','reference') AND NOT EXISTS (
+                        SELECT 1 FROM battle_tasks t WHERE t.round_id=p.round_id AND
+                        (t.data->'question_images' ? p.id::text OR t.data->'reference_images' ? p.id::text))''', (rid, sid))
                 return old['id']
-            await cur.execute('INSERT INTO battle_tasks(round_id,author_id,data) VALUES (%s,%s,%s) RETURNING id', (rid, sid, Jsonb(body.model_dump())))
+            await cur.execute('INSERT INTO battle_tasks(round_id,author_id,data) VALUES (%s,%s,%s) RETURNING id', (rid, sid, Jsonb(body.model_dump(mode='json'))))
             return (await cur.fetchone())['id']
 
     async def task_action(self, rid, tid, action, sid=None, admin=False, note=''):
@@ -158,10 +247,10 @@ class BattlesRepository:
             row = await self.round(cur, rid, True)
             self.require_visible(row)
             task = await self.task(cur, rid, tid)
-            await cur.execute('SELECT id,answer FROM battle_attempts WHERE task_id=%s AND student_id=%s', (tid, sid))
+            await cur.execute('SELECT id,answer,images FROM battle_attempts WHERE task_id=%s AND student_id=%s', (tid, sid))
             previous = await cur.fetchone()
             if previous:
-                if previous['answer'] == body.answer:
+                if previous['answer'] == body.answer and previous['images'] == [str(i) for i in body.images]:
                     return previous['id']  # safe retry after a lost response
                 raise Conflict('Решение уже отправлено: одна попытка на задачу')
             self.accepting(row)
@@ -169,8 +258,9 @@ class BattlesRepository:
                 raise Conflict('Можно решать только опубликованные чужие задачи')
             if task['revision'] != body.revision:
                 raise Conflict('Задача изменилась. Откройте её заново')
-            await cur.execute('INSERT INTO battle_attempts(task_id,student_id,snapshot,answer,ai_status) VALUES (%s,%s,%s,%s,%s) RETURNING id',
-                              (tid, sid, Jsonb(task['data']), body.answer, 'queued' if 'ai' in row['reviewers'] else 'disabled'))
+            await self.validate_photos(cur, row, sid, 'answer', body.images)
+            await cur.execute('INSERT INTO battle_attempts(task_id,student_id,snapshot,answer,ai_status,images) VALUES (%s,%s,%s,%s,%s,%s) RETURNING id',
+                              (tid, sid, Jsonb(task['data']), body.answer, 'queued' if self.ai_enabled(row) else 'disabled', Jsonb([str(i) for i in body.images])))
             return (await cur.fetchone())['id']
 
     async def attempt(self, cur, rid, aid):
@@ -195,7 +285,7 @@ class BattlesRepository:
             if row['status'] not in ('open', 'grading'):
                 raise Conflict('Оценки раунда уже зафиксированы или раунд не начат')
             attempt = await self.attempt(cur, rid, aid)
-            if role not in row['reviewers']:
+            if role not in row['reviewers'] or (role == 'ai' and not self.ai_enabled(row)):
                 raise Conflict('Этот проверяющий не участвует в раунде')
             if not admin and (role != 'author' or attempt['author_id'] != sid):
                 raise Forbidden('Можно проверять только решения своей задачи')
@@ -206,7 +296,7 @@ class BattlesRepository:
                     raise Conflict('Эту оценку уже скорректировал учитель')
             if admin and role != 'teacher' and len(reason.strip()) < 5:
                 raise Conflict('Для корректировки чужой оценки укажите причину')
-            data = body.model_dump()
+            data = body.model_dump(mode='json')
             if admin and role != 'teacher':
                 data.update(corrected_by_teacher=True, correction_reason=reason.strip())
             await self.put_review(cur, aid, role, data)
@@ -276,6 +366,7 @@ class BattlesRepository:
                 data = dict(t['data'])
                 if not admin and not own and row['status'] != 'closed':
                     data.pop('reference', None)
+                    data.pop('reference_images', None)
                 tasks.append(dict(data, id=t['id'], revision=t['revision'], status=t['status'], author_name=t['author_name'], own=own,
                                   likes=t['likes'], liked=t['liked'], has_answers=t['has_answers'], moderation_note=t['moderation_note'] if admin or own else ''))
             reviews = await self.reviews(cur, rid)
@@ -294,7 +385,8 @@ class BattlesRepository:
                 snapshot = dict(a['snapshot'])
                 if not admin and own and row['status'] != 'closed':
                     snapshot.pop('reference', None)
-                attempts.append(dict(id=a['id'], task_id=a['task_id'], own=own, snapshot=snapshot, answer=a['answer'], ai_status=a['ai_status'],
+                    snapshot.pop('reference_images', None)
+                attempts.append(dict(id=a['id'], task_id=a['task_id'], own=own, snapshot=snapshot, answer=a['answer'], images=a['images'], ai_status=a['ai_status'],
                                      student_name=a['student_name'] if admin else None, created_at=a['created_at'],
                                      reviews=data if visible else {k: v for k, v in data.items() if k == role},
                                      review_history={k: v['history'] for k, v in grades.items()} if admin else {},
@@ -310,7 +402,7 @@ class BattlesRepository:
         async with self.cursor() as cur:
             row = await self.round(cur, rid, True)
             await self.attempt(cur, rid, aid)
-            if row['status'] not in ('open', 'grading') or 'ai' not in row['reviewers']:
+            if row['status'] not in ('open', 'grading') or not self.ai_enabled(row):
                 raise Conflict('Проверка недоступна')
             await cur.execute("UPDATE battle_attempts SET ai_status='queued',tries=0,next_run_at=now() WHERE id=%s AND ai_status='failed'", (aid,))
             if not cur.rowcount:
@@ -319,7 +411,7 @@ class BattlesRepository:
     async def claim(self):
         async with self.cursor() as cur:
             # Lock the parent first, matching every other mutation's lock order.
-            await cur.execute('''SELECT r.* FROM battle_rounds r WHERE r.status IN ('open','grading') AND EXISTS (
+            await cur.execute('''SELECT r.* FROM battle_rounds r WHERE r.status IN ('open','grading') AND r.submission_format='text' AND r.reviewers ? 'ai' AND EXISTS (
                 SELECT 1 FROM battle_attempts a JOIN battle_tasks t ON t.id=a.task_id WHERE t.round_id=r.id
                 AND ((a.ai_status='queued' AND a.next_run_at<=now()) OR (a.ai_status='checking' AND a.lease_until<now())))
                 ORDER BY r.created_at LIMIT 1 FOR UPDATE SKIP LOCKED''')
@@ -341,7 +433,7 @@ class BattlesRepository:
         async with self.cursor() as cur:
             await cur.execute('SELECT * FROM battle_rounds WHERE id=%s FOR UPDATE', (job['round_id'],))
             row = await cur.fetchone()
-            if row is None:
+            if row is None or not self.ai_enabled(row):
                 return  # Deleted while the remote model was responding.
             a = await self.attempt(cur, row['id'], job['id'])
             if row['status'] not in ('open', 'grading') or a['ai_status'] != 'checking' or a['lease_id'] != job['lease_id']:

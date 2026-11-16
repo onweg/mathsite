@@ -346,3 +346,139 @@ class BattleWorkflowTests(unittest.IsolatedAsyncioTestCase):
         draft = await self.round(start=False)
         await self.call(self.admin, 'PUT', f"/admin/battles/{draft['id']}/publication", status=409, json=dict(published=True))
         await self.call(self.admin, 'DELETE', f"/admin/battles/{draft['id']}")
+
+    async def photo_round(self, roles=None):
+        r = await self.round(roles or ['teacher', 'author'], start=False)
+        r = await self.call(self.admin, 'PUT', f"/admin/battles/{r['id']}", json=r | dict(submission_format='photos'))
+        await self.call(self.admin, 'POST', f"/admin/battles/{r['id']}/start")
+        return r
+
+    async def upload(self, rid, purpose, client=None, tid=None, status=200, content=None):
+        import base64
+        png = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1cAAAAASUVORK5CYII=')
+        return await self.call(client or self.author, 'POST', f'/battles/{rid}/photos', status=status,
+                               params=dict(purpose=purpose, **({'task_id': tid} if tid else {})),
+                               files={'file': ('photo.png', png if content is None else content, 'image/png')})
+
+    async def test_photo_round_private_reference_human_grading_and_cleanup(self):
+        rid = (await self.photo_round())['id']
+        question = (await self.upload(rid, 'question'))['id']
+        reference = (await self.upload(rid, 'reference'))['id']
+        body = TASK | dict(question='', reference='', question_images=[question], reference_images=[reference])
+        tid = (await self.call(self.author, 'PUT', f'/battles/{rid}/my-task', json=body))['id']
+        url = lambda photo: f'/battles/{rid}/photos/{photo}'
+        for photo in (question, reference):
+            await self.call(self.guest, 'GET', url(photo), status=404)
+            self.assertEqual((await self.admin.get('/admin' + url(photo))).status_code, 200)
+        await self.call(self.author, 'POST', f'/battles/{rid}/tasks/{tid}/status', json=dict(action='submit'))
+        await self.call(self.admin, 'POST', f'/admin/battles/{rid}/tasks/{tid}/status', json=dict(action='approve'))
+        response = await self.guest.get(url(question))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers['cache-control'], 'private, no-store')
+        self.assertEqual(response.headers['content-type'], 'image/png')
+        task = (await self.call(self.solver, 'GET', f'/battles/{rid}'))['tasks'][0]
+        self.assertNotIn('reference_images', task)
+        await self.call(self.solver, 'GET', url(reference), status=404)
+        image = (await self.upload(rid, 'answer', self.solver, tid))['id']
+        answer = dict(revision=task['revision'], answer='', images=[image])
+        aid = (await self.call(self.solver, 'POST', f'/battles/{rid}/tasks/{tid}/answer', status=202, json=answer))['id']
+        again = await self.call(self.solver, 'POST', f'/battles/{rid}/tasks/{tid}/answer', status=202, json=answer)
+        self.assertEqual(again['id'], aid)
+        await self.call(self.solver, 'POST', f'/battles/{rid}/tasks/{tid}/answer', status=409, json=answer | dict(answer='Другой ответ'))
+        await self.upload(rid, 'answer', self.solver, tid, status=409)
+        detail = await self.call(self.solver, 'GET', f'/battles/{rid}')
+        self.assertEqual(detail['attempts'][0]['ai_status'], 'disabled')
+        self.assertNotIn('reference_images', detail['attempts'][0]['snapshot'])
+        self.assertFalse(await self.worker.run_one())
+        for client in (self.other, self.guest):
+            await self.call(client, 'GET', url(image), status=404)
+        self.assertEqual((await self.author.get(url(image))).status_code, 200)
+        self.assertEqual((await self.solver.get(url(image))).status_code, 200)
+        # Withdrawing a task must preserve the submitted snapshot and its photos.
+        await self.call(self.author, 'POST', f'/battles/{rid}/tasks/{tid}/status', json=dict(action='withdraw'))
+        await self.call(self.author, 'PUT', f'/battles/{rid}/my-task', status=409, json=body)
+        await self.upload(rid, 'reference', status=409)
+        await self.call(self.guest, 'GET', url(question), status=404)
+        self.assertEqual((await self.solver.get(url(question))).status_code, 200)
+        await self.call(self.author, 'DELETE', url(reference))
+        self.assertEqual((await self.admin.get('/admin' + url(reference))).status_code, 200)
+        await self.call(self.author, 'POST', f'/battles/{rid}/tasks/{tid}/status', json=dict(action='submit'))
+        await self.call(self.admin, 'POST', f'/admin/battles/{rid}/tasks/{tid}/status', json=dict(action='approve'))
+        await self.call(self.admin, 'PUT', f'/admin/battles/{rid}/attempts/{aid}/review', status=409,
+                        json=dict(role='ai', grade=GRADE, reason='Нельзя включить нейросеть'))
+        await self.call(self.admin, 'POST', f'/admin/battles/{rid}/attempts/{aid}/retry', status=409)
+        # Even a stale queued job cannot send photo-round work to AI.
+        async with await AsyncConnection.connect(database_dsn()) as conn:
+            await conn.execute("UPDATE battle_attempts SET ai_status='queued' WHERE id=%s", (aid,))
+        self.assertFalse(await self.worker.run_one())
+        await self.grade(rid, aid, grade=GRADE | dict(reasoning=2))
+        await self.call(self.author, 'PUT', f'/battles/{rid}/attempts/{aid}/review', json=GRADE)
+        await self.call(self.admin, 'POST', f'/admin/battles/{rid}/stop')
+        await self.call(self.admin, 'POST', f'/admin/battles/{rid}/finalize')
+        final = await self.call(self.solver, 'GET', f'/battles/{rid}')
+        self.assertEqual(final['rankings']['solvers'][0]['score'], 9)
+        self.assertEqual(final['attempts'][0]['snapshot']['reference_images'], [reference])
+        self.assertEqual((await self.solver.get(url(reference))).status_code, 200)
+        await self.call(self.admin, 'PUT', f'/admin/battles/{rid}/publication', json=dict(published=False))
+        for photo in (question, reference, image):
+            await self.call(self.author, 'GET', url(photo), status=404)
+            self.assertEqual((await self.admin.get('/admin' + url(photo))).status_code, 200)
+        await self.call(self.admin, 'DELETE', f'/admin/battles/{rid}')
+        async with await AsyncConnection.connect(database_dsn()) as conn:
+            self.assertEqual((await (await conn.execute('SELECT count(*) FROM battle_photos')).fetchone())[0], 0)
+
+    async def test_photo_rules_and_attachment_ownership(self):
+        from uuid import uuid4
+        r = await self.round(start=False)
+        self.assertEqual(r['submission_format'], 'text')
+        await self.call(self.admin, 'PUT', f"/admin/battles/{r['id']}", status=422, json=r | dict(submission_format='photos'))
+        await self.call(self.admin, 'POST', f"/admin/battles/{r['id']}/start")
+        await self.upload(r['id'], 'question', status=409)
+        await self.call(self.author, 'PUT', f"/battles/{r['id']}/my-task", status=409, json=TASK | dict(question_images=[str(uuid4())]))
+        photo_round = await self.photo_round(['teacher'])
+        rid = photo_round['id']
+        await self.call(self.admin, 'PUT', f'/admin/battles/{rid}', status=409,
+                        json=photo_round | dict(submission_format='text', reviewers=['ai']))
+        await self.upload(rid, 'question', self.guest, status=401)
+        await self.upload(rid, 'question', status=409, content=b'<svg><script>alert(1)</script></svg>')
+        await self.upload(rid, 'question', status=409, content=b'X' * (8 * 1024 * 1024 + 1))
+        photo = (await self.upload(rid, 'reference'))['id']
+        await self.call(self.author, 'PUT', f'/battles/{rid}/my-task', status=409, json=TASK | dict(question_images=[photo]))
+        await self.call(self.other, 'PUT', f'/battles/{rid}/my-task', status=409, json=TASK | dict(reference_images=[photo]))
+        other_round = await self.photo_round()
+        await self.call(self.author, 'PUT', f"/battles/{other_round['id']}/my-task", status=409, json=TASK | dict(reference_images=[photo]))
+        await self.call(self.author, 'PUT', f'/battles/{rid}/my-task', status=409, json=TASK | dict(reference_images=[photo, photo]))
+        await self.call(self.author, 'PUT', f'/battles/{rid}/my-task', status=422, json=TASK | dict(reference_images=[photo] * 4))
+        pending = (await self.upload(rid, 'question'))['id']
+        await self.call(self.author, 'DELETE', f'/battles/{rid}/photos/{pending}')
+        await self.call(self.author, 'GET', f'/battles/{rid}/photos/{pending}', status=404)
+        await self.call(self.author, 'PUT', f'/battles/{rid}/my-task', json=TASK | dict(reference_images=[photo]))
+        await self.call(self.author, 'DELETE', f'/battles/{rid}/photos/{photo}')
+        self.assertEqual((await self.author.get(f'/battles/{rid}/photos/{photo}')).status_code, 200)
+        await self.call(self.author, 'PUT', f'/battles/{rid}/my-task', json=TASK)
+        await self.call(self.author, 'GET', f'/battles/{rid}/photos/{photo}', status=404)
+        # Text-only answers in photo rounds are also excluded from AI grading.
+        task = await self.task(rid)
+        aid = (await self.answer(rid, task))['id']
+        self.assertFalse(await self.worker.run_one())
+        detail = await self.call(self.solver, 'GET', f'/battles/{rid}')
+        self.assertEqual(detail['attempts'][0]['ai_status'], 'disabled')
+        await self.grade(rid, aid)
+        self.assertEqual((await self.call(self.solver, 'GET', f'/battles/{rid}'))['attempts'][0]['score'], 10)
+        # A task author who isn't a reviewer cannot inspect someone else's photo answer.
+        image = (await self.upload(rid, 'answer', self.other, task['id']))['id']
+        await self.call(self.other, 'POST', f"/battles/{rid}/tasks/{task['id']}/answer", status=202,
+                        json=dict(revision=task['revision'], images=[image]))
+        await self.call(self.author, 'GET', f'/battles/{rid}/photos/{image}', status=404)
+        await self.call(self.solver, 'GET', f'/battles/{rid}/photos/{image}', status=404)
+
+    async def test_pending_photo_upload_limit_and_expiry(self):
+        rid = (await self.photo_round())['id']
+        for _ in range(12):
+            await self.upload(rid, 'question')
+        await self.upload(rid, 'question', status=409)
+        async with await AsyncConnection.connect(database_dsn()) as conn:
+            await conn.execute("UPDATE battle_photos SET created_at=now()-interval '25 hours' WHERE round_id=%s", (rid,))
+        await self.upload(rid, 'question')
+        async with await AsyncConnection.connect(database_dsn()) as conn:
+            self.assertEqual((await (await conn.execute('SELECT count(*) FROM battle_photos WHERE round_id=%s', (rid,))).fetchone())[0], 1)

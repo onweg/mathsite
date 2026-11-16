@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Markdown } from './Markdown'
 import { useStudent } from '../lib/student'
 import { ApiError } from '../lib/api'
+import { BattlePhotos, BattlePhotoPicker } from './BattlePhotos'
 import { BattleRound, BattleDetail, BattleTask, BattleAttempt, BattleGrade, TaskInput, RoundInput, Reviewer, Rank, battlesApi, reviewerNames } from '../lib/battles'
 
 const btn = 'inline-flex items-center justify-center rounded-lg border border-paper-50/25 px-4 py-2 text-sm hover:border-gold-500 disabled:opacity-40'
@@ -42,6 +43,7 @@ function RoundEditor({ initial, onSave }: { initial?: BattleRound; onSave: (body
   const localDate = (date: Date) => new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
   const [title, setTitle] = useState(initial?.title ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
+  const [format, setFormat] = useState<'text' | 'photos'>(initial?.submission_format ?? 'text')
   const [roles, setRoles] = useState<Reviewer[]>(initial?.reviewers ?? ['teacher', 'author', 'ai'])
   const [taskDate, setTaskDate] = useState(localDate(initial ? new Date(initial.task_deadline) : new Date(Date.now() + 7 * 86400_000)))
   const [solveDate, setSolveDate] = useState(localDate(initial ? new Date(initial.solve_deadline) : new Date(Date.now() + 14 * 86400_000)))
@@ -49,14 +51,20 @@ function RoundEditor({ initial, onSave }: { initial?: BattleRound; onSave: (body
   const [error, setError] = useState('')
   return <form className={panel} onSubmit={async e => {
     e.preventDefault(); if (busy) return; setBusy(true); setError('')
-    try { await onSave({ title, description, reviewers: roles, task_deadline: new Date(taskDate).toISOString(), solve_deadline: new Date(solveDate).toISOString() }) }
+    try { await onSave({ title, description, reviewers: roles, submission_format: format, task_deadline: new Date(taskDate).toISOString(), solve_deadline: new Date(solveDate).toISOString() }) }
     catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }}>
     <label className="block">Название раунда<input className={field} value={title} onChange={e => setTitle(e.target.value)} minLength={3} maxLength={160} required /></label>
     <label className="block">Тема и правила<textarea className={field} value={description} onChange={e => setDescription(e.target.value)} minLength={1} maxLength={4000} required /></label>
-    <fieldset className="space-y-2"><legend className="mb-2">Кто оценивает решения</legend>{(Object.keys(reviewerNames) as Reviewer[]).map(role => <label key={role} className="flex items-center gap-3"><input type="checkbox" checked={roles.includes(role)} onChange={e => setRoles(prev => e.target.checked ? [...prev, role] : prev.filter(r => r !== role))} />{reviewerNames[role]}</label>)}</fieldset>
+    <label className="block">Формат работ<select aria-label="Формат работ" className={field} value={format} onChange={e => {
+      const value = e.target.value as 'text' | 'photos'
+      setFormat(value)
+      if (value === 'photos') setRoles(prev => prev.filter(role => role !== 'ai'))
+    }}><option value="text">Только текст</option><option value="photos">Текст и фотографии</option></select></label>
+    <p className="text-sm text-paper-50/65">{format === 'photos' ? 'Можно прикреплять фото условия, эталона и решения. Нейросеть не проверяет ни одну работу этого раунда, даже текстовую. Выберите учителя и/или автора задачи.' : 'Все условия, эталоны и решения вводятся текстом. Нейросеть можно назначить проверяющим.'}</p>
+    <fieldset className="space-y-2"><legend className="mb-2">Кто оценивает решения</legend>{(Object.keys(reviewerNames) as Reviewer[]).map(role => <label key={role} className="flex items-center gap-3"><input type="checkbox" disabled={role === 'ai' && format === 'photos'} checked={roles.includes(role)} onChange={e => setRoles(prev => e.target.checked ? [...prev, role] : prev.filter(r => r !== role))} />{reviewerNames[role]}</label>)}</fieldset>
     <div className="grid gap-4 sm:grid-cols-2"><label>Задачи принимаются до<input type="datetime-local" className={field} value={taskDate} onChange={e => setTaskDate(e.target.value)} required /></label><label>Решения и лайки принимаются до<input type="datetime-local" className={field} value={solveDate} min={taskDate} onChange={e => setSolveDate(e.target.value)} required /></label></div>
-    <p className="text-xs text-paper-50/60">Время указано в часовом поясе вашего устройства. Одна авторская задача на участника. После запуска сроки и состав проверяющих фиксируются.</p>
+    <p className="text-xs text-paper-50/60">Время указано в часовом поясе вашего устройства. Одна авторская задача на участника. После запуска формат работ, сроки и состав проверяющих фиксируются.</p>
     {error && <p role="alert" className="text-red-300">{error}</p>}
     <button className={btn} disabled={busy || !roles.length}>{busy ? 'Сохраняем…' : 'Сохранить раунд'}</button>
   </form>
@@ -102,6 +110,7 @@ function BattleWorkspace({ id, token, onBack }: { id: string; token?: string; on
   return <div className="space-y-6">
     <button className={btn} onClick={onBack}>К раундам</button>
     <div className="space-y-3"><p className="text-gold-500 text-sm">{roundStatus[r.status]}</p><h2 className="font-serif text-3xl">{r.title}</h2><Markdown text={r.description} /><p className="text-sm text-paper-50/60">Задачи до {when(r.task_deadline)} · решения и лайки до {when(r.solve_deadline)}</p><p className="text-sm">Проверяют: {r.reviewers.map(role => reviewerNames[role]).join(', ')}. Итог — среднее всех назначенных оценок, каждая от 0 до 10.</p></div>
+    <p className="text-sm text-paper-50/65">{r.submission_format === 'photos' ? 'Формат: текст и фотографии. Нейросеть отключена для всех работ раунда.' : 'Формат: только текст. Фотографии не принимаются.'}</p>
     {error && <p role="alert" className="text-red-300">{error}</p>}
     {!token && !participant && <p>Для участия <a href="/me" className="text-gold-500 underline">войдите по личному QR-коду</a>.</p>}
     {token && <div className="flex flex-wrap gap-3">
@@ -113,7 +122,7 @@ function BattleWorkspace({ id, token, onBack }: { id: string; token?: string; on
         setBusy(true); setError('')
         try { await api.delete(id); onBack() } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
       }}>Удалить раунд</button>
-      {r.status === 'draft' && <><button className={btn} onClick={() => setEditingRound(!editingRound)}>Изменить настройки</button><button className={btn} disabled={busy} onClick={() => { if (confirm('Запустить батл? Сроки и состав проверяющих будут зафиксированы.')) click(() => api.transition(id, 'start')) }}>Запустить батл</button></>}
+      {r.status === 'draft' && <><button className={btn} onClick={() => setEditingRound(!editingRound)}>Изменить настройки</button><button className={btn} disabled={busy} onClick={() => { if (confirm('Запустить батл? Формат работ, сроки и состав проверяющих будут зафиксированы.')) click(() => api.transition(id, 'start')) }}>Запустить батл</button></>}
       {r.status === 'open' && <button className={btn} disabled={busy} onClick={() => { if (confirm('Завершить приём задач, решений и лайков? Вернуться к приёму в этом раунде нельзя.')) click(() => api.transition(id, 'stop')) }}>Завершить приём работ</button>}
       {r.status === 'grading' && <><button className={btn} disabled={busy || data.rankings.pending > 0} onClick={() => { if (confirm('Зафиксировать итоговый рейтинг? Изменять оценки после этого нельзя.')) click(() => api.transition(id, 'finalize')) }}>Подвести итоги</button><span className="text-sm self-center">Ждут оценок: {data.rankings.pending}</span></>}
     </div>}
@@ -125,19 +134,19 @@ function BattleWorkspace({ id, token, onBack }: { id: string; token?: string; on
     </div>
     {tab === 'tasks' && <div className="space-y-5">
       {!data.tasks.length && <p className="text-paper-50/60">Задач пока нет. Своя задача создаётся во вкладке «Моё участие».</p>}
-      {data.tasks.map(t => <TaskCard key={t.id} task={t} detail={data} admin={!!token} participant={participant} busy={busy} onAction={(action, note) => act(() => api.taskStatus(id, t.id, action, note))} onLike={() => act(() => api.like(id, t.id, !t.liked))} onAnswer={answer => act(() => api.answer(id, t, answer))} />)}
+      {data.tasks.map(t => <TaskCard key={t.id} task={t} detail={data} admin={!!token} token={token} participant={participant} busy={busy} onAction={(action, note) => act(() => api.taskStatus(id, t.id, action, note))} onLike={() => act(() => api.like(id, t.id, !t.liked))} onAnswer={(answer, images) => act(() => api.answer(id, t, answer, images))} />)}
     </div>}
     {tab === 'mine' && <div className="space-y-6">
       {participant && <><h3 className="font-serif text-2xl">Моя задача</h3>{mine && <p className="text-gold-500">{taskStatus[mine.status]}{mine.moderation_note && ` · ${mine.moderation_note}`}</p>}
-        {data.can_author && (!mine || (mine.status === 'draft' && !mine.has_answers)) ? <TaskEditor key={mine ? `${mine.id}-${mine.revision}` : 'new'} initial={mine} onSave={body => act(() => api.saveTask(id, body))} /> : <p className="text-sm text-paper-50/60">{mine?.has_answers ? 'Уже есть решения: условие и эталон зафиксированы.' : mine ? 'Для редактирования верните задачу в черновик, пока открыт приём задач.' : 'Приём авторских задач закрыт.'}</p>}
+        {data.can_author && (!mine || (mine.status === 'draft' && !mine.has_answers)) ? <TaskEditor key={mine ? `${mine.id}-${mine.revision}` : 'new'} initial={mine} rid={id} photos={r.submission_format === 'photos'} onSave={body => act(() => api.saveTask(id, body))} /> : <p className="text-sm text-paper-50/60">{mine?.has_answers ? 'Уже есть решения: условие и эталон зафиксированы.' : mine ? 'Для редактирования верните задачу в черновик, пока открыт приём задач.' : 'Приём авторских задач закрыт.'}</p>}
         {mine && <TaskCard task={mine} detail={data} participant admin={false} busy={busy} onAction={(action, note) => act(() => api.taskStatus(id, mine.id, action, note))} onLike={async () => {}} onAnswer={async () => {}} />}
-        <h3 className="font-serif text-2xl">Мои решения</h3>{!data.attempts.some(a => a.own) && <p>Пока нет отправленных решений.</p>}{data.attempts.filter(a => a.own).map(a => <AttemptCard key={a.id} attempt={a} roles={r.reviewers} />)}</>}
+        <h3 className="font-serif text-2xl">Мои решения</h3>{!data.attempts.some(a => a.own) && <p>Пока нет отправленных решений.</p>}{data.attempts.filter(a => a.own).map(a => <AttemptCard key={a.id} rid={id} attempt={a} roles={r.reviewers} />)}</>}
       {!participant && <p>Войдите по QR-коду, чтобы участвовать.</p>}
     </div>}
     {tab === 'reviews' && <div className="space-y-5">
       {!token && !r.reviewers.includes('author') && <p>В этом раунде авторы задач не выставляют оценки.</p>}
       {!data.attempts.some(a => !a.own) && <p>Пока нет работ для проверки.</p>}
-      {data.attempts.filter(a => !a.own).map(a => <div key={a.id} className={panel}><AttemptCard attempt={a} roles={r.reviewers} />
+      {data.attempts.filter(a => !a.own).map(a => <div key={a.id} className={panel}><AttemptCard rid={id} token={token} attempt={a} roles={r.reviewers} />
         {a.can_review && <GradeEditor initial={a.reviews[token ? 'teacher' : 'author']} label={token ? 'Оценка учителя' : 'Оценка автора'} onSave={(grade) => act(() => api.review(id, a.id, token ? 'teacher' : 'author', grade, ''))} />}
         {token && r.status !== 'closed' && <>
           {a.ai_status === 'failed' && <button className={btn} disabled={busy} onClick={() => click(() => api.retry(id, a.id))}>Повторить проверку нейросетью</button>}
@@ -149,28 +158,31 @@ function BattleWorkspace({ id, token, onBack }: { id: string; token?: string; on
   </div>
 }
 
-function TaskEditor({ initial, onSave }: { initial?: BattleTask; onSave: (body: TaskInput) => Promise<unknown> }) {
-  const [draft, setDraft] = useState<TaskInput>({ title: initial?.title ?? '', question: initial?.question ?? '', practical_use: initial?.practical_use ?? '', reference: initial?.reference ?? '' })
+function TaskEditor({ initial, onSave, rid, photos }: { initial?: BattleTask; rid: string; photos: boolean; onSave: (body: TaskInput) => Promise<unknown> }) {
+  const [draft, setDraft] = useState<TaskInput>({ title: initial?.title ?? '', question: initial?.question ?? '', practical_use: initial?.practical_use ?? '', reference: initial?.reference ?? '', question_images: initial?.question_images ?? [], reference_images: initial?.reference_images ?? [] })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   return <form className={panel} onSubmit={async e => { e.preventDefault(); if (busy) return; setBusy(true); setError(''); try { await onSave(draft) } catch (e) { setError((e as Error).message) } finally { setBusy(false) } }}>
     <p className="text-sm text-paper-50/60">Одна задача на раунд. Сначала сохраните черновик, затем отправьте учителю на публикацию. При изменении условия прежние лайки сбрасываются.</p>
-    {([['title', 'Название задачи', 3, 160], ['question', 'Условие задачи', 10, 5000], ['practical_use', 'Где пригодится в жизни', 5, 1500], ['reference', 'Эталонное решение и ответ', 5, 5000]] as const).map(([key, label, min, max]) => <label key={key} className="block">{label}<textarea className={field} rows={key === 'title' ? 1 : 4} value={draft[key]} onChange={e => setDraft(prev => ({ ...prev, [key]: e.target.value }))} minLength={min} maxLength={max} required /></label>)}
-    <p className="text-xs text-paper-50/60">Эталон увидят учитель и назначенная нейросеть. Остальным ученикам он откроется после подведения итогов.</p>
+    {([['title', 'Название задачи', 3, 160], ['question', 'Условие задачи', 10, 5000], ['practical_use', 'Где пригодится в жизни', 5, 1500], ['reference', 'Эталонное решение и ответ', 5, 5000]] as const).map(([key, label, min, max]) => <label key={key} className="block">{label}<textarea className={field} rows={key === 'title' ? 1 : 4} value={draft[key]} onChange={e => setDraft(prev => ({ ...prev, [key]: e.target.value }))} minLength={photos && (key === 'question' || key === 'reference') ? undefined : min} maxLength={max} required={key === 'title' || key === 'practical_use' || !(key === 'question' ? draft.question_images?.length : draft.reference_images?.length)} /></label>)}
+    {photos && <><BattlePhotoPicker rid={rid} purpose="question" label="Фото условия" ids={draft.question_images ?? []} disabled={busy} onBusy={setBusy} onChange={ids => setDraft(d => ({ ...d, question_images: ids }))} /><BattlePhotoPicker rid={rid} purpose="reference" label="Фото эталона" ids={draft.reference_images ?? []} disabled={busy} onBusy={setBusy} onChange={ids => setDraft(d => ({ ...d, reference_images: ids }))} /></>}
+    <p className="text-xs text-paper-50/60">Эталон увидит учитель{!photos && ' и назначенная нейросеть'}. Остальным ученикам он откроется после подведения итогов.</p>
     {error && <p role="alert" className="text-red-300">{error}</p>}<button className={btn} disabled={busy}>{busy ? 'Сохраняем…' : 'Сохранить задачу'}</button>
   </form>
 }
 
-function TaskCard({ task: t, detail, admin, participant, busy, onAction, onLike, onAnswer }: { task: BattleTask; detail: BattleDetail; admin: boolean; participant: boolean; busy: boolean; onAction: (action: string, note?: string) => Promise<unknown>; onLike: () => Promise<unknown>; onAnswer: (answer: string) => Promise<unknown> }) {
+function TaskCard({ task: t, detail, admin, token, participant, busy, onAction, onLike, onAnswer }: { task: BattleTask; detail: BattleDetail; admin: boolean; token?: string; participant: boolean; busy: boolean; onAction: (action: string, note?: string) => Promise<unknown>; onLike: () => Promise<unknown>; onAnswer: (answer: string, images: string[]) => Promise<unknown> }) {
   const [answer, setAnswer] = useState('')
+  const [images, setImages] = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
   const [solving, setSolving] = useState(false)
   const [note, setNote] = useState('')
   const done = detail.attempts.some(a => a.own && a.task_id === t.id)
   const act = (fn: () => Promise<unknown>) => { void fn().catch(() => {}) }
   return <article className={panel}>
     <div className="flex flex-wrap justify-between gap-3"><h3 className="font-serif text-2xl">{t.title}</h3><span className="text-xs text-gold-500">{taskStatus[t.status]}</span></div>
-    <p className="text-xs text-paper-50/60">Автор: {t.author_name} · Лайки: {t.likes}</p><Markdown text={t.question} /><p className="text-sm text-sage-300">В жизни: {t.practical_use}</p>
-    {t.reference && <details><summary className="cursor-pointer text-sm text-gold-500">Эталонное решение</summary><Markdown text={t.reference} /></details>}
+    <p className="text-xs text-paper-50/60">Автор: {t.author_name} · Лайки: {t.likes}</p><Markdown text={t.question} /><BattlePhotos rid={detail.round.id} token={token} ids={t.question_images} label="Фото условия" /><p className="text-sm text-sage-300">В жизни: {t.practical_use}</p>
+    {(t.reference || !!t.reference_images?.length) && <details><summary className="cursor-pointer text-sm text-gold-500">Эталонное решение</summary><Markdown text={t.reference ?? ''} /><BattlePhotos rid={detail.round.id} token={token} ids={t.reference_images} label="Фото эталона" /></details>}
     {t.moderation_note && <p className="text-sm">Комментарий учителя: {t.moderation_note}</p>}
     <div className="flex flex-wrap gap-3">
       {t.own && detail.can_author && t.status === 'draft' && <button className={btn} disabled={busy} onClick={() => act(() => onAction('submit'))}>На проверку учителю</button>}
@@ -178,16 +190,16 @@ function TaskCard({ task: t, detail, admin, participant, busy, onAction, onLike,
       {participant && !t.own && t.status === 'published' && <><button className={btn} disabled={busy || !detail.can_solve} aria-pressed={t.liked} onClick={() => act(onLike)}>{t.liked ? 'Снять лайк' : 'Поставить лайк'}</button>{done ? <span className="self-center text-sm text-sage-300">Решение отправлено · см. «Моё участие»</span> : <button className={btn} disabled={!detail.can_solve} onClick={() => setSolving(!solving)}>Решить задачу</button>}</>}
     </div>
     {admin && t.status === 'pending' && detail.can_solve && <div className="space-y-3"><p className="text-sm text-paper-50/65">Проверьте условие, практический смысл и эталон перед публикацией.</p><label className="block">Комментарий автору<textarea className={field} value={note} onChange={e => setNote(e.target.value)} maxLength={1500} /></label><div className="flex flex-wrap gap-3"><button className={btn} disabled={busy} onClick={() => { if (confirm('Условие и эталон проверены? Опубликовать задачу?')) act(() => onAction('approve', note)) }}>Одобрить и опубликовать</button><button className={btn} disabled={busy || note.trim().length < 3} onClick={() => act(() => onAction('return', note))}>Вернуть на доработку</button></div></div>}
-    {solving && !done && <form className="space-y-3" onSubmit={async e => { e.preventDefault(); if (busy || !confirm('Отправить окончательное решение? Доступна одна попытка, изменить ответ будет нельзя.')) return; try { await onAnswer(answer); setSolving(false) } catch { /* parent displays the error */ } }}><label className="block">Моё решение<textarea className={`${field} min-h-40`} value={answer} onChange={e => setAnswer(e.target.value)} minLength={5} maxLength={6000} required placeholder="Объясни ход решения, приведи вычисления и ответ в контексте задачи." /></label><button className={btn} disabled={busy || !detail.can_solve}>Отправить решение</button></form>}
+    {solving && !done && <form className="space-y-3" onSubmit={async e => { e.preventDefault(); if (busy || uploading || !confirm('Отправить окончательное решение? Доступна одна попытка, изменить ответ будет нельзя.')) return; try { await onAnswer(answer, images); setSolving(false) } catch { /* parent displays the error */ } }}><label className="block">Моё решение<textarea className={`${field} min-h-40`} value={answer} onChange={e => setAnswer(e.target.value)} minLength={images.length ? undefined : 5} maxLength={6000} required={!images.length} placeholder="Объясни ход решения, приведи вычисления и ответ в контексте задачи." /></label>{detail.round.submission_format === 'photos' && <BattlePhotoPicker rid={detail.round.id} taskId={t.id} purpose="answer" label="Фото решения" ids={images} disabled={busy || uploading} onBusy={setUploading} onChange={setImages} />}<button className={btn} disabled={busy || uploading || !detail.can_solve}>Отправить решение</button></form>}
   </article>
 }
 
-function AttemptCard({ attempt: a, roles }: { attempt: BattleAttempt; roles: Reviewer[] }) {
+function AttemptCard({ attempt: a, roles, rid, token }: { rid: string; token?: string; attempt: BattleAttempt; roles: Reviewer[] }) {
   const scores = Object.values(a.reviews).map(gradeScore)
   return <article className={panel}>
     <h4 className="font-serif text-xl">{a.snapshot.title}</h4><p className="text-sm text-paper-50/60">{a.student_name ?? (a.own ? 'Моё решение' : 'Анонимная работа')} · {when(a.created_at)}</p>
-    <details><summary className="cursor-pointer text-sm">Условие задачи{a.snapshot.reference ? ' и эталон' : ''}</summary><Markdown text={a.snapshot.question} />{a.snapshot.reference && <Markdown text={a.snapshot.reference} />}</details>
-    <Markdown text={a.answer} />
+    <details><summary className="cursor-pointer text-sm">Условие задачи{a.snapshot.reference || a.snapshot.reference_images?.length ? ' и эталон' : ''}</summary><Markdown text={a.snapshot.question} /><BattlePhotos rid={rid} token={token} ids={a.snapshot.question_images} label="Фото условия" />{a.snapshot.reference && <Markdown text={a.snapshot.reference} />}<BattlePhotos rid={rid} token={token} ids={a.snapshot.reference_images} label="Фото эталона" /></details>
+    <Markdown text={a.answer} /><BattlePhotos rid={rid} token={token} ids={a.images} label="Фото решения" />
     <p className="font-mono text-gold-500">{a.score === null ? 'Ожидает полного набора оценок' : `Итог: ${a.score} / 10`}</p>
     {scores.length > 1 && Math.max(...scores) - Math.min(...scores) >= 4 && <p className="text-sm text-amber-300">Есть расхождение оценок: требуется внимание учителя.</p>}
     {roles.map(role => { const grade = a.reviews[role]; return <div key={role} className="border-l border-paper-50/20 pl-3 text-sm space-y-2"><p className="text-gold-500">{grade ? grade.corrected_by_teacher ? `${reviewerNames[role]} · оценка скорректирована учителем` : role === 'ai' ? 'Проверено нейросетью' : `Проверено: ${reviewerNames[role]}` : `${reviewerNames[role]} · ${role === 'ai' && a.ai_status === 'failed' ? 'сбой проверки — нужна помощь учителя' : 'ожидается оценка или скрыта до вашей проверки'}`}{grade && ` · ${gradeScore(grade)} / 10`}</p>{grade && <><p className="text-xs text-paper-50/60">Рассуждения {grade.reasoning}/4 · вычисления {grade.calculations}/4 · жизненный контекст {grade.context}/2</p><Markdown text={grade.feedback} />{grade.correction_reason && <p>Причина корректировки: {grade.correction_reason}</p>}</>}{!!a.review_history[role]?.length && <details><summary>История оценок ({a.review_history[role]!.length})</summary>{a.review_history[role]!.map((h, i) => <p key={i}>{when(h.at)} · {gradeScore(h.data)} / 10 · {h.data.feedback}</p>)}</details>}</div> })}

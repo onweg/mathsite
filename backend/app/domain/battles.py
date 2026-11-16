@@ -1,5 +1,6 @@
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, AwareDatetime, model_validator
 
@@ -11,11 +12,14 @@ class RoundInput(BaseModel):
     title: str = Field(min_length=3, max_length=160)
     description: str = Field(min_length=1, max_length=4000)
     reviewers: list[Reviewer] = Field(min_length=1, max_length=3)
+    submission_format: Literal['text', 'photos'] = 'text'
     task_deadline: AwareDatetime
     solve_deadline: AwareDatetime
 
     @model_validator(mode='after')
     def valid(self):
+        if self.submission_format == 'photos' and 'ai' in self.reviewers:
+            raise ValueError('В раунде с фотографиями нейросеть не участвует в проверке')
         if len(set(self.reviewers)) != len(self.reviewers):
             raise ValueError('Проверяющие не должны повторяться')
         if self.task_deadline > self.solve_deadline:
@@ -26,15 +30,32 @@ class RoundInput(BaseModel):
 class TaskInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     title: str = Field(min_length=3, max_length=160)
-    question: str = Field(min_length=10, max_length=5000)
+    question: str = Field(default='', max_length=5000)
     practical_use: str = Field(min_length=5, max_length=1500)
-    reference: str = Field(min_length=5, max_length=5000)
+    reference: str = Field(default='', max_length=5000)
+    question_images: list[UUID] = Field(default_factory=list, max_length=3)
+    reference_images: list[UUID] = Field(default_factory=list, max_length=3)
+
+    @model_validator(mode='after')
+    def content(self):
+        if not self.question_images and len(self.question) < 10:
+            raise ValueError('Добавьте условие текстом (от 10 символов) или фотографиями')
+        if not self.reference_images and len(self.reference) < 5:
+            raise ValueError('Добавьте эталон текстом (от 5 символов) или фотографиями')
+        return self
 
 
 class AnswerInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     revision: int = Field(ge=1)
-    answer: str = Field(min_length=5, max_length=6000)
+    answer: str = Field(default='', max_length=6000)
+    images: list[UUID] = Field(default_factory=list, max_length=3)
+
+    @model_validator(mode='after')
+    def content(self):
+        if not self.images and len(self.answer) < 5:
+            raise ValueError('Добавьте решение текстом (от 5 символов) или фотографиями')
+        return self
 
 
 class ReviewInput(BaseModel):

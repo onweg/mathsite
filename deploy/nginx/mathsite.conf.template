@@ -47,6 +47,14 @@ server {
         proxy_pass http://127.0.0.1:8000;
     }
 
+    # Фото батла: один файл до 8 МБ плюс заголовки multipart.
+    location ~ ^/api/battles/[0-9a-fA-F-]+/photos$ {
+        client_max_body_size 9m;
+        proxy_read_timeout 90s;
+        rewrite ^/api/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8000;
+    }
+
     location /api/ {
         rewrite ^/api/(.*)$ /$1 break;
         proxy_pass http://127.0.0.1:8000;

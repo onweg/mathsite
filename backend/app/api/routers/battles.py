@@ -1,13 +1,14 @@
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, UploadFile, File, Response
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_current_admin, get_current_student, get_optional_student
 from app.api.routers.solution_checks import private_response
 from app.domain.battles import RoundInput, TaskInput, AnswerInput, ReviewInput, Reviewer
 from app.domain.student.types import Student
+from app.core.errors import Conflict
 
 router = APIRouter(prefix='/battles', tags=['battles'], dependencies=[Depends(private_response)])
 admin = APIRouter(prefix='/admin/battles', tags=['admin:battles'], dependencies=[Depends(get_current_admin), Depends(private_response)])
@@ -19,6 +20,53 @@ def repo(request: Request):
 
 
 Repo = Annotated[object, Depends(repo)]
+
+
+def photo_response(photo):
+    return Response(bytes(photo['content']), media_type=photo['media_type'], headers={
+        'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
+        'Content-Disposition': 'inline',
+    })
+
+
+@admin.get('/{rid}/photos/{pid}')
+async def admin_photo(rid: UUID, pid: UUID, db: Repo):
+    return photo_response(await db.photo(rid, pid, admin=True))
+
+
+@router.get('/{rid}/photos/{pid}')
+async def photo(rid: UUID, pid: UUID, db: Repo,
+                student: Annotated[Student | None, Depends(get_optional_student)] = None):
+    return photo_response(await db.photo(rid, pid, student.id if student else None))
+
+
+@router.post('/{rid}/photos')
+async def upload_photo(rid: UUID, purpose: Literal['question', 'reference', 'answer'],
+                       student: Pupil, db: Repo, file: UploadFile = File(...), task_id: UUID | None = None):
+    try:
+        content = await file.read(8 * 1024 * 1024 + 1)
+    finally:
+        await file.close()
+    if len(content) > 8 * 1024 * 1024:
+        raise Conflict('Фото больше 8 МБ. Уменьшите размер файла')
+    # Allow only raster formats, detected from bytes, never a client-provided MIME.
+    if content.startswith(b'\xff\xd8\xff'):
+        media_type = 'image/jpeg'
+    elif content.startswith(b'\x89PNG\r\n\x1a\n'):
+        media_type = 'image/png'
+    elif content.startswith(b'RIFF') and content[8:12] == b'WEBP':
+        media_type = 'image/webp'
+    else:
+        raise Conflict('Нужна фотография JPG, PNG или WebP')
+    if purpose == 'answer' and task_id is None:
+        raise Conflict('Укажите задачу, которую решаете')
+    return {'id': await db.upload_photo(rid, student.id, purpose, content, media_type, task_id)}
+
+
+@router.delete('/{rid}/photos/{pid}')
+async def discard_photo(rid: UUID, pid: UUID, student: Pupil, db: Repo):
+    await db.discard_photo(rid, pid, student.id)
+    return {'ok': True}
 
 
 class TaskAction(BaseModel):
