@@ -1,4 +1,5 @@
 import { apiJson, BASE } from './api'
+import { requestJson } from './http'
 
 export type Reviewer = 'teacher' | 'author' | 'ai'
 export const reviewerNames: Record<Reviewer, string> = { teacher: 'Учитель', author: 'Автор задачи', ai: 'Нейросеть' }
@@ -34,10 +35,6 @@ export async function uploadBattlePhoto(rid: string, purpose: 'question' | 'refe
   const body = new FormData()
   body.append('file', file)
   const query = new URLSearchParams({ purpose, ...(taskId ? { task_id: taskId } : {}) })
-  const response = await fetch(`${BASE}/battles/${rid}/photos?${query}`, { method: 'POST', credentials: 'include', body })
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}))
-    throw new Error(typeof error.detail === 'string' ? error.detail : 'Не удалось загрузить фото. Попробуйте ещё раз')
-  }
-  return (await response.json()).id
+  const response = await requestJson<{ id: string }>(`${BASE}/battles/${rid}/photos?${query}`, { method: 'POST', credentials: 'include', body })
+  return response.id
 }

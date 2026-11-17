@@ -6,7 +6,7 @@
     ready    → все чанки записаны, можно использовать в RAG
     failed   → индексация упала, в error_message подробности
 
-Все переходы идут только вперёд. При удалении материала чанки чистятся по source_key.
+Повторная обработка переводит ready/failed в pending. Чанки заменяются атомарно.
 """
 
 from __future__ import annotations
@@ -98,6 +98,8 @@ class MaterialsService:
 
     async def delete(self, material_id: UUID) -> None:
         material = await self.get(material_id)
+        if material.status in ("pending", "indexing"):
+            raise Conflict("Дождитесь завершения обработки материала перед удалением")
         # сначала чистим чанки, потом файл, потом запись — безопасно для догоняющих запросов
         await self._chunks.delete_by_source(material.source_key)
         try:
@@ -106,20 +108,27 @@ class MaterialsService:
             log.warning("не удалось удалить файл %s: %s", material.filename, e)
         await self._repo.delete(material_id)
 
+    async def queue_reindex(self, material_id: UUID) -> Material:
+        await self.get(material_id)
+        if not await self._repo.queue_reindex(material_id):
+            raise Conflict("Материал уже обрабатывается. Дождитесь завершения.")
+        return await self.get(material_id)
+
     async def run_indexing(self, material_id: UUID) -> None:
         """Фоновая задача: запускается через FastAPI BackgroundTasks."""
         material = await self._repo.get(material_id)
         if not material:
             log.error("run_indexing: material %s исчез", material_id)
             return
-        if material.status == "ready":
-            log.info("material %s уже проиндексирован", material_id)
+        if not await self._repo.claim_indexing(material_id):
+            log.info("material %s не ожидает обработки или уже обрабатывается", material_id)
             return
 
-        await self._repo.update_status(material_id, "indexing")
         path = self._upload_dir / material.filename
         try:
             count = await self._indexer.index_pdf(path, material.source_key, replace=True)
+            if count == 0:
+                raise ValueError("Нет данных для поиска: 0 фрагментов. Нужен PDF с текстовым слоем.")
             await self._repo.update_status(
                 material_id, "ready", chunks_count=count, error_message=""
             )

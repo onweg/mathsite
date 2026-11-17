@@ -40,23 +40,31 @@ class MaterialsRepository(Protocol):
 
     async def delete(self, material_id: UUID) -> None: ...
 
+    async def queue_reindex(self, material_id: UUID) -> bool: ...
+
+    async def claim_indexing(self, material_id: UUID) -> bool: ...
+
 
 _SELECT = (
-    "SELECT id, slug, title, source_key, filename, status, chunks_count, "
+    "SELECT id, slug, title, source_key, filename, status, "
+    "(SELECT count(*) FROM chunks c WHERE c.source = materials.source_key), "
     "error_message, created_at FROM materials"
 )
 
 
 def _row_to_material(row) -> Material:
+    empty_ready = row[5] == "ready" and row[6] == 0
     return Material(
         id=row[0],
         slug=row[1],
         title=row[2],
         source_key=row[3],
         filename=row[4],
-        status=row[5],
+        status="failed" if empty_ready else row[5],
         chunks_count=row[6],
-        error_message=row[7],
+        error_message=("Нет данных для поиска: 0 фрагментов. Повторите обработку; "
+                       "для скана сначала нужен PDF с распознанным текстом."
+                       if empty_ready else row[7]),
         created_at=row[8],
     )
 
@@ -64,6 +72,23 @@ def _row_to_material(row) -> Material:
 class PgMaterialsRepository:
     def __init__(self, pool: AsyncConnectionPool):
         self._pool = pool
+
+    async def queue_reindex(self, material_id: UUID) -> bool:
+        async with self._pool.connection() as conn:
+            cur = await conn.execute(
+                "UPDATE materials SET status = 'pending', error_message = '' "
+                "WHERE id = %s AND status IN ('ready', 'failed') RETURNING id",
+                (material_id,),
+            )
+            return await cur.fetchone() is not None
+
+    async def claim_indexing(self, material_id: UUID) -> bool:
+        async with self._pool.connection() as conn:
+            cur = await conn.execute(
+                "UPDATE materials SET status = 'indexing' "
+                "WHERE id = %s AND status = 'pending' RETURNING id", (material_id,),
+            )
+            return await cur.fetchone() is not None
 
     async def list(self) -> list[Material]:
         async with self._pool.connection() as conn, conn.cursor() as cur:
@@ -74,7 +99,8 @@ class PgMaterialsRepository:
     async def list_ready(self) -> list[Material]:
         async with self._pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
-                f"{_SELECT} WHERE status = 'ready' ORDER BY created_at DESC"
+                f"{_SELECT} WHERE status = 'ready' AND EXISTS "
+                "(SELECT 1 FROM chunks c WHERE c.source = materials.source_key) ORDER BY created_at DESC"
             )
             rows = await cur.fetchall()
         return [_row_to_material(r) for r in rows]

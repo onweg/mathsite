@@ -12,6 +12,8 @@ class ChunksRepository(Protocol):
 
     async def insert_many(self, chunks: list[tuple[Chunk, list[float]]]) -> int: ...
 
+    async def replace_source(self, source: Source, chunks: list[tuple[Chunk, list[float]]]) -> int: ...
+
     async def hybrid_search(
         self,
         query: str,
@@ -108,6 +110,18 @@ class PgChunksRepository:
                     """,
                     (chunk.source, chunk.page, chunk.text, chunk.tokens, vec),
                 )
+            await conn.commit()
+        return len(chunks)
+
+    async def replace_source(self, source: Source, chunks: list[tuple[Chunk, list[float]]]) -> int:
+        if not chunks or any(chunk.source != source for chunk, _ in chunks):
+            raise ValueError("Replacement must contain nonempty chunks from the same source")
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute("DELETE FROM chunks WHERE source = %s", (source,))
+            await cur.executemany(
+                "INSERT INTO chunks (source, page, text, tokens, embedding) VALUES (%s, %s, %s, %s, %s)",
+                [(c.source, c.page, c.text, c.tokens, vec) for c, vec in chunks],
+            )
             await conn.commit()
         return len(chunks)
 

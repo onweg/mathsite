@@ -77,7 +77,7 @@ async def reindex(
     _: Annotated[User, Depends(get_current_admin)],
     svc: Annotated[MaterialsService, Depends(get_materials_service)],
 ) -> MaterialDTO:
-    material = await svc.get(material_id)
+    material = await svc.queue_reindex(material_id)
     background.add_task(svc.run_indexing, material_id)
     return _dto(material)
 

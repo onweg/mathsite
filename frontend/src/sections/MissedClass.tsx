@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { Magnetic } from '../components/Magnetic'
 import { Markdown } from '../components/Markdown'
+import { MaterialPicker, selectionLabel, type MaterialSelection as Selection } from '../components/MaterialPicker'
 import { MicButton } from '../components/MicButton'
 import { Reveal, RevealText } from '../components/RevealText'
 import { useSpeech } from '../hooks/useSpeech'
@@ -15,14 +16,10 @@ import {
   type Topic,
 } from '../lib/api'
 
-type Selection =
-  | { kind: 'topic'; value: Topic }
-  | { kind: 'material'; source_key: string; title: string }
-
 type State =
   | { kind: 'empty' }
   | { kind: 'loading' }
-  | { kind: 'answered'; query: string; reply: RagReply }
+  | { kind: 'answered'; query: string; reply: RagReply; sourceLabel: string }
   | { kind: 'error'; message: string }
 
 const CHIPS: Record<Topic, { label: string; q: string }[]> = {
@@ -48,6 +45,7 @@ export function MissedClass() {
   const [input, setInput] = useState('')
   const [state, setState] = useState<State>({ kind: 'empty' })
   const resultRef = useRef<HTMLDivElement>(null)
+  const inFlight = useRef(false)
 
   useEffect(() => {
     publicMaterials
@@ -59,14 +57,16 @@ export function MissedClass() {
   const topic: Topic = selection.kind === 'topic' ? selection.value : 'algebra'
 
   const run = async (q: string) => {
-    if (!q.trim()) return
+    if (!q.trim() || inFlight.current) return
+    inFlight.current = true
+    const sourceLabel = selectionLabel(selection)
     setState({ kind: 'loading' })
     try {
       const reply = await askRag(q, {
         topic: selection.kind === 'topic' ? selection.value : undefined,
         source_key: selection.kind === 'material' ? selection.source_key : undefined,
       })
-      setState({ kind: 'answered', query: q, reply })
+      setState({ kind: 'answered', query: q, reply, sourceLabel })
       // плавно уводим фокус к ответу
       requestAnimationFrame(() => {
         resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -76,6 +76,8 @@ export function MissedClass() {
         kind: 'error',
         message: e instanceof Error ? e.message : 'Не получилось',
       })
+    } finally {
+      inFlight.current = false
     }
   }
 
@@ -200,7 +202,7 @@ export function MissedClass() {
               <AnswerBlock
                 query={state.query}
                 reply={state.reply}
-                sourceLabel={selectionLabel(selection)}
+                sourceLabel={state.sourceLabel}
                 onReset={reset}
               />
             </motion.div>
@@ -277,31 +279,8 @@ function AskForm({
 
   return (
     <div className="flex flex-col gap-4 rounded-3xl border border-paper-50/10 bg-ink-900/60 p-5 md:p-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <TopicChip
-          active={selection.kind === 'topic' && selection.value === 'algebra'}
-          onClick={() => onSelectionChange({ kind: 'topic', value: 'algebra' })}
-        >
-          Алгебра
-        </TopicChip>
-        <TopicChip
-          active={selection.kind === 'topic' && selection.value === 'geometry'}
-          onClick={() => onSelectionChange({ kind: 'topic', value: 'geometry' })}
-        >
-          Геометрия
-        </TopicChip>
-        {materials.map((m) => (
-          <TopicChip
-            key={m.source_key}
-            active={selection.kind === 'material' && selection.source_key === m.source_key}
-            onClick={() =>
-              onSelectionChange({ kind: 'material', source_key: m.source_key, title: m.title })
-            }
-          >
-            {m.title}
-          </TopicChip>
-        ))}
-      </div>
+      <MaterialPicker selection={selection} materials={materials}
+        onChange={onSelectionChange} disabled={disabled} />
 
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
         <input
@@ -342,37 +321,13 @@ function AskForm({
   )
 }
 
-function TopicChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      onClick={onClick}
-      data-cursor
-      className={`relative overflow-hidden rounded-full border px-4 py-1.5 font-mono text-[10px] uppercase tracking-[0.22em] transition-colors ${
-        active
-          ? 'border-gold-500 bg-gold-500 text-ink-950'
-          : 'border-paper-50/10 bg-ink-800/60 text-paper-50/70 hover:text-paper-50'
-      }`}
-    >
-      <span className="relative">{children}</span>
-    </button>
-  )
-}
-
 /* -------------------------------------------------------------------------- */
 
 function LoadingLog() {
   const steps = [
-    'Ищу в учебнике Макарычева…',
-    'Нашёл релевантные фрагменты.',
-    'Читаю страницы и формулирую разбор…',
+    'Ищу в выбранном источнике…',
+    'Проверяю подходящие фрагменты…',
+    'Готовлю ответ по найденному тексту…',
   ]
   return (
     <div className="rounded-3xl border border-paper-50/10 bg-ink-900/60 p-8 md:p-12">
@@ -410,15 +365,6 @@ function LoadingLog() {
       />
     </div>
   )
-}
-
-function selectionLabel(s: Selection): string {
-  if (s.kind === 'topic') {
-    return s.value === 'algebra'
-      ? 'учебник алгебры 8 класса, Макарычев'
-      : 'учебник геометрии 7–9, Атанасян'
-  }
-  return s.title
 }
 
 function PulseDot() {

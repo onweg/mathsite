@@ -1,36 +1,9 @@
 import { resetAnalyticsIdentity } from './analyticsSession'
+import { ApiError, requestJson } from './http'
+export { ApiError } from './http'
 
 export const BASE =
   (import.meta.env.VITE_API_URL as string | undefined) || 'http://localhost:8000'
-
-/**
- * Человеко-читаемые ошибки — показываем пользователю.
- * HTML от nginx и Python-трейсы наружу не должны уходить никогда.
- */
-function humanError(status: number): string {
-  if (status === 0) return 'Нет связи с сервером. Проверь интернет.'
-  if (status === 401) return 'Нужно войти заново.'
-  if (status === 403) return 'Нет доступа.'
-  if (status === 404) return 'Не найдено.'
-  if (status === 409) return 'Данные не прошли проверку.'
-  if (status === 429) return 'Слишком часто. Подожди минуту и попробуй снова.'
-  if (status === 502 || status === 503 || status === 504)
-    return 'Сервер временно недоступен. Попробуй через минуту.'
-  if (status >= 500) return 'Что-то пошло не так на сервере. Мы уже знаем.'
-  return 'Что-то пошло не так. Попробуй ещё раз.'
-}
-
-/** Ошибка API с машинным кодом: по нему фронт различает ситуации. */
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    readonly code: string | null = null,
-    readonly status = 0,
-  ) {
-    super(message)
-    this.name = 'ApiError'
-  }
-}
 
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; text: string }
 export type Topic = 'algebra' | 'geometry'
@@ -45,20 +18,12 @@ export async function chat(
   messages: ChatMessage[],
   opts: { topic?: Topic; section?: string } = {},
 ): Promise<ChatReply> {
-  const r = await fetch(`${BASE}/chat`, {
+  const data = await requestJson<ChatReply>(`${BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: JSON.stringify({ messages, topic: opts.topic, section: opts.section }),
   })
-  if (!r.ok) {
-    throw new Error(humanError(r.status))
-  }
-  const data = (await r.json()) as {
-    text: string
-    blocked?: boolean
-    reason?: string | null
-  }
   return {
     text: data.text,
     blocked: Boolean(data.blocked),
@@ -84,7 +49,7 @@ export async function askRag(
   query: string,
   opts: { topic?: Topic; source_key?: string; limit?: number } = {},
 ): Promise<RagReply> {
-  const r = await fetch(`${BASE}/rag/ask`, {
+  const data = await requestJson<RagReply>(`${BASE}/rag/ask`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -95,10 +60,6 @@ export async function askRag(
       limit: opts.limit ?? 5,
     }),
   })
-  if (!r.ok) {
-    throw new Error(humanError(r.status))
-  }
-  const data = (await r.json()) as RagReply
   return {
     text: data.text,
     blocked: Boolean(data.blocked),
@@ -132,32 +93,21 @@ export type LoginResponse = {
 }
 
 export async function login(email: string, password: string): Promise<LoginResponse> {
-  const r = await fetch(`${BASE}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ email, password }),
-  })
-  if (!r.ok) {
-    let detail: string | undefined
-    const ct = r.headers.get('content-type') || ''
-    if (ct.includes('application/json')) {
-      const data = await r.json().catch(() => ({}))
-      detail = (data as { detail?: string }).detail
-    }
-    if (r.status === 401) throw new Error('Неверный email или пароль')
-    throw new Error(detail || humanError(r.status))
+  try {
+    return await requestJson<LoginResponse>(`${BASE}/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', body: JSON.stringify({ email, password }),
+    })
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) throw new ApiError('Неверный email или пароль', error.code, 401)
+    throw error
   }
-  return (await r.json()) as LoginResponse
 }
 
 export async function me(token: string): Promise<AdminUser> {
-  const r = await fetch(`${BASE}/auth/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-    credentials: 'include',
+  return requestJson<AdminUser>(`${BASE}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` }, credentials: 'include',
   })
-  if (!r.ok) throw new Error(`me ${r.status}`)
-  return (await r.json()) as AdminUser
 }
 
 // ====== Квизы ======
@@ -282,26 +232,12 @@ export async function apiJson<T>(
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
-  const r = await fetch(`${BASE}${path}`, {
+  return requestJson<T>(`${BASE}${path}`, {
     method,
     headers,
     credentials: 'include',
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
-  if (r.status === 204) return undefined as T
-  if (!r.ok) {
-    // Пробуем вытащить detail из JSON. HTML от nginx / голый 500 — наружу не отдаём.
-    let detail: string | undefined
-    let code: string | null = null
-    const ct = r.headers.get('content-type') || ''
-    if (ct.includes('application/json')) {
-      const data = await r.json().catch(() => ({}))
-      detail = (data as { detail?: string }).detail
-      code = (data as { code?: string }).code ?? null
-    }
-    throw new ApiError(detail || humanError(r.status), code, r.status)
-  }
-  return (await r.json()) as T
 }
 
 // ---- Admin ----
@@ -518,23 +454,11 @@ export const publicWeekly = {
     fd.append('solution_md', body.solution_md)
     fd.append('student_name', body.student_name)
     if (body.file) fd.append('file', body.file)
-    const r = await fetch(`${BASE}/weekly/${taskId}/submissions`, {
+    return requestJson<WeeklySubmissionDTO>(`${BASE}/weekly/${taskId}/submissions`, {
       method: 'POST',
       credentials: 'include',
       body: fd,
     })
-    if (!r.ok) {
-      let detail: string | undefined
-      const ct = r.headers.get('content-type') || ''
-      if (ct.includes('application/json')) {
-        const data = await r.json().catch(() => ({}))
-        detail = (data as { detail?: string }).detail
-      }
-      // 413 отдаёт nginx, а не приложение — объясняем по-человечески
-      if (r.status === 413) throw new Error('Фото слишком большое. Сожми или сфотографируй заново.')
-      throw new Error(detail || humanError(r.status))
-    }
-    return (await r.json()) as WeeklySubmissionDTO
   },
 
   /** Своё решение и вердикт. null — не отправлял или зашёл без QR. */
@@ -675,17 +599,12 @@ export const adminMaterials = {
     const fd = new FormData()
     fd.append('file', file)
     fd.append('title', title)
-    const r = await fetch(`${BASE}/admin/materials`, {
+    const data = await requestJson<{ material: MaterialDTO }>(`${BASE}/admin/materials`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       credentials: 'include',
       body: fd,
     })
-    if (!r.ok) {
-      const data = await r.json().catch(() => ({}))
-      throw new Error((data as { detail?: string }).detail || `upload ${r.status}`)
-    }
-    const data = (await r.json()) as { material: MaterialDTO }
     return data.material
   },
   reindex: (token: string, id: string) =>
@@ -809,17 +728,12 @@ export const adminStudents = {
     const fd = new FormData()
     fd.append('file', file)
     fd.append('default_class_label', defaultClassLabel)
-    const r = await fetch(`${BASE}/admin/students/bulk/${kind}`, {
+    return requestJson<ImportResultDTO>(`${BASE}/admin/students/bulk/${kind}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       credentials: 'include',
       body: fd,
     })
-    if (!r.ok) {
-      const data = await r.json().catch(() => ({}))
-      throw new Error((data as { detail?: string }).detail || `import ${r.status}`)
-    }
-    return (await r.json()) as ImportResultDTO
   },
   update: (
     token: string,
@@ -971,21 +885,12 @@ export const adminLibrary = {
     fd.append('collection', body.collection)
     fd.append('title', body.title)
     fd.append('summary', body.summary)
-    const r = await fetch(`${BASE}/admin/library/upload`, {
+    return requestJson<LibraryItemDTO>(`${BASE}/admin/library/upload`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       credentials: 'include',
       body: fd,
     })
-    if (!r.ok) {
-      const data = await r.json().catch(() => ({}))
-      // 413 отдаёт nginx, а не приложение — объясняем по-человечески
-      if (r.status === 413) {
-        throw new Error('Сервер не принял файл такого размера. Нужен лимит в nginx.')
-      }
-      throw new Error((data as { detail?: string }).detail || `upload ${r.status}`)
-    }
-    return (await r.json()) as LibraryItemDTO
   },
   update: (
     token: string,
