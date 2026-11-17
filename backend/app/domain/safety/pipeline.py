@@ -51,6 +51,9 @@ def pre_filter(text: str) -> CheckResult:
 
     masked, _ = mask_pii(stripped)
     normalized = rules.normalize(masked)
+    for word in normalized.split():
+        if word in rules.FORBIDDEN_WHOLE_WORDS:
+            return CheckResult.blocked(f"forbidden:{word}")
     for word in rules.FORBIDDEN_WORDS:
         if word in normalized:
             return CheckResult.blocked(f"forbidden:{word}")

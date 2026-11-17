@@ -525,8 +525,6 @@ function SourceCard({ chunk, index }: { chunk: RagChunk; index: number }) {
     el.style.setProperty('--cursor-y', `${e.clientY - r.top}px`)
   }
 
-  const pct = Math.round(chunk.similarity * 100)
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -550,11 +548,8 @@ function SourceCard({ chunk, index }: { chunk: RagChunk; index: number }) {
               {chunk.page ?? '—'}
             </div>
             <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.25em] text-paper-50/50">
-              страница
+              страница PDF
             </div>
-          </div>
-          <div className="rounded-full border border-paper-50/15 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.22em] text-paper-50/80">
-            {pct}% соответствие
           </div>
         </div>
 

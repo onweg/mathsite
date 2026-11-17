@@ -33,6 +33,13 @@ def test_personal_contacts_are_removed_before_llm():
     assert not post_filter('  ').allowed
 
 
+def test_math_properties_are_not_mistaken_for_a_forbidden_abbreviation():
+    assert pre_filter('Свойства арифметического квадратного корня').allowed
+    assert pre_filter('Объясни своими словами свойства корня').allowed
+    assert not pre_filter('Расскажи про СВО.').allowed
+    assert not pre_filter('СВО').allowed
+
+
 @pytest.mark.parametrize('separator', [',', ';', '|', '\t', '  '])
 def test_class_import_retains_names_classes_and_line_numbers(separator):
     assert _parse_text(f'\n Иванов Иван{separator}8А\nПетров Пётр\n') == [(2, 'Иванов Иван', '8А'), (3, 'Петров Пётр', '')]

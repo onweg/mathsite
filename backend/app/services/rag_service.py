@@ -16,7 +16,9 @@ from .classifier_service import ClassifierService
 
 log = logging.getLogger("mathsite.rag")
 
-_MIN_SIMILARITY = 0.5
+# Broader semantic recall; literal topic matches also bypass this cutoff.
+# The answer must still be supported by the retrieved textbook fragments.
+_MIN_SIMILARITY = 0.3
 
 
 @dataclass(frozen=True)
@@ -62,7 +64,8 @@ class RagService:
                 source = "textbook_8_geometry"
 
         q_vec = await self._llm.embed(query, kind="query")
-        hits = await self._repo.semantic_search(
+        hits = await self._repo.hybrid_search(
+            query,
             q_vec,
             source=source,
             limit=limit,
@@ -71,8 +74,9 @@ class RagService:
         if not hits:
             return RagAnswer(
                 reply=ChatReply(text=(
-                    "В учебнике 8 класса я не нашёл ответа на этот вопрос. "
-                    "Спроси у учителя."
+                    "Не удалось найти подходящие фрагменты в выбранном источнике. "
+                    "Это не означает, что темы нет в учебнике. "
+                    "Попробуй название параграфа или попроси учителя проверить обработку файла."
                 )),
                 hits=[],
                 not_found=True,

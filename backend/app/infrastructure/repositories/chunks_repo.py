@@ -12,6 +12,16 @@ class ChunksRepository(Protocol):
 
     async def insert_many(self, chunks: list[tuple[Chunk, list[float]]]) -> int: ...
 
+    async def hybrid_search(
+        self,
+        query: str,
+        query_vec: list[float],
+        *,
+        source: Source | None,
+        limit: int,
+        min_similarity: float,
+    ) -> list[SearchHit]: ...
+
     async def semantic_search(
         self,
         query_vec: list[float],
@@ -25,6 +35,61 @@ class ChunksRepository(Protocol):
 class PgChunksRepository:
     def __init__(self, pool: AsyncConnectionPool):
         self._pool = pool
+
+    async def hybrid_search(
+        self,
+        query: str,
+        query_vec: list[float],
+        *,
+        source: Source | None,
+        limit: int,
+        min_similarity: float,
+    ) -> list[SearchHit]:
+        """Search book text as well as embeddings, without ANN post-filter loss.
+
+        Materialize the selected book before ranking: its small corpus can be
+        searched exactly. Russian full-text matches bypass the cosine cutoff;
+        similarity remains the actual cosine value, not a confidence score.
+        Join words split by PDF line-wrap hyphens for lexical search only.
+        Russian Snowball produces different stems for корень (корен) and
+        корня/корни (корн); expand those equivalents in both directions.
+        """
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                r"""
+                WITH book AS MATERIALIZED (
+                    SELECT id, source, page, text, embedding
+                    FROM chunks
+                    WHERE (%s::text IS NULL OR source = %s)
+                ), scored AS (
+                    SELECT id, source, page, text,
+                           1 - (embedding <=> %s::vector) AS similarity,
+                           to_tsvector('russian', regexp_replace(
+                               text, '([[:alpha:]])-[[:space:]]+([[:alpha:]])',
+                               '\1\2', 'g'
+                           )) AS document,
+                           ts_rewrite(ts_rewrite(
+                               plainto_tsquery('russian', %s),
+                               'корен'::tsquery, 'корен | корн'::tsquery
+                           ), 'корн'::tsquery, 'корен | корн'::tsquery) AS terms
+                    FROM book
+                )
+                SELECT id, source, page, text, similarity
+                FROM scored
+                WHERE document @@ terms OR similarity >= %s
+                ORDER BY (document @@ terms) DESC,
+                         ts_rank_cd(document, terms) DESC,
+                         similarity DESC, id
+                LIMIT %s
+                """,
+                (source, source, query_vec, query, min_similarity, limit),
+            )
+            rows = await cur.fetchall()
+        return [
+            SearchHit(id=row[0], source=row[1], page=row[2], text=row[3],
+                      similarity=round(float(row[4]), 4))
+            for row in rows
+        ]
 
     async def delete_by_source(self, source: Source) -> None:
         async with self._pool.connection() as conn, conn.cursor() as cur:
